@@ -1,4 +1,4 @@
-from miann.constants import DATASET_DIR
+from miann.constants import get_data_config
 from ._data import MPPData
 import json
 import logging
@@ -7,111 +7,66 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-def create_dataset(params, dataset_name, dataset_dir=DATASET_DIR):
+def create_dataset(params):
     """
-    Create a NNDataset from a params dictionary and save to dataset_name.
+    Create a NNDataset from params and save to dataset_name (define in params).
     """
-    if params is None:
-        # get params from json
-        params = json.load(open(os.path.join(dataset_dir, dataset_name, 'params.json')))
     log = logging.getLogger()
     log.info('Creating train/val/test datasets with params:')
     log.info(json.dumps(params, indent=4))
     p = params
-        
+    # prepare outdir
+    data_config = get_data_config(p['data_config'])
+    outdir = os.path.join(data_config.DATASET_DIR, p['dataset_name'])
+    os.makedirs(outdir, exist_ok=True)
+    # prepare datasets
     mpp_datas = {'train': [], 'val': [], 'test': []}
     for data_dir in p['data_dirs']:
-        mpp_data = MPPData.from_data_dir(data_dir, seed=p['seed'])
-        if p['normalise']:
-            mpp_data.subtract_background(p['background_value'])
-        train, val, test = mpp_data.train_val_test_split(p['train_frac'], p['val_frac'])
+        mpp_data = MPPData.from_data_dir(data_dir, seed=p['seed'], data_config=p['data_config'])
+        train, val, test = mpp_data.train_val_test_split(**p['split_kwargs'])
+        # subsample train data now
         if p['subsample']:
-            train.subsample(frac=p['frac'], frac_per_obj=p['frac_per_obj'], num=p['num'], num_per_obj=p['num_per_obj'], 
-                            add_neighborhood=p['neighborhood'], neighborhood_size=p['neighborhood_size'])
+            train = train.subsample(add_neighborhood=p['neighborhood'], neighborhood_size=p['neighborhood_size'], 
+                **p['subsample_kwargs'])
         elif p['neighborhood']:
             train.add_neighborhood(p['neighborhood_size'])
         mpp_datas['train'].append(train)
         mpp_datas['test'].append(test)
         mpp_datas['val'].append(val)
-        # merge all datasets
-        train = MPPData.concat(mpp_datas['train'])
-        val = MPPData.concat(mpp_datas['val'])
-        test = MPPData.concat(mpp_datas['test'])
-        if p['normalise']:
-            rescale_values = train.rescale_intensities_per_channel(percentile=p['percentile'])
-            _ = val.rescale_intensities_per_channel(rescale_values=rescale_values)
-            _ = test.rescale_intensities_per_channel(rescale_values=rescale_values)
-            p['normalise_rescale_values'] = list(rescale_values)
-        # add conditions
-        if p.get('condition', None) is not None:
-            train.add_conditions(p['condition'], cell_cycle_file=p.get('cell_cycle_file', None),
-                                 wells_metadata_file=p.get('wells_metadata_file', None))
-            kwargs = {'TR_bin_3_quantile': getattr(train, 'TR_bin_3_quantile', None), 
-                      'TR_lowhigh_bin_2_quantile': getattr(train, 'TR_lowhigh_bin_2_quantile', None),
-                     'TR_mean_std': getattr(train, 'TR_mean_std', None)}
-            val.add_conditions(p['condition'], cell_cycle_file=p.get('cell_cycle_file', None),
-                               wells_metadata_file=p.get('wells_metadata_file', None), **kwargs)
-            test.add_conditions(p['condition'], cell_cycle_file=p.get('cell_cycle_file', None),
-                                wells_metadata_file=p.get('wells_metadata_file', None), **kwargs)
-            p.update(kwargs)
-        # subset to valid mapobject_ids
-        if p.get('subset_to_cell_cycle', False):
-            train.subset(cell_cycle_file=p['cell_cycle_file'])
-            val.subset(cell_cycle_file=p['cell_cycle_file'])
-            test.subset(cell_cycle_file=p['cell_cycle_file'])
-        # subset to non-na conditions
-        if ('TR_lowhigh_bin_2' in p.get('condition', [])) or ('TR_lowhigh_bin_2' in p.get('condition', [[]])[0]):
-            train.subset(condition=True)
-            val.subset(condition=True)
-            test.subset(condition=True)
-        # subset to channels
-        if p.get('channels', None) is not None:
-            train.subset_channels(p['channels'])
-            val.subset_channels(p['channels'])
-            test.subset_channels(p['channels'])
-
-
-        # get images for test and val dataset
-        #test_imgs = {'img':[], 'mcu':[], 'cond': []}
-        #val_imgs = {'img': [], 'mcu': [], 'cond': []}
-        #test_imgs['img'] = np.array(test.get_object_imgs(data='MPP', img_size=p['test_img_size']))
-        #val_imgs['img'] = np.array(val.get_object_imgs(data='MPP', img_size=p['test_img_size']))
-        #if p['mcu_dir']:
-        #    test_imgs['mcu'] = np.array(test.get_object_imgs(data='MCU', img_size=p['test_img_size']))
-        #    val_imgs['mcu'] = np.array(val.get_object_imgs(data='MCU', img_size=p['test_img_size']))
-        #if p.get('condition', None) is not None:
-        #    test_imgs['cond'] = np.array(test.get_object_imgs(data='condition', img_size=p['test_img_size']))
-        #    val_imgs['cond'] = np.array(val.get_object_imgs(data='condition', img_size=p['test_img_size']))
-        test_imgs = test.copy()
-        val_imgs = val.copy()
-        # subsample and add neighbors to val and test
-        if p['subsample']:
-            val.subsample(frac=p['frac'], frac_per_obj=p['frac_per_obj'], num=p['num'], num_per_obj=p['num_per_obj'], 
-                                add_neighborhood=p['neighborhood'], neighborhood_size=p['neighborhood_size'])
-            test.subsample(frac=p['frac'], frac_per_obj=p['frac_per_obj'], num=p['num'], num_per_obj=p['num_per_obj'], 
-                                add_neighborhood=p['neighborhood'], neighborhood_size=p['neighborhood_size'])
-        elif p['neighborhood']:
-            test.add_neighborhood(p['neighborhood_size'])
-            val.add_neighborhood(p['neighborhood_size'])
+    # merge all datasets
+    train = MPPData.concat(mpp_datas['train'])
+    val = MPPData.concat(mpp_datas['val'])
+    test = MPPData.concat(mpp_datas['test'])
+    # prepare (channels, normalise, condition, subset)
+    train.prepare(params)  # this has side-effects on params, st val + test use correct params
+    val.prepare(params)
+    test.prepare(params)
+    # save test and val imgs
+    val.write(os.path.join(outdir, 'val_imgs'))
+    test.write(os.path.join(outdir, 'test_imgs'))
+    # subsample and add neighbors to val and test (for prediction during training)
+    if p['subsample']:
+        val = val.subsample(add_neighborhood=p['neighborhood'], neighborhood_size=p['neighborhood_size'], 
+                **p['subsample_kwargs'])
+        test = test.subsample(add_neighborhood=p['neighborhood'], neighborhood_size=p['neighborhood_size'], 
+                **p['subsample_kwargs'])
+    elif p['neighborhood']:
+        val.add_neighborhood(p['neighborhood_size'])
+        test.add_neighborhood(p['neighborhood_size'])
             
-        log.info('-------------------')
-        log.info('created datasets:')
-        log.info('train: {}'.format(str(train)))
-        log.info('val: {}'.format(str(val)))
-        log.info('test: {}'.format(str(test)))
-        log.info('-------------------')
+    log.info('-------------------')
+    log.info('created datasets:')
+    log.info('train: {}'.format(str(train)))
+    log.info('val: {}'.format(str(val)))
+    log.info('test: {}'.format(str(test)))
+    log.info('-------------------')
 
-        # save data
-        outdir = os.path.join(dataset_dir, dataset_name)
-        os.makedirs(outdir, exist_ok=True)
-        train.write(os.path.join(outdir, 'train'))
-        val.write(os.path.join(outdir, 'val'))
-        test.write(os.path.join(outdir, 'test'))
-        val_imgs.write(os.path.join(outdir, 'val_imgs'))
-        test_imgs.write(os.path.join(outdir, 'test_imgs'))
-
-        # save params
-        json.dump(params, open(os.path.join(outdir, 'params.json'), 'w'), indent=4)
+    # save datasets
+    train.write(os.path.join(outdir, 'train'))
+    val.write(os.path.join(outdir, 'val'))
+    test.write(os.path.join(outdir, 'test'))
+    # save params
+    json.dump(params, open(os.path.join(outdir, 'params.json'), 'w'), indent=4)
 
 
 class NNDataset:
@@ -120,9 +75,10 @@ class NNDataset:
 
     A NNDataset is stored train/val/test/val_img/test_img folders that contain MPPData.
     """
-    def __init__(self, dataset_name, dataset_dir=DATASET_DIR):
+    def __init__(self, dataset_name, data_config='NascentRNA'):
         self.log = logging.getLogger(self.__class__.__name__)
-        self.dataset_folder = os.path.join(dataset_dir, dataset_name)
+        self.data_config = get_data_config(data_config)
+        self.dataset_folder = os.path.join(self.data_config.DATASET_DIR, dataset_name)
         
         # data
         self.data = {
@@ -135,8 +91,10 @@ class NNDataset:
             'test': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'test_imgs'))
         }
         self.channels = self.data['train'].channels.reset_index().set_index('name')
-        
+        self.params = json.load(open(os.path.join(self.dataset_folder, 'params.json'), 'r'))
+
     def get_channel_ids(self, to_channels, from_channels=None):
+        # TODO docstring
         if from_channels is None:
             from_channels = self.channels.copy()
             from_channels['index'] = np.arange(len(from_channels))
