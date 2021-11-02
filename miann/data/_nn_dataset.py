@@ -131,7 +131,7 @@ class NNDataset:
         add_c_to_y: append condition to y. Needed for adversarial loss
         """
 
-        output_types = [tf.float32, tf.float32]
+        output_types = []
         output_shapes = []
 
         # x
@@ -139,7 +139,7 @@ class NNDataset:
         if is_conditional:
             num = x[0].shape[0]
             output_types.append(tuple([tf.float32, tf.float32]))
-            output_shapes.append(tuple(tf.TensorShape(x[0].shape[1:]), tf.TensorShape(x[1].shape[1:])))
+            output_shapes.append(tuple([tf.TensorShape(x[0].shape[1:]), tf.TensorShape(x[1].shape[1:])]))
         else:
             num = x.shape[0]
             output_types.append(tf.float32)

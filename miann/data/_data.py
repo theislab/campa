@@ -71,7 +71,7 @@ class MPPData:
 
         Expects the following files: x.npy, y.npy, mpp.npy, obj_ids.npy
         If present, will read the following additional files: 
-            labels.npy, icl.npy, latent.npy
+            labels.npy, icl.npy, latent.npy, conditions.npy
 
         Args:
             mode: mmap_mode for np.load. Set to None to load data in memory.
@@ -80,17 +80,13 @@ class MPPData:
         data_config = get_data_config(data_config_name)
         # read all data from data_dir
         metadata = pd.read_csv(os.path.join(data_config.DATA_DIR, data_dir, 'metadata.csv'), index_col=0).reset_index(drop=True)
-        channels = pd.read_csv(os.path.join(data_config.DATA_DIR, data_dir, 'channels.csv'), names=['index', 'name'], index_col=0).reset_index(drop=True)
+        channels = pd.read_csv(os.path.join(data_config.DATA_DIR, data_dir, 'channels.csv'), names=['channel_id', 'name'], index_col=0).reset_index(drop=True)
+        channels.index.name = 'channel_id'
         # read npy data
         data = {}
-        for fname in ['x', 'y', 'mpp']:
+        for fname in ['x', 'y', 'mpp', 'obj_ids']:
             data[fname] = np.load(os.path.join(data_config.DATA_DIR, data_dir, f'{fname}.npy'), mmap_mode=mode)
-        try:  # TODO this is legacy code, if creating new data, do not need
-            print('WARNING: reading legacy mapobject idsnpy')
-            data['obj_ids'] = np.load(os.path.join(data_config.DATA_DIR, data_dir, 'mapobject_ids.npy'), mmap_mode=mode)
-        except FileNotFoundError as e:
-            data['obj_ids'] = np.load(os.path.join(data_config.DATA_DIR, data_dir, 'obj_ids.npy'), mmap_mode=mode)
-        for fname in ['labels', 'icl', 'latent']:
+        for fname in ['labels', 'icl', 'latent', 'conditions']:
             try:
                 data[fname] = np.load(os.path.join(data_config.DATA_DIR, data_dir, f'{fname}.npy'), mmap_mode=mode)
             except FileNotFoundError as e:
@@ -224,7 +220,7 @@ class MPPData:
         after self.prepare(), you might want to call self.subsample() and
         self.add_neighorhood()
         """
-        # subset channels
+        # subset channels - should be done first, as normalise writes params wrt channel ordering
         if params.get('channels', None) is not None:
             self.subset_channels(params['channels'])
         # normalise
@@ -236,6 +232,7 @@ class MPPData:
         # subset (after conditions, bc subsetting might need conditions)
         if params['subset']:
             self.subset(**params['subset_kwargs'])
+
 
     # --- Detailed fns used in prepare() ---
     # TODO: Nastassya write tests for this
@@ -316,10 +313,9 @@ class MPPData:
         Updates self.mpp and self.channels
         """
         # TODO need copy argument?
-        cids = self.channels[self.channels['name'].isin(channels)].index
-        #cids = list(self.channels.set_index('name').loc[channels]['channel_id'])
-        #channels[channels['name'].isin(['00_EU'])].index
-        self.channels = self.channels.loc[cids].reset_index()
+        cids = list(self.channels.reset_index().set_index('name').loc[channels]['channel_id'])
+        self.channels = self.channels.loc[cids].reset_index(drop=True)
+        self.channels.index.name = 'channel_id'
         self._data['mpp'] = self.mpp[:,:,:,cids]
         self.log.info(f'Restricted channels to {len(self.channels)} channels')
         
