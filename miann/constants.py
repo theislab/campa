@@ -19,6 +19,7 @@ config.read(config_fname)
 
 # get paths defined in config
 EXPERIMENT_DIR = get_value(config, key='experiment_dir')
+BASE_DATA_DIR = get_value(config, key='data_dir')
 
 def get_data_config(data_config="NascentRNA"):
     return load_config(get_value(config, section='data', key=data_config))

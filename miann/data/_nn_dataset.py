@@ -75,9 +75,14 @@ class NNDataset:
 
     A NNDataset is stored train/val/test/val_img/test_img folders that contain MPPData.
     """
-    def __init__(self, dataset_name, data_config='NascentRNA'):
+    def __init__(self, dataset_name, data_config=None):
         self.log = logging.getLogger(self.__class__.__name__)
-        self.data_config = get_data_config(data_config)
+        if data_config is None:
+            self.data_config_name = "NascentRNA"
+            self.log.warn(f"Using default data_config {self.data_config_name}")
+        else:
+            self.data_config_name = data_config
+        self.data_config = get_data_config(self.data_config_name)
         self.dataset_folder = os.path.join(self.data_config.DATASET_DIR, dataset_name)
         
         # data
@@ -92,6 +97,11 @@ class NNDataset:
         }
         self.channels = self.data['train'].channels.reset_index().set_index('name')
         self.params = json.load(open(os.path.join(self.dataset_folder, 'params.json'), 'r'))
+
+    def __str__(self):
+        s = f"NNDataset for {self.data_config_name} (shape {self.data['train'].mpp.shape[1:]})."
+        s += f" train: {len(self.data['train'].mpp)}, val: {len(self.data['val'].mpp)}, test: {len(self.data['test'].mpp)}"
+        return s
 
     def get_channel_ids(self, to_channels, from_channels=None):
         # TODO docstring
