@@ -182,7 +182,7 @@ class MPPData:
         self.log.info(f'Saving mpp data to {save_dir}')
         for key in self._data.keys():
             np.save(os.path.join(save_dir, f'{key}.npy'), self._data[key])
-        self.channels.to_csv(os.path.join(save_dir, 'channels.csv'), header=None, index=None)
+        self.channels.to_csv(os.path.join(save_dir, 'channels.csv'), header=None)
         self.metadata.to_csv(os.path.join(save_dir, 'metadata.csv'))
     
     def copy(self):
