@@ -4,6 +4,7 @@ Multiplexed Image Analysis with Neural Networks
 ## Installation
 
 1. Create new conda environment:
+
 `
 conda create -n pelkmans-3.9 python=3.9
 conda activate pelkmans-3.9
