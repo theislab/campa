@@ -9,6 +9,7 @@ Multiplexed Image Analysis with Neural Networks
 conda create -n pelkmans-3.9 python=3.9
 conda activate pelkmans-3.9
 `
+
 2. Install tensorflow:
 
 `
@@ -18,5 +19,6 @@ pip install tensorflow
 
 3. Install other packages:
 
+`
 conda install matplotlib jupyterlab pandas
-
+`
