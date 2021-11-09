@@ -3,6 +3,7 @@ Multiplexed Image Analysis with Neural Networks
 
 ## Installation
 
+
 1. Create new conda environment:
 
 `
@@ -20,5 +21,6 @@ pip install tensorflow
 3. Install other packages:
 
 `
-conda install matplotlib jupyterlab pandas
+conda install matplotlib jupyterlab pandas tqdm
 `
+

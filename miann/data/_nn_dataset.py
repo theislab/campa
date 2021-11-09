@@ -9,7 +9,7 @@ import tensorflow as tf
 
 def create_dataset(params):
     """
-    Create a NNDataset from params and save to dataset_name (define in params).
+    Create a NNDataset from params and save to dataset_name (defined in params).
     """
     log = logging.getLogger()
     log.info('Creating train/val/test datasets with params:')
@@ -87,13 +87,13 @@ class NNDataset:
         
         # data
         self.data = {
-            'train': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'train')),
-            'val': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'val')),
-            'test': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'test'))
+            'train': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'train'), base_dir=''),
+            'val': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'val'), base_dir=''),
+            'test': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'test'), base_dir='')
         }
         self.imgs = {
-            'val': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'val_imgs')),
-            'test': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'test_imgs'))
+            'val': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'val_imgs'), base_dir=''),
+            'test': MPPData.from_data_dir(os.path.join(self.dataset_folder, 'test_imgs'), base_dir='')
         }
         self.channels = self.data['train'].channels.reset_index().set_index('name')
         self.params = json.load(open(os.path.join(self.dataset_folder, 'params.json'), 'r'))

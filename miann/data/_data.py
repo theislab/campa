@@ -5,7 +5,8 @@ import pandas as pd
 import os
 from miann.data._img_utils import pad_border, BoundingBox
 from miann.data._conditions import get_one_hot, convert_condition, get_combined_one_hot, get_bin_3_condition, get_lowhigh_bin_2_condition, get_zscore_condition, process_condition_desc
-
+import json
+from copy import copy
 
 class ImageData():
 
@@ -27,17 +28,19 @@ class ImageData():
         # TODO crop and return object images for different kinds: data, mask (object mask)
         pass
 
+from typing import Mapping
 
 class MPPData:
 
-    def __init__(self, metadata, channels, data, **kwargs):
+    def __init__(self, metadata: pd.DataFrame, channels: pd.DataFrame, data: Mapping[str,np.ndarray], **kwargs):
         """
-        data: dictionary containing MPPData
-            required_keys = ['x' , 'y', 'mpp', 'obj_ids']
-            optional_keys = ['conditions', 'labels', 'icl', 'latent']
+        data: dictionary containing MPPData, at least containing required_keys
+   
         kwargs:
             data_config (defualt NascentRNA)
             seed (default 42)
+            _skip_initialisation (default True): can skip checking if has all keys - WARNING: skipping this might
+                result in a not well defined MPPData.
         """
         # set up logger
         self.log = getLogger(self.__class__.__name__)
@@ -49,9 +52,15 @@ class MPPData:
         self.data_config_name = kwargs.get('data_config', 'NascentRNA')
         self.data_config = get_data_config(self.data_config_name)
         self.channels = channels
-        for required_key in ['x' , 'y', 'mpp', 'obj_ids']:
-            assert required_key in data.keys(), f"required key {required_key} missing from data"
         self._data = data
+
+        if kwargs.get('_skip_initialisation', False):
+            self.metadata = metadata
+            self.log.debug(f"Created unitialised MPPData")
+            return
+
+        for required_key in ['x', 'y', 'mpp', 'obj_ids']:
+            assert required_key in data.keys(), f"required key {required_key} missing from data"
         # subset metadata to obj_ids in data
         self.metadata = metadata[metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))]
         # add neighbor dimensions to mpp if not existing
@@ -65,37 +74,76 @@ class MPPData:
         pass
 
     @classmethod
-    def from_data_dir(cls, data_dir, mode='r', **kwargs):
+    def from_data_dir(cls, data_dir, mode='r', base_dir=None, 
+        keys=['x', 'y', 'mpp', 'obj_ids'], 
+        optional_keys=['labels', 'latent', 'conditions'], **kwargs):
         """
         Read MPPData from directory.
 
-        Expects the following files: x.npy, y.npy, mpp.npy, obj_ids.npy
-        If present, will read the following additional files: 
-            labels.npy, icl.npy, latent.npy, conditions.npy
+        If mpp_params are present, will first load mpp_data from base_data_dir, 
+        and add remaining information from data_dir.
+
+        Requires metadata.csv and channels.csv.
+        Reads data from key.npy for each key in required_keys.
+        If present, will also read key.npy for each key in optional_keys
 
         Args:
             mode: mmap_mode for np.load. Set to None to load data in memory.
+            base_dir: look for data in base_dir/data_dir. Default in DATA_DIR
         """
-        data_config_name = kwargs.get('data_config', "NascentRNA")
-        data_config = get_data_config(data_config_name)
-        # read all data from data_dir
-        metadata = pd.read_csv(os.path.join(data_config.DATA_DIR, data_dir, 'metadata.csv'), index_col=0).reset_index(drop=True)
-        channels = pd.read_csv(os.path.join(data_config.DATA_DIR, data_dir, 'channels.csv'), names=['channel_id', 'name'], index_col=0).reset_index(drop=True)
+        # load data_config
+        data_config = get_data_config(kwargs.get('data_config', "NascentRNA"))
+        if base_dir is None:
+            base_dir = data_config.DATA_DIR
+
+        # mpp_params present?
+        if os.path.isfile(os.path.join(base_dir, data_dir, 'mpp_params.json')):
+            # first, load base_mpp_data
+            res_keys, res_optional_keys = _get_keys(keys, optional_keys, None)
+            mpp_params = json.load(open(os.path.join(base_dir, data_dir, 'mpp_params.json'), 'r'))
+            self = cls.from_data_dir(mpp_params['base_data_dir'], keys=res_keys, optional_keys=res_optional_keys, 
+                base_dir=data_config.DATA_DIR, mode=mode, **kwargs)
+            # second, add mpp_data
+            res_keys, res_optional_keys = _get_keys(keys, optional_keys, self)
+            self.add_data_from_dir(data_dir, keys=res_keys, optional_keys=res_optional_keys, base_dir=base_dir, mode=mode, subset=mpp_params['subset'])
+            self.log.info(f"Loaded data from {data_dir}, with base data from {mpp_params['base_data_dir']}")
+            return self
+        else:
+            # have reached true base_dir, load data        
+            # read all data from data_dir
+            self = cls._from_data_dir(data_dir, mode, base_dir, keys, optional_keys, **kwargs)
+            self.log.info(f"Loaded data from {data_dir}.")
+        return self
+    
+    @classmethod
+    def _from_data_dir(cls, data_dir, mode='r', base_dir=None, 
+        keys=['x', 'y', 'mpp', 'obj_ids'], 
+        optional_keys=['labels', 'latent', 'conditions'], **kwargs):
+        """
+        Helper function to read MPPData from directory. Ignores mpp_params.json
+        """
+        # get base_dir
+        if base_dir is None:
+            data_config = get_data_config(kwargs.get('data_config', "NascentRNA"))
+            base_dir = data_config.DATA_DIR
+
+        metadata = pd.read_csv(os.path.join(base_dir, data_dir, 'metadata.csv'), index_col=0).reset_index(drop=True)
+        channels = pd.read_csv(os.path.join(base_dir, data_dir, 'channels.csv'), names=['channel_id', 'name'], index_col=0).reset_index(drop=True)
         channels.index.name = 'channel_id'
         # read npy data
         data = {}
-        for fname in ['x', 'y', 'mpp', 'obj_ids']:
-            data[fname] = np.load(os.path.join(data_config.DATA_DIR, data_dir, f'{fname}.npy'), mmap_mode=mode)
-        for fname in ['labels', 'icl', 'latent', 'conditions']:
-            try:
-                data[fname] = np.load(os.path.join(data_config.DATA_DIR, data_dir, f'{fname}.npy'), mmap_mode=mode)
-            except FileNotFoundError as e:
-                continue
+        for fname in keys:
+            data[fname] = _try_mmap_load(os.path.join(base_dir, data_dir, f'{fname}.npy'), mmap_mode=mode)
+        for fname in optional_keys:
+            d = _try_mmap_load(os.path.join(base_dir, data_dir, f'{fname}.npy'), mmap_mode=mode, allow_not_existing=True)
+            if d is not None:
+                data[fname] = d
         # init self
         self = cls(metadata=metadata, channels=channels, data=data, **kwargs)
         self.data_dir = data_dir
+        self.base_dir = base_dir
         return self
-    
+
     @classmethod
     def concat(cls, objs):
         """concatenate the mpp_data objects by concatenating all arrays and return a new one"""
@@ -136,21 +184,27 @@ class MPPData:
 
     @property
     def latent(self):
-        if 'latent' in self._data.keys():
-            return self._data['latent']
-        return None
+        return self.data('latent')
 
-    @property
-    def icl(self):
-        if 'icl' in self._data.keys():
-            return self._data['icl']
+    def data(self, key):
+        """
+        Information contained in MPPData.
+
+        Required keys are: mpp, x, y, obj_ids.
+
+        Args;
+            key: identifier for data that should be returned
+
+        Returns:
+            array-like data, or None if data could not be found
+        """
+        if key in self._data.keys():
+            return self._data[key]
         return None
 
     @property
     def conditions(self):
-        if 'conditions' in self._data.keys():
-            return self._data['conditions']
-        return None
+        return self.data('conditions')
 
     @property
     def has_neighbor_data(self):
@@ -171,19 +225,39 @@ class MPPData:
         return s
 
     # --- Saving ---
-    def write(self, save_dir):
+    def write(self, save_dir, save_keys=None, mpp_params=None):
         """
         Write MPPData to disk.
         
-        Save channels, metadata as csv and one npy file per entry in self._data.
+        Save channels, metadata as csv and one npy file per entry in MPPData.data.
+
+        Args:
+            save_dir: full path to directory in which to save MPPData
+            save_keys: only save these MPPData.data entries. "x", "y", "obj_ids" are always saved
+            mpp_params: params to be saved in save_dir. Use if save_keys is not None. Should contain base_data_dir (relative to DATA_DIR), and subset information
+                for correct MPPData initialisation.
+        Returns:
+            Nothing, saves data to disk
         """
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        self.log.info(f'Saving mpp data to {save_dir}')
-        for key in self._data.keys():
-            np.save(os.path.join(save_dir, f'{key}.npy'), self._data[key])
+        if save_keys is None:
+            save_keys = self._data.keys()
+        else:
+            if mpp_params is None or mpp_params.get('base_data_dir', None) is None:
+                self.log.warn("Saving partial keys of mpp data without a base_data_dir to enable correct loading")
+            else:
+                # save mpp_params
+                mpp_params = {'base_data_dir':mpp_params['base_data_dir'], 'subset': mpp_params.get('subset', False)}
+                json.dump(mpp_params, open(os.path.join(save_dir, 'mpp_params.json'), 'w'))
+        # add required save_keys
+        save_keys = list(set(save_keys).union(["x", "y", "obj_ids"]))
+        self.log.info(f'Saving mpp data to {save_dir} (keys: {save_keys})')
+        for key in save_keys:
+            np.save(os.path.join(save_dir, f'{key}.npy'), np.array(self._data[key]))
         self.channels.to_csv(os.path.join(save_dir, 'channels.csv'), header=None)
         self.metadata.to_csv(os.path.join(save_dir, 'metadata.csv'))
+
     
     def copy(self):
         raise(NotImplementedError)
@@ -191,10 +265,48 @@ class MPPData:
 
     # TODO Nastassya: ensure that each function logs what its doing with log.info
     # --- Modify / Add data ---
-    def add_exp_data(self, exp):
-        # TODO add self._data['latent'] and self._data['clustering'] from files saved in "aggregated" experiment folder
-        # TODO check that ids are correct, and lengths are the same
-        pass
+    def add_data_from_dir(self, data_dir, keys=[], optional_keys=[], subset=False, **kwargs):
+        """
+        Add data to MPPData from data_dir.
+
+        Expects x, y, and obj_ids to be present in data_dir.
+        If not subset, and data in data_dir differs from data in mpp_data, raises a ValueError.
+
+        Assumes that the data in data_dir uses the same data_config as the present object.
+
+        Args:
+            data_dir: full path to the dir containing the npy files to be loaded
+            keys: filenames of data that should be loaded
+            optional_keys: filenames of data that could optionally be loaded if present
+            subset: if True, subset MPPData to data present in data_dir.
+            kwargs: passes to MPPData.from_data_dir
+
+        Returns:
+            Nothing, modifies MPPData in place. Adds `keys` to `MPPData._data`
+        
+        """
+        mpp_to_add = MPPData._from_data_dir(data_dir, keys=list(set(['x', 'y', 'obj_ids']+keys)), optional_keys=optional_keys,
+             _skip_initialisation=True, data_config=self.data_config_name, **kwargs)
+        # subset metadata to obj_ids in data
+        mpp_to_add.metadata = mpp_to_add.metadata[mpp_to_add.metadata[self.data_config.OBJ_ID].isin(np.unique(mpp_to_add.obj_ids))]
+        # check that channels are the same
+        assert (self.channels.name == mpp_to_add.channels.name).all()
+        # check that obj_ids from mpp_to_add are the same / a subset of the current obj_ids
+        if subset:
+            assert set(self.unique_obj_ids).issuperset(mpp_to_add.unique_obj_ids)
+            # subset self to the obj_ids in mpp_to_add
+            self.subset(obj_ids=mpp_to_add.unique_obj_ids)
+        # now, data should be exactly the same
+        assert (self.obj_ids == mpp_to_add.obj_ids).all()
+        assert (self.x == mpp_to_add.x).all()
+        assert (self.y == mpp_to_add.y).all()
+        # finally, add keys
+        for key in keys:
+            self._data[key] = mpp_to_add.data(key)
+        for key in optional_keys:
+            if mpp_to_add.data(key) is not None:
+                self._data[key] = mpp_to_add.data(key)
+        self.log.info(f'Updated data to keys {list(self._data.keys())}')
     
     def train_val_test_split(self, train_frac=0.8, val_frac=0.1):
         """split along obj_ids for train/val/test split"""
@@ -266,7 +378,7 @@ class MPPData:
                     NO_NAN is special token selecting all values except nan
 
         Returns:
-            nothing, modifies Data object in place
+            if copy, subsetted MPPData, otherwise nothing, modifies Data object in place
         """
         selected_obj_ids = np.array(self.metadata[self.data_config.OBJ_ID])
         self.log.info(f'Before subsetting: {len(selected_obj_ids)} objects')
@@ -384,12 +496,10 @@ class MPPData:
             self._rescale_intensities_per_channel(percentile, rescale_values)
 
     # --- Helper functions ---
-    # TODO should be private?
     def apply_mask(self, mask, copy=False):
         """
         return new MPPData with masked self._data values
         """
-        # TODO use this fn for all sorts of masking
         data = {}
         for key in self._data.keys():
             data[key] = self._data[key][mask]
@@ -446,10 +556,23 @@ class MPPData:
     # ---- getting functions -----
     def _get_per_mpp_value(self, per_obj_value):
         """takes list of values corresponding to self.metadata[OBJ_ID]
-        and propagates them to self.obj_id"""
-        per_obj_df = pd.DataFrame({'val': per_obj_value, 'obj_id': self.metadata[self.data_config.OBJ_ID]})
-        df = pd.DataFrame({'obj_id': self.obj_ids})
-        per_mpp_value = df.merge(per_obj_df, left_on='obj_id', right_on='obj_id', how='left')['val']
+        and propagates them to self.obj_id
+        
+        Args:
+            per_obj_value: list of values, or dict containing multiple value lists
+        
+        Returns:
+            pd.Series or pd.DataFrame
+        """
+        if isinstance(per_obj_value, dict):
+            val = per_obj_value.keys()
+            per_obj_value.update({"MERGE_KEY": self.metadata[self.data_config.OBJ_ID]})
+            per_obj_df = pd.DataFrame(per_obj_value)
+        else:
+            val = 'val'
+            per_obj_df = pd.DataFrame({'val': per_obj_value, 'MERGE_KEY': self.metadata[self.data_config.OBJ_ID]})
+        df = pd.DataFrame({'MERGE_KEY': self.obj_ids})
+        per_mpp_value = df.merge(per_obj_df, left_on='MERGE_KEY', right_on='MERGE_KEY', how='left')[val]
         return per_mpp_value
     
     def get_condition(self, desc, cond_params={}):
@@ -490,6 +613,35 @@ class MPPData:
                 cond = convert_condition(np.array(cond)[:,np.newaxis], desc=desc, data_config=self.data_config)
         return cond
             
+    def get_adata(self, X='mpp', obsm=[]):
+        """
+        Create adata from information contained in MPPData.
+
+        channels are put in adata.var
+        metadata is put in adata.obs
+
+        Args:
+            X: key in MPPData.data that should be in adata.X
+            obsm: keys in MPPData.data that should be in adata.obsm
+        """
+        import anndata as ad
+        obsm = {o: self.data(o) for o in obsm}
+        if X == 'mpp':
+            var = self.channels
+            X = self.center_mpp
+        else:
+            var = None
+            X = self.data(X)
+        # add spatial coords as obsm['spatial']
+        obsm['spatial'] = np.stack([self.x, self.y]).T
+        # get per-pixel obs
+        obs = self._get_per_mpp_value(self.metadata.to_dict(orient='list'))
+        adata = ad.AnnData(X=X.astype(np.float32), obs=obs, var=var, obsm=obsm)
+        # set var_names if possible
+        if var is not None:
+            adata.var_names = adata.var['name']
+        return adata
+
     # TODO nastassya: test
     def _get_neighborhood(self, obj_ids, xs, ys, size=3, border_mode='center'):
         """return neighborhood information for given obj_ids + xs + ys"""
@@ -565,3 +717,51 @@ class MPPData:
             imgs.append(res)
         return imgs
 
+
+def _try_mmap_load(fname, mmap_mode='r', allow_not_existing=False):
+    """
+    use np.load to read fname. If mmap loading fails, load with mmap_mode=None.
+
+    Args:
+        allow_not_existing: if fname does not exist, do not raise and exception, just return None
+
+    Returns:
+        np.ndarray: loaded numpy array
+    """
+    try:
+        try:
+            res = np.load(fname, mmap_mode=mmap_mode)
+        except ValueError as e:
+            if "Array can't be memory-mapped: Python objects in dtype." in str(e):
+                print("Cannot read with memmap: ", fname)
+                res = np.load(fname, mmap_mode=None, allow_pickle=True)
+            else:
+                raise e
+    except FileNotFoundError as e:
+        if allow_not_existing:
+            return None
+        else:
+            raise e
+    return res
+
+def _get_keys(keys, optional_keys, base_mpp_data=None):
+    """
+    keys and optional keys to use for loading base_mpp_data / mpp_data,
+    when reading parts of the data from other dirs
+    """
+    if base_mpp_data is None:
+        # loading of base_mpp_data
+        # return all keys as optional, as might still be present in mpp_data_dir
+        res_keys = ['x', 'y', 'obj_ids']
+        res_optional_keys = list(set(optional_keys).union(keys).difference(res_keys))
+    else:
+        # loading of mpp_data
+        # check which of required keys are already loaded, and move them to optional
+        res_keys = ['x', 'y', 'obj_ids']
+        res_optional_keys = copy(optional_keys)
+        for k in list(set(keys).difference(res_keys)):
+            if base_mpp_data.data(k) is not None:
+                res_optional_keys.append(k)
+            else:
+                res_keys.append(k)
+    return res_keys, res_optional_keys
