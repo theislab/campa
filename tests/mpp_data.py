@@ -33,6 +33,12 @@ print(mpp_data.channels)
 mpp_data.subset(cell_cycle='NO_NAN')
 print(np.unique(mpp_data.metadata.cell_cycle))
 
+# get condition for each mpp
+TR = mpp_data.get_condition('TR')[:,0]
+print(TR)
+
+
+
 # add conditions
 cond_params = {}
 mpp_data.add_conditions(['TR_norm_lowhigh_bin_2', 'TR_bin_3', 'cell_cycle'], cond_params=cond_params)
@@ -40,19 +46,24 @@ mpp_data.add_conditions(['TR_norm_lowhigh_bin_2', 'TR_bin_3', 'cell_cycle'], con
 print(mpp_data.conditions)
 print(cond_params)
 
+
+
 # filter nan objects with nan conditions
 mpp_data.subset(nona_condition=True)
+
 
 # normalise
 rescale_values = []
 mpp_data.normalise(background_value='mean_background', percentile= 98.0, rescale_values=rescale_values)
 print(rescale_values)
 
+
 # subsample
 mpp_data_sub = mpp_data.subsample(frac_per_obj=0.05,
 add_neighborhood=True, neighborhood_size=3)
 
 print(mpp_data.mpp.shape, mpp_data_sub.mpp.shape)
+
 
 # get and plot image
 import matplotlib.pyplot as plt
@@ -65,5 +76,17 @@ plt.show()
 
 # add neighbors
 mpp_data.add_neighborhood(size=3)
-
 print(mpp_data.mpp.shape)
+
+
+
+# subset to one cell
+mpp_data_sub = mpp_data.subset(obj_ids=mpp_data.unique_obj_ids[:1], copy=True)
+
+# get adata object from information in MPPData
+adata = mpp_data_sub.get_adata()
+print(adata)
+
+# with adata, can use all scanpy functions, e.g. spatial plotting
+import scanpy as sc
+sc.pl.embedding(adata, basis='spatial', color=['00_DAPI'])

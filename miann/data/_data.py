@@ -490,6 +490,10 @@ class MPPData:
         self._data['mpp'] = mpp
         
     def normalise(self, background_value=None, percentile=None, rescale_values=[]):
+        """
+            background_value: float value to be subtracted, or name of column in CHANNELS_METADATA
+            percentile:
+        """
         if background_value is not None:
             self._subtract_background(background_value)
         if percentile is not None:

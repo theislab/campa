@@ -1,8 +1,11 @@
 # Constants for NascentRNA dataset
-import os
 
 # --- dataset specific constants ---
-DATA_DIR = "/Users/nastassya.horlava/Documents/Projects/4i_project/Data/"
+import os
+from miann.constants import BASE_DATA_DIR
+
+# --- dataset specific constants ---
+DATA_DIR = os.path.join(BASE_DATA_DIR, "")
 DATASET_DIR = os.path.join(DATA_DIR, 'datasets')
 # name of column in metadata.csv that contains a unique object identifier
 OBJ_ID = 'mapobject_id'
