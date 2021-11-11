@@ -103,17 +103,6 @@ class NNDataset:
         s += f" train: {len(self.data['train'].mpp)}, val: {len(self.data['val'].mpp)}, test: {len(self.data['test'].mpp)}"
         return s
 
-    def get_channel_ids(self, to_channels, from_channels=None):
-        # TODO docstring
-        if from_channels is None:
-            from_channels = self.channels.copy()
-            from_channels['index'] = np.arange(len(from_channels))
-        if not isinstance(from_channels, pd.DataFrame):
-            from_channels = pd.DataFrame({'name': from_channels, 'index': np.arange(len(from_channels))})
-            from_channels = from_channels.set_index('name')
-        from_channels = from_channels.reindex(to_channels)
-        return list(from_channels['index'])
-
     def x(self, split, is_conditional=False):
         x = self.data[split].mpp.astype(np.float32)
         if is_conditional:
@@ -124,7 +113,7 @@ class NNDataset:
     def y(self, split, output_channels=None):
         y = self.data[split].center_mpp
         if output_channels is not None:
-            channel_ids = self.get_channel_ids(output_channels)
+            channel_ids = self.data[split].get_channel_ids(output_channels)
             y = y[:,channel_ids]
         return y
 

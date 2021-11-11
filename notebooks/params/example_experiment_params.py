@@ -7,7 +7,6 @@ base_config = {
         'save_config': True,
     },
     'data': {
-        'load_dataset': True,
         'data_config': 'NascentRNA',
         'dataset_name': '184A1_test_dataset',
         'output_channels': None,

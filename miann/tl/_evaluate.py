@@ -1,302 +1,13 @@
-from __future__ import annotations
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from miann.tl import Experiment
-
 # TODO working on evaluation + clustering pipeline for exp model. 
 # TODO when finished: create fns for how to aggregate - should easily be possible with this code!
 import numpy as np
 import os
 import tensorflow as tf
 import logging
-from miann.constants import EXPERIMENT_DIR, get_data_config
-from miann.tl import Estimator
-from miann.data import MPPData
-from miann.utils import merged_config
-import json
-from copy import deepcopy
-import scanpy as sc
-from pynndescent import NNDescent
-import pickle
-
-# TODO aggregator should use Cluster to get the clustering on all data
-# TODO aggregator deals with multiple data dirs etc
-class Cluster:
-    """
-    cluster MPPData.
-
-    Has functions to create a (subsampled) MPPData for clustering, cluster_mpp, cluster it, 
-    and to project the clustering to other MPPDatas.
-    """
-    config = {
-        # --- cluster data creation (mpp_data is saved to cluster_data_dir) ---
-        'data_config': 'NascentRNA',
-        'data_dirs': [],
-        'add_data_dirs': None,
-        # name of dataset that gives params for processing (except subsampling/subsetting)
-        'process_like_dataset': None,
-        'subsample': False, # either 'subsample' or 'som'
-        'som_kargs': {},
-        'subsample_kwargs': {},
-        'subset': False,
-        'subset_kwargs': {},
-        # name of the dir containing the mpp_data that is clustered. Relative to EXPERIMENT_DIR
-        'cluster_data_dir': None,
-        # --- cluster params ---
-        # name of the cluster assignment file
-        'cluster_name': 'clustering',
-        # representation that should be clustered (name of existing file)
-        'cluster_rep': 'latent',
-        'cluster_method': 'leiden', # leiden or kmeans
-        'leiden_resolution': 0.8,
-        'kmeans_n': 20,
-        'umap': True, # calculate umap of cluster data
-    }
-
-    def __init__(self, config, cluster_mpp=None, save_config=False):
-        self.log = logging.getLogger(self.__class__.__name__)
-        self.config = merged_config(self.config, config)
-        self.data_config = get_data_config(self.config['data_config'])
-        # load dataset_params
-        self.dataset_params = None
-        if self.config['process_like_dataset'] is not None:
-            params_fname = os.path.join(self.data_config.DATASET_DIR, self.config['process_like_dataset'], 'params.json')
-            self.dataset_params = json.load(open(params_fname, 'r'))
-        self._cluster_mpp = cluster_mpp
-        # try to load cluster_mpp from disk to ensure that is properly initialised
-        self.get_cluster_mpp()
-
-        # save config
-        if save_config:
-            config_fname = os.path.join(EXPERIMENT_DIR, self.config['cluster_data_dir'], 'cluster_params.json')
-            json.dump(self.config, open(config_fname, 'w'), indent=4)
-        
-    @classmethod
-    def from_cluster_data_dir(cls, data_dir):
-        """
-        data_dir: containing complete mpp_data with cluster_rep and cluster_name files
-        """
-        # load mpp_data and cluster_params (for reference) from data_dir
-        # TODO
-        config_fname = os.path.join(EXPERIMENT_DIR, data_dir, 'cluster_params.json')
-        config = json.load(open(config_fname, 'r'))
-        return cls(config, save_config=False)
-
-    @classmethod
-    def from_exp_split(cls, exp: Experiment):
-        """
-        Init from experiment for clustering of val/test split
-        """
-        # TODO load exp 
-        #est = Estimator(exp.set_to_evaluate())
-        #mpp_data = est.ds.data[exp.evaluate_config['split']]
-    
-        cluster_config = deepcopy(exp.config['cluster'])
-        # add data_config
-        cluster_config['data_config'] = exp.config['data']['data_config']
-        cluster_config['subsample'] = False
-        cluster_config['cluster_data_dir'] = os.path.join(exp.dir, exp.name, f'results_epoch{exp.epoch:03d}', exp.evaluate_config['split'])
-
-        return cls(cluster_config, save_config=True)
-
-    def get_cluster_mpp(self, reload=False):
-        """
-        MPPData that is used for clustering.
-
-        If not initialised, tries to read it from cluster_data_dir. 
-        In addition, tries to read cluster_rep and cluster_name from cluster_data_dir and add it to 
-        an existing cluster_mpp
-
-        Returns:
-            MPPData or None if data could not be loaded
-        """
-        data_dir = self.config['cluster_data_dir']
-        rep = self.config['cluster_rep']
-        name = self.config['cluster_name']
-        # check that dir is defined
-        if data_dir is None:
-            self.log.warn("Cluster_data_dir is None, cannot load cluster_mpp")
-            return self._cluster_mpp
-        # load data
-        if (self._cluster_mpp is None) or reload:
-            try:
-                mpp_data = MPPData.from_data_dir(data_dir, base_dir=EXPERIMENT_DIR, optional_keys=[rep, name])
-                self.log.info(f'Loaded cluster_mpp {mpp_data}')
-                self._cluster_mpp = mpp_data
-            except FileNotFoundError as e:
-                self.log.warn(f"Could not load MPPData from {data_dir}")
-                raise e
-                return None
-        return self._cluster_mpp
-
-
-    def get_nndescent_index(self, recreate=False):
-        index_fname =  os.path.join(EXPERIMENT_DIR, self.config['cluster_data_dir'], 'pynndescent_index.pickle')
-        if os.path.isfile(index_fname) and not recreate:
-            # load and return index
-            return pickle.load(open(index_fname, 'rb'))
-        # need to create index
-        cluster_mpp = self.get_cluster_mpp()
-        # check that cluster_rep has been computed already for cluster_mpp
-        assert cluster_mpp.data(self.config['cluster_rep']) is not None
-        self.log.info(f"Creating pynndescent index for {self.config['cluster_rep']}")
-        index = NNDescent(cluster_mpp.data(self.config['cluster_rep']).astype(np.float32))
-        pickle.dump(index, open(index_fname, 'wb'))
-        return index
-
-    def create_cluster_data(self):
-        """
-        Use cluster_params to create and save mpp_data to use for clustering
-
-        Raises: ValueError if config does not contain data_dirs and process_like_dataset
-        """
-        # check that have required information
-        if (len(self.config['data_dirs']) == 0) or self.config['process_like_dataset'] is None:
-            raise ValueError("Cannot create cluster data without data_dirs and process_like_dataset")
-        if self.config['add_data_dirs'] is not None:
-            assert len(self.config['data_dirs']) == len(self.config['add_data_dirs'])
-
-        # TODO load mpp data + subsample (or SOM)
-        # TODO save resulting mpp data to cluster_data_dir
-              # 1. subset mpp_data
-        #if cluster_params['subsample'] == 'subsample':
-        #    mpp_data = mpp_data.subsample(**cluster_params['subsample_kwargs'])
-        #    save_only_clustering = False
-        #elif cluster_params['subsample'] == 'som':
-        #    raise NotImplementedError('som') # TODO copy + adapt SOM code
-        #    save_only_clustering = False
-        #elif cluster_params['subsample'] is None:
-        #    pass
-        #else:
-        #    raise NotImplementedError(cluster_params['subsample'])
-        # load cluster_mpp
-        return self.get_cluster_mpp()
-
-    def predict_cluster_rep(self, exp):
-        """
-        Use exp to predict the necessary cluster representation
-        """
-        cluster_mpp = self.get_cluster_mpp()
-        if cluster_mpp.data(self.config['cluster_rep']) is not None:
-            self.log.info(f"cluster_mpp already contains key {self.config['cluster_rep']}. Not recalculating.")
-            return
-        pred = Predictor(exp)
-        cluster_rep = pred.get_representation(cluster_mpp, rep=self.config['cluster_rep'])
-        cluster_mpp._data[self.config['cluster_rep']] = cluster_rep
-        # save cluster_rep
-        if self.config['cluster_data_dir'] is not None:
-            cluster_mpp.write(os.path.join(EXPERIMENT_DIR, self.config['cluster_data_dir']), save_keys=[self.config['cluster_rep']])
-        
-    def create_clustering(self):
-        """
-        Cluster cluster_mpp using cluster_method defined in config.
-
-        If cluster_data_dir is defined, saves clustering there.
-
-        Raises: ValueError if cluster_rep is not available
-        """
-        cluster_mpp = self.get_cluster_mpp()
-        # check that have cluster_rep
-        if cluster_mpp.data(self.config['cluster_rep']) is None:
-            raise ValueError(f"Key {self.config['cluster_rep']} is not available for clustering.")
-        # cluster 
-        if self.config['cluster_method'] == 'leiden':
-            self.log.info('Creating leiden clustering')
-            # leiden clustering
-            adata = cluster_mpp.get_adata(X=self.config['cluster_rep'])
-            sc.pp.neighbors(adata)
-            sc.tl.leiden(adata, resolution=self.config['leiden_resolution'], key_added='clustering')
-            cluster_mpp._data[self.config['cluster_name']] = np.array(adata.obs['clustering'])
-            if self.config['umap']:
-                self.log.info('Calculating umap')
-                sc.tl.umap(adata)
-                cluster_mpp._data['umap'] = adata.obsm['X_umap']
-        elif self.config['cluster_method'] == 'kmeans':
-            self.log.info('Creating kmeans clustering')
-            from sklearn.cluster import KMeans
-            est = KMeans(n_clusters=self.config['kmeans_n'], random_state=0)
-            kmeans = est.fit(cluster_mpp.data(self.config['cluster_rep'])).labels_
-            # TODO: cast kmeans to str?
-            cluster_mpp._data[self.config['cluster_name']] = kmeans
-        else:
-            raise NotImplementedError(self.config['cluster_method'])
-        
-        # create and save pynndescent index
-        _ = self.get_nndescent_index(recreate=True)
-        
-        # add umap if not exists already
-        if self.config['umap'] and not self.config['cluster_method'] == 'leiden':
-            self.log.info("Calculating umap")
-            adata = cluster_mpp.get_adata(X=cluster_mpp['cluster_rep'])
-            sc.pp.neighbors(adata)
-            sc.tl.umap(adata)
-            cluster_mpp._data['umap'] = adata.obsm['X_umap']
-
-        self._cluster_mpp = cluster_mpp
-        # save to cluster_data_dir
-        if self.config['cluster_data_dir'] is not None:
-            cluster_mpp.write(os.path.join(EXPERIMENT_DIR, self.config['cluster_data_dir']), 
-                save_keys=[self.config['cluster_name'], 'umap'])
-
-    def predict_clustering(self, mpp_data: MPPData, save_dir=None, batch_size=200000):
-        """
-        Project already computed clustering from cluster_mpp to mpp_data
-
-        Args:
-            mpp_data: MPPData to project the clustering to. Should contain cluster_rep
-            save_dir: optional, full path to dir where the clustering should be saved
-            batch_size: iterate over data in batches of size batch_size
-
-        Returns:
-            mpp_data with clustering
-        """
-        cluster_mpp = self.get_cluster_mpp()
-        # check that clustering has been computed already for cluster_mpp
-        assert cluster_mpp is not None
-        assert cluster_mpp.data(self.config['cluster_name']) is not None
-        assert mpp_data.data(self.config['cluster_rep']) is not None
-
-        # get NNDescent index for fast projection
-        index = self.get_nndescent_index()
-        self.log.info("Projecting clustering to {len(mpp_data.x)} sampled")
-        # func for getting max count cluster in each row
-        def most_frequent(arr):
-            els, counts = np.unique(arr, return_counts=True)
-            return els[np.argmax(counts)]
-        # project clusters
-        clustering = []
-        samples = mpp_data.data(self.config['cluster_rep'])
-        for i in np.arange(0, samples.shape[0], batch_size):
-            self.log.info(f'processing chunk {i}')
-            cur_samples = samples[i:i+batch_size]
-            neighs = index.query(cur_samples.astype(np.float32), k=15)[0]
-            clustering.append(np.apply_along_axis(most_frequent, 
-                arr=cluster_mpp.data(self.config['cluster_name'])[neighs], axis=1))
-        clustering = np.concatenate(clustering)
-        mpp_data._data[self.config['cluster_name']] = clustering
-
-        # save
-        if save_dir is not None:
-            mpp_data.write(save_dir, save_keys=[self.config['cluster_name']])
-        return mpp_data
-
-    def predict_cluster_imgs(self, exp):
-        """
-        Predict cluster imgs from experiment
-        """
-        # create Predictor
-        pred = Predictor(exp)
-        # predict clustering on imgs
-        img_save_dir = os.path.join(EXPERIMENT_DIR, exp.dir, exp.name, f'results_epoch{pred.est.epoch:03d}', exp.config['evaluation']['split']+'_imgs')
-        mpp_imgs = pred.est.ds.imgs[exp.config['evaluation']['split']]
-        # add latent space to mpp_imgs + subset
-        try:
-            mpp_imgs.add_data_from_dir(img_save_dir, keys=[self.config['cluster_rep']], subset=True, base_dir='')
-        except FileNotFoundError:
-            self.log.warn(f"Did not find {self.config['cluster_rep']} in {img_save_dir}. Run create_clustering first.")
-            return 
-        self.log.info(f'Projecting cluster_imgs for {exp.dir}/{exp.name}')
-        return self.predict_clustering(mpp_imgs, save_dir=img_save_dir)
+from miann.tl import Estimator, Experiment
+from miann.pl._plot import annotate_img
+import matplotlib.pyplot as plt
+from matplotlib import cm, colors
 
 class Predictor:
     """
@@ -327,18 +38,28 @@ class Predictor:
         if config['predict_imgs']:
             self.predict_split(config['split']+'_imgs', img_ids=config['img_ids'], reps=config['predict_reps'])
 
+    # TODO might not need?
+    def calculate_mse(self, mpp_data):
+        """
+        Calculate mean squared error from mpp_data. If mpp_data does not have decoder representation, predict it
+        """
+        if mpp_data.data('decoder') is None:
+            self.predict(mpp_data, reps=['decoder'])
+        return np.mean((mpp_data.center_mpp - mpp_data.data('decoder'))**2, axis=0)
+
     def predict(self, mpp_data, save_dir=None, reps=['latent'], mpp_params={}):
         """
         Predict reps from mpp_data, 
         
         Args:
-        save_dir: save predicted reps to this dir
+        save_dir: save predicted reps to this dir (absolute path)
         reps: which representations to predict
         mpp_params: base_data_dir and subset information to save alongside of predicted mpp_data. See MPPData.write()
 
         Returns:
             MPPData with keys reps.
         """
+        self.log.info(f'Predicting representation {reps} for mpp_data')
         for rep in reps:
             mpp_data._data[rep] = self.get_representation(mpp_data, rep=rep)
         if save_dir is not None:
@@ -415,3 +136,186 @@ class Predictor:
             return self.est.model.encoder_y.predict(data, batch_size=self.batch_size)
         else:
             raise NotImplementedError(rep)
+
+
+class ModelComparator:
+    def __init__(self, exps, save_dir=None):
+        """
+        Compare experiments 
+        """
+        self.exps = {exp.name: exp for exp in exps}
+        self.exp_names = list(self.exps.keys())
+        self.save_dir = save_dir
+
+        # default channels and mpp data
+        self.mpps = {exp_name: self.exps[exp_name].get_split_mpp_data() for exp_name in self.exp_names}
+        self.img_mpps = {exp_name: self.exps[exp_name].get_split_imgs_mpp_data() for exp_name in self.exp_names}
+        channels = {exp_name: self.exps[exp_name].config['data'].get('output_channels', None) for exp_name in self.exp_names}
+        self.channels = {key: val if val is not None else self.mpps[key].channels['name'] for key, val in channels.items()}
+        
+    @classmethod
+    def from_dir(cls, exp_names, exp_dir):
+        """
+        Initialise from experiments in experiment dir
+        """
+        exps = [Experiment.from_dir(os.path.join(exp_dir, exp_name)) for exp_name in exp_names]
+        return cls(exps, save_dir=exp_dir)
+
+    def plot_history(self, values=['loss'], exp_names=None, save_prefix=''):
+        """line plot of values against epochs for different experiments
+        Args:
+            values: key in history dict to be plotted
+            exp_names (optional): compare only a subset of experiments
+        """
+        if exp_names is None:
+            exp_names = self.exp_names
+        cmap = plt.get_cmap('tab10')
+        cnorm  = colors.Normalize(vmin=0, vmax=10)
+        fig, axes = plt.subplots(1,len(values), figsize=(len(values)*5,5), sharey=True)
+        if len(values) == 1:
+            # make axes iterable, even if there is only one ax
+            axes = [axes]
+        for val, ax in zip(values, axes):
+            ax.set_title(val)
+            for i,exp_name in enumerate(exp_names):
+                color = cm.viridis(i)
+                hist = self.exps[exp_name].get_history()
+                if val in hist.keys():
+                    ax.plot(hist.index, hist[val], label=exp_name, color=cmap(cnorm(i)))
+            ax.legend()
+        if self.save_dir is not None:
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.save_dir, '{}history.png'.format(save_prefix)), dpi=100)
+
+    def plot_final_score(self, score='loss', fallback_score='loss', exp_names=None, save_prefix=''):
+        if exp_names is None:
+            exp_names = self.exp_names
+        scores = []
+        for exp_name in exp_names:
+            hist = self.exps[exp_name].get_history()
+            scores.append(list(hist.get(score, hist[fallback_score]))[-1])
+        fig, ax = plt.subplots(1,1)
+        ax.bar(x=range(len(scores)), height=scores)
+        ax.set_xticks(range(len(scores)))
+        ax.set_xticklabels(exp_names, rotation=45)
+        ax.set_title(score + '('+fallback_score+')')
+        if self.save_dir is not None:
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.save_dir, '{}final.png'.format(save_prefix)), dpi=100)
+
+    def plot_per_channel_mse(self, exp_names=None, channels=None, save_prefix=''):
+        def mse(mpp_data):
+            return np.mean((mpp_data.center_mpp - mpp_data.data('decoder'))**2, axis=0)
+        # setup: get experiments + mpps
+        if exp_names is None:
+            exp_names = self.exp_names
+        if channels is None:
+            channels = self.channels[exp_names[0]]
+
+        # calculate mse
+        mse_scores = {exp_name: mse(self.mpps[exp_name]) for exp_name in exp_names}
+        channel_ids = {exp_name: self.mpps[exp_name].get_channel_ids(channels) for exp_name in exp_names}
+
+        # plot mse
+        offset = 0.9 / len(exp_names)
+        fig, ax = plt.subplots(1,1, figsize=(20,5))
+        X = np.arange(len(channels))
+        for i,exp_name in enumerate(exp_names):
+            ax.bar(X+offset*i, mse_scores[exp_name][channel_ids[exp_name]], label=exp_name, width=offset)
+        ax.set_xticks(X+0.5)
+        ax.set_xticklabels(channels, rotation=90)
+        ax.legend()
+        if self.save_dir is not None:
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.save_dir, '{}per_channel_mse.png'.format(save_prefix)), dpi=100)
+
+    def plot_predicted_images(self, exp_names=None, channels=None, img_ids=None, save_prefix='', **kwargs):
+        """
+        kwargs passed to mpp_data.get_object_imgs
+        """
+        if exp_names is None:
+            exp_names = self.exp_names
+        if channels is None:
+            channels = self.channels[exp_names[0]]
+        output_channels = self.exps[exp_names[0]].config['data'].get('output_channels', None)
+        output_channel_ids = {exp_name: self.img_mpps[exp_name].get_channel_ids(channels, from_channels=output_channels) for exp_name in exp_names}
+
+        # get input images
+        input_channel_ids = self.img_mpps[exp_names[0]].get_channel_ids(channels)
+        input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(channel_ids=input_channel_ids, **kwargs)
+        if img_ids is None:
+            img_ids = range(len(input_imgs))
+        
+        # get predicted images
+        predicted_imgs = []
+        for exp_name in exp_names:
+            pred_imgs = self.img_mpps[exp_name].get_object_imgs(data='decoder', channel_ids=output_channel_ids[exp_name], **kwargs)
+            predicted_imgs.append(pred_imgs)
+        
+        # plot
+        for img_id in img_ids:
+            fig, axes = plt.subplots(len(exp_names)+1,len(channels), figsize=(len(channels)*2,2*(len(exp_names)+1)), squeeze=False)
+            for i, col in enumerate(axes.T):
+                col[0].imshow(input_imgs[img_id][:,:,i], vmin=0, vmax=1)
+                if i == 0:
+                    col[0].set_ylabel('Groundtruth')
+                col[0].set_title(channels[i])
+                for j, ax in enumerate(col[1:]):
+                    ax.imshow(predicted_imgs[j][img_id][:,:,i], vmin=0, vmax=1)
+                    if i == 0:
+                        ax.set_ylabel(exp_names[j])
+            for ax in axes.flat:
+                ax.set_yticks([])
+                ax.set_xticks([])
+                ax.set_yticklabels([])
+                ax.set_xticklabels([])
+            if self.save_dir is not None:
+                plt.tight_layout()
+                plt.savefig(os.path.join(self.save_dir, '{}predicted_images_{}.png'.format(save_prefix, img_id)), dpi=300)
+
+
+    def plot_cluster_images(self, exp_names=None, img_ids=None, img_labels=None, img_channel='00_DAPI', save_prefix='', 
+        rep='clustering', **kwargs):
+        if exp_names is None:
+            exp_names = self.exp_names
+
+        # get input images
+        input_channel_ids = self.img_mpps[exp_names[0]].get_channel_ids([img_channel])
+        input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(channel_ids=input_channel_ids, **kwargs)
+        if img_ids is None:
+            img_ids = np.arange(len(input_imgs))
+        
+        # get cluster images
+        cluster_imgs = []
+        for exp_name in exp_names:
+            # load annotation
+            cluster_annotation = self.exps[exp_name].get_split_cluster_annotation(rep)
+            cluster_img = self.img_mpps[exp_name].get_object_imgs(data=rep, annotation_kwargs={'color': True, 'annotation':cluster_annotation}, **kwargs)
+            cluster_imgs.append(cluster_img)
+        # calculate num clusters for consistent color maps
+        num_clusters = [len(np.unique(clus_imgs)) for clus_imgs in cluster_imgs]
+        
+        # plot results
+        fig, axes = plt.subplots(len(img_ids),len(cluster_imgs)+1, figsize=(3*(len(cluster_imgs)+1),len(img_ids)*3), squeeze=False)
+        for cid, row in zip(img_ids,axes):
+            row[0].imshow(input_imgs[cid][:,:,0], vmin=0, vmax=1)
+            ylabel = 'Object id {} '.format(cid)
+            if img_labels is not None:
+                ylabel = ylabel + img_labels[cid]
+            row[0].set_ylabel(ylabel)
+            if cid == 0:
+                row[0].set_title('channel {}'.format(img_channel))
+            for i, ax in enumerate(row[1:]):
+                ax.imshow(cluster_imgs[i][cid], vmin=0, vmax=num_clusters[i])
+                if cid == 0:
+                    ax.set_title(exp_names[i])
+        for ax in axes.flat:
+            ax.set_yticks([])
+            ax.set_xticks([])
+            ax.set_yticklabels([])
+            ax.set_xticklabels([])
+        plt.tight_layout()
+        if self.save_dir is not None:
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.save_dir, '{}cluster_images.png'.format(save_prefix)), dpi=100)
+

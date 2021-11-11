@@ -7,6 +7,9 @@ from miann.data._img_utils import pad_border, BoundingBox
 from miann.data._conditions import get_one_hot, convert_condition, get_combined_one_hot, get_bin_3_condition, get_lowhigh_bin_2_condition, get_zscore_condition, process_condition_desc
 import json
 from copy import copy
+from miann.pl._plot import annotate_img
+
+from tensorflow.python.ops.gen_nn_ops import data_format_dim_map_eager_fallback
 
 class ImageData():
 
@@ -107,6 +110,8 @@ class MPPData:
             res_keys, res_optional_keys = _get_keys(keys, optional_keys, self)
             self.add_data_from_dir(data_dir, keys=res_keys, optional_keys=res_optional_keys, base_dir=base_dir, mode=mode, subset=mpp_params['subset'])
             self.log.info(f"Loaded data from {data_dir}, with base data from {mpp_params['base_data_dir']}")
+            self.data_dir = data_dir
+            self.base_dir = base_dir
             return self
         else:
             # have reached true base_dir, load data        
@@ -200,6 +205,8 @@ class MPPData:
         """
         if key in self._data.keys():
             return self._data[key]
+        elif key == 'center_mpp':
+            return self.center_mpp
         return None
 
     @property
@@ -289,8 +296,6 @@ class MPPData:
              _skip_initialisation=True, data_config=self.data_config_name, **kwargs)
         # subset metadata to obj_ids in data
         mpp_to_add.metadata = mpp_to_add.metadata[mpp_to_add.metadata[self.data_config.OBJ_ID].isin(np.unique(mpp_to_add.obj_ids))]
-        # check that channels are the same
-        assert (self.channels.name == mpp_to_add.channels.name).all()
         # check that obj_ids from mpp_to_add are the same / a subset of the current obj_ids
         if subset:
             assert set(self.unique_obj_ids).issuperset(mpp_to_add.unique_obj_ids)
@@ -306,6 +311,9 @@ class MPPData:
         for key in optional_keys:
             if mpp_to_add.data(key) is not None:
                 self._data[key] = mpp_to_add.data(key)
+        # update channels if added mpp
+        if 'mpp' in keys + optional_keys:
+            self.channels = mpp_to_add.channels
         self.log.info(f'Updated data to keys {list(self._data.keys())}')
     
     def train_val_test_split(self, train_frac=0.8, val_frac=0.1):
@@ -613,7 +621,7 @@ class MPPData:
                 cond = convert_condition(np.array(cond)[:,np.newaxis], desc=desc, data_config=self.data_config)
         return cond
             
-    def get_adata(self, X='mpp', obsm=[]):
+    def get_adata(self, X='mpp', obsm=[], obs=[]):
         """
         Create adata from information contained in MPPData.
 
@@ -622,10 +630,14 @@ class MPPData:
 
         Args:
             X: key in MPPData.data that should be in adata.X
-            obsm: keys in MPPData.data that should be in adata.obsm
+            obsm: keys in MPPData.data that should be in adata.obsm. 
+                Can be dict with keys the desired names in adata, and values the keys in MPPData.data
+            obs: keys from MPPData.data that should be in adata.obs in addition to all information form metadata
         """
         import anndata as ad
-        obsm = {o: self.data(o) for o in obsm}
+        if isinstance(obsm, list):
+            obsm = {o: o for o in obsm}
+        obsm = {k: self.data(v) for k,v in obsm.items()}
         if X == 'mpp':
             var = self.channels
             X = self.center_mpp
@@ -635,8 +647,10 @@ class MPPData:
         # add spatial coords as obsm['spatial']
         obsm['spatial'] = np.stack([self.x, self.y]).T
         # get per-pixel obs
-        obs = self._get_per_mpp_value(self.metadata.to_dict(orient='list'))
-        adata = ad.AnnData(X=X.astype(np.float32), obs=obs, var=var, obsm=obsm)
+        obs_ = self._get_per_mpp_value(self.metadata.to_dict(orient='list'))
+        for o in obs:
+            obs_[o] = self.data(o)
+        adata = ad.AnnData(X=X.astype(np.float32), obs=obs_, var=var, obsm=obsm)
         # set var_names if possible
         if var is not None:
             adata.var_names = adata.var['name']
@@ -656,6 +670,23 @@ class MPPData:
             data[mask] = np.array(vals)
         return data
     
+    def get_channel_ids(self, to_channels, from_channels=None):
+        """
+        for a list of channels, return their ids in mpp_data
+
+        Args:
+            from_channels: get channel_ids assuming ordering of from_channels. 
+                This is useful for models that are trained with different output than input channels
+        """
+        if from_channels is None:
+            from_channels = self.channels.copy()
+            from_channels = from_channels.reset_index().set_index('name')
+        if not isinstance(from_channels, pd.DataFrame):
+            from_channels = pd.DataFrame({'name': from_channels, 'channel_id': np.arange(len(from_channels))})
+            from_channels = from_channels.set_index('name')
+        from_channels = from_channels.reindex(to_channels)
+        return list(from_channels['channel_id'])
+
     # --- image plotting (only for non-subsampled MPPData) ---
     @staticmethod
     def _get_img_from_data(x, y, data, img_size=None, pad=0):
@@ -682,12 +713,13 @@ class MPPData:
             # padding info is only relevant when not cropping img to shape
             return img, (x.min()-pad, y.min()-pad)
     
-    def get_object_img(self, obj_id, data='mpp', channel_ids=None, **kwargs):
+    def get_object_img(self, obj_id, data='mpp', channel_ids=None, annotation_kwargs=None, **kwargs):
         """
         Calculate data image of given object id.
         data: key in self._data that should be plotted on the image
         channel_ids: only if key == 'mpp'. Channels that the image should have. 
             If None, all channels are returned.
+        annotation_kwargs: arguments for self.annotate_img. (annotation, to_col, color)
         kwargs: arguments for self._get_img_from_data
         """
         mask = self.obj_ids == obj_id
@@ -698,24 +730,31 @@ class MPPData:
             if channel_ids is not None:
                 values = values[:,channel_ids]
         else:
-            values = self._data[data]
+            values = self._data[data][mask]
         if len(values.shape) == 1:
             values = values[:, np.newaxis]
-        return MPPData._get_img_from_data(x, y, values, **kwargs)
+        # color image if necessary
+        img = MPPData._get_img_from_data(x, y, values, **kwargs)
+        if annotation_kwargs is not None:
+            img = annotate_img(img, from_col=data, **annotation_kwargs)
+        return img
     
-    def get_object_imgs(self, data='mpp', channel_ids=None, **kwargs):
+    def get_object_imgs(self, data='mpp', channel_ids=None, annotation_kwargs=None, **kwargs):
         """
         Return images for each obj_id in current data. 
-        Args: arguments for get_object_id
+
+        Args: arguments for get_object_img
         """
         imgs = []
         for obj_id in self.metadata[self.data_config.OBJ_ID]:
-            res = self.get_object_img(obj_id=obj_id, data=data, channel_ids=channel_ids, **kwargs)
+            res = self.get_object_img(obj_id=obj_id, data=data, channel_ids=channel_ids, annotation_kwargs=annotation_kwargs, **kwargs)
             if kwargs.get('img_size', None) is None:
                 # fn also returns padding info, which we don't need here
                 res = res[0]
             imgs.append(res)
         return imgs
+
+
 
 
 def _try_mmap_load(fname, mmap_mode='r', allow_not_existing=False):
