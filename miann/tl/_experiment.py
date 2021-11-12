@@ -153,7 +153,7 @@ class Experiment:
         data_dir = os.path.join(self.full_path, f'results_epoch{self.epoch:03d}', split)
         if os.path.isdir(data_dir):
             return MPPData.from_data_dir(data_dir, base_dir='', keys=['x', 'y', 'obj_ids', 'mpp'], 
-            optional_keys=list(set([self.config['cluster']['cluster_rep'], 'latent', 'decoder', self.config['cluster']['cluster_name']])), 
+            optional_keys=list(set([self.config['cluster']['cluster_rep'], 'latent', 'decoder', self.config['cluster']['cluster_name'], 'umap'])), 
             data_config=self.config['data']['data_config'])
         return None
 
@@ -165,7 +165,7 @@ class Experiment:
         data_dir = os.path.join(self.full_path, f'results_epoch{self.epoch:03d}', split+'_imgs')
         if os.path.isdir(data_dir):
             return MPPData.from_data_dir(data_dir, base_dir='', keys=['x', 'y', 'obj_ids', 'mpp'], 
-            optional_keys=list(set([self.config['cluster']['cluster_rep'], 'latent', 'decoder', self.config['cluster']['cluster_name']])), 
+            optional_keys=list(set([self.config['cluster']['cluster_rep'], 'latent', 'decoder', self.config['cluster']['cluster_name'], 'umap'])), 
             data_config=self.config['data']['data_config'])
         return None
 

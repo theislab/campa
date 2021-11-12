@@ -31,9 +31,9 @@ def run_experiments(mode, exps):
         comp.plot_history(values=['val_loss', 'val_decoder_loss'])
         comp.plot_final_score(score='val_decoder_loss', fallback_score='val_loss', save_prefix='decoder_loss_')
         comp.plot_per_channel_mse()
-        comp.plot_predicted_images(img_ids=[0,1,2,3,4], img_size=225)
-        comp.plot_cluster_images(img_ids=[0,1,2,3,4], img_size=225)
-        # TODO also plot umaps with conditions colored
+        comp.plot_predicted_images(img_ids=[0,1,2,3,4], img_size=exps[0].data_params['test_img_size'])
+        comp.plot_cluster_images(img_ids=[0,1,2,3,4], img_size=exps[0].data_params['test_img_size'])
+        comp.plot_umap()
 
 
 def parse_arguments():

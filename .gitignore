@@ -127,7 +127,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
->>>>>>> 69a4ade9d92b06e57a5f15be2bc1905e315c82da
-
-# custom
-test_new_dataset.ipynb

@@ -5,9 +5,10 @@ import os
 import tensorflow as tf
 import logging
 from miann.tl import Estimator, Experiment
-from miann.pl._plot import annotate_img
 import matplotlib.pyplot as plt
 from matplotlib import cm, colors
+import scanpy as sc
+from miann.data._conditions import process_condition_desc
 
 class Predictor:
     """
@@ -318,4 +319,24 @@ class ModelComparator:
         if self.save_dir is not None:
             plt.tight_layout()
             plt.savefig(os.path.join(self.save_dir, '{}cluster_images.png'.format(save_prefix)), dpi=100)
+
+    def plot_umap(self, exp_names=None, save_prefix=''):
+        from miann.tl._cluster import add_clustering_to_adata
+        for exp_name in self.exps.keys():
+            # prepare adata, add clustering with correct colors
+            adata = self.mpps[exp_name].get_adata(obsm={'X_umap': 'umap'})
+            print(self.mpps[exp_name].data_dir)
+            cluster_name = self.exps[exp_name].config['cluster']['cluster_name']
+            cluster_annotation = self.exps[exp_name].get_split_cluster_annotation(cluster_name)
+            add_clustering_to_adata(self.mpps[exp_name].data_dir, cluster_name, adata, cluster_annotation)
+            
+            # plot umap
+            conditions = [process_condition_desc(c)[0] for c in self.exps[exp_name].data_params['condition']]
+            print(conditions)
+            sc.pl.umap(adata, color=conditions + [cluster_name, '15_SON', '18_NONO', 
+    '11_PML', '21_NCL', '16_H3', '21_COIL', '02_CDK7', '01_PABPC1', '00_DAPI'], vmax='p99')
+            if self.save_dir is not None:
+                plt.savefig(os.path.join(self.save_dir, f'{save_prefix}umap_{exp_name}.png', dpi=100))
+
+    
 
