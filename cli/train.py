@@ -22,7 +22,7 @@ def run_experiments(mode, exps):
             cl = Cluster.from_exp_split(exp)
             cl.create_clustering()
             # predict cluster for images
-            if exp.config['evaluate']['predict_cluster_imgs']:
+            if exp.config['evaluation']['predict_cluster_imgs']:
                 cl.predict_cluster_imgs(exp)
     # compare models
     if mode in ('all', 'compare'):
