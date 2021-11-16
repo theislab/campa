@@ -425,12 +425,21 @@ class MPPData:
         Updates self.mpp and self.channels
         """
         # TODO need copy argument?
+        self.log.info('Subsetting from {} channels'.format(len(self.channels)))
+
         cids = list(self.channels.reset_index().set_index('name').loc[channels]['channel_id'])
+        raw_channels = self.channels
         self.channels = self.channels.loc[cids].reset_index(drop=True)
         self.channels.index.name = 'channel_id'
         self._data['mpp'] = self.mpp[:,:,:,cids]
+        subset_mpp_channels = self.channels
         self.log.info(f'Restricted channels to {len(self.channels)} channels')
-        
+        channels_diff=np.setdiff1d(raw_channels, subset_mpp_channels)
+        if len(channels_diff)>0:
+            self.log.info(f'The following channels were excluded {channels_diff}')
+        else:
+            self.log.info(f'None of the channels were excluded ')
+
     # TODO Nastassya: write tests for this
     def subsample(self, frac=None, frac_per_obj=None, num=None, num_per_obj=None, add_neighborhood=False, neighborhood_size=3):
         """

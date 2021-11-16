@@ -84,6 +84,8 @@ def get_lowhigh_bin_2_condition(cond, desc, cond_params):
 
 def get_zscore_condition(cond, desc, cond_params):
     # z-score TR
+    #contiinous nbr, normalizes it
+    #should work only after split up
     if cond_params.get(f'{desc}_mean_std', None) is not None:
         tr_mean, tr_std = cond_params[f'{desc}_mean_std']
     else:

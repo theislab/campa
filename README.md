@@ -24,3 +24,4 @@ pip install tensorflow
 conda install matplotlib jupyterlab pandas tqdm
 `
 
+4. Install miann  
