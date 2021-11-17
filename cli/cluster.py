@@ -67,7 +67,7 @@ def parse_arguments():
     # create
     create = subparsers.add_parser('create', help='Create (subsampled) data for clustering. Uses all data used to train exp')
     create.add_argument('--subsample', action='store_true', help='Subsample the data')
-    create.add_argument('--frac', default=0.005, help='Fraction of pixels to use for clustering')
+    create.add_argument('--frac', default=0.005, type=float, help='Fraction of pixels to use for clustering')
     create.add_argument('--save-dir', help='directory to save subsampled cluster data, relative to experiment dir. Default is aggregated/sub-FRAC')
     create.set_defaults(func=create_cluster_data)
     # prepare-full
