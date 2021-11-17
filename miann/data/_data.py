@@ -546,7 +546,7 @@ class MPPData:
                 if pd.isna(val):
                     self.log.warning(f"Missing background value for channel {ch}")
             background_value = background_value.fillna(0)
-            self.log.debug('use background_value: {background_value}')
+            self.log.debug(f'use background_value: {background_value}')
             self._data['mpp'] = self.mpp.astype(np.float32) - np.array(background_value)
         # cut off at 0 (no negative values)
         self._data['mpp'][self.mpp<0] = 0
