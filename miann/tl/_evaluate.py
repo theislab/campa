@@ -84,6 +84,7 @@ class Predictor:
                 img_ids = list(mpp_data.unique_obj_ids)
             if isinstance(img_ids, int):
                 # choose random img_ids from available ones
+                # TODO this uses new rng, before used old default np.random.choice. Will choose different cells
                 rng = np.random.default_rng(seed=42)
                 img_ids = rng.choice(mpp_data.unique_obj_ids, img_ids, replace=False)
             # subset mpp_data to these img_ids
@@ -334,9 +335,9 @@ class ModelComparator:
             conditions = [process_condition_desc(c)[0] for c in self.exps[exp_name].data_params['condition']]
             print(conditions)
             sc.pl.umap(adata, color=conditions + [cluster_name, '15_SON', '18_NONO', 
-    '11_PML', '21_NCL', '16_H3', '21_COIL', '02_CDK7', '01_PABPC1', '00_DAPI'], vmax='p99')
+    '11_PML', '21_NCL', '16_H3', '21_COIL', '02_CDK7', '01_PABPC1', '00_DAPI'], vmax='p99', show=False)
             if self.save_dir is not None:
-                plt.savefig(os.path.join(self.save_dir, f'{save_prefix}umap_{exp_name}.png', dpi=100))
+                plt.savefig(os.path.join(self.save_dir, f'{save_prefix}umap_{exp_name}.png'), dpi=100)
 
     
 

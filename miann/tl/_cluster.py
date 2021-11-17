@@ -429,4 +429,4 @@ class Cluster:
             self.log.warn(f"Did not find {self.config['cluster_rep']} in {img_save_dir}. Run create_clustering first.")
             return 
         self.log.info(f'Projecting cluster_imgs for {exp.dir}/{exp.name}')
-        return self.predict_clustering(mpp_imgs, save_dir=img_save_dir)
+        return self.project_clustering(mpp_imgs, save_dir=img_save_dir)
