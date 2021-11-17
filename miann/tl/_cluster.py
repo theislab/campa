@@ -140,6 +140,7 @@ class Cluster:
         # add information on data to cluster
         cluster_config['data_config'] = exp.config['data']['data_config']
         cluster_config['data_dirs'] = exp.data_params['data_dirs']
+        # only process data for model if experiment has model to evaluate
         cluster_config['process_like_dataset'] = exp.config['data']['dataset_name']
         cluster_config['seed'] = exp.data_params['seed']
         if data_dir is None:
@@ -216,13 +217,13 @@ class Cluster:
             self._cluster_annotation = self._load_cluster_annotation()
         return self._cluster_annotation
         
-    def _load_cluster_annotation(self):
+    def _load_cluster_annotation(self, recreate=False):
         """
         Read cluster annotation file / create it
         """
         fname = os.path.join(EXPERIMENT_DIR, self.config['cluster_data_dir'], f"{self.config['cluster_name']}_annotation.csv")
         # try to read file
-        if os.path.exists(fname):
+        if os.path.exists(fname) and not recreate:
             annotation = pd.read_csv(fname, index_col=0, dtype=str, keep_default_na=False)
             return annotation
         else:
@@ -266,10 +267,12 @@ class Cluster:
 
         Raises: ValueError if config does not contain data_dirs and process_like_dataset
         """
+        # TODO: add option how to process data (e.g. for MPPcluster, do not need to add neighborhood)
         self.log.info('creating cluster mpp from config')
         # check that have required information
-        if (len(self.config['data_dirs']) == 0) or self.config['process_like_dataset'] is None:
-            raise ValueError("Cannot create cluster data without data_dirs and process_like_dataset")
+        if (len(self.config['data_dirs']) == 0):
+            raise ValueError("Cannot create cluster data without data_dirs")
+        self.log.info(f"processing cluster_mpp like dataset {self.config['process_like_dataset']}")
         # load params to use when processing
         data_config = get_data_config(self.config['data_config'])
         data_params = json.load(open(os.path.join(data_config.DATASET_DIR, self.config['process_like_dataset'], 'params.json'), 'r'))
@@ -349,8 +352,8 @@ class Cluster:
         if self.config['umap'] and not self.config['cluster_method'] == 'leiden':
             self.add_umap()
 
-        # ensure that have annotation file
-        self.cluster_annotation
+        # recreate annotation file
+        self._cluster_annotation = self._load_cluster_annotation(recreate=True)
 
     def add_umap(self):
         """
@@ -399,6 +402,8 @@ class Cluster:
         # project clusters
         clustering = []
         samples = mpp_data.data(self.config['cluster_rep'])
+        if self.config['cluster_rep'] == 'mpp':  # use center mpp in this special case
+            samples = mpp_data.center_mpp
         for i in np.arange(0, samples.shape[0], batch_size):
             self.log.info(f'processing chunk {i}')
             cur_samples = samples[i:i+batch_size]
@@ -417,16 +422,20 @@ class Cluster:
         """
         Predict cluster imgs from experiment
         """
-        # create Predictor
-        pred = Predictor(exp)
-        # predict clustering on imgs
-        img_save_dir = os.path.join(EXPERIMENT_DIR, exp.dir, exp.name, f'results_epoch{pred.est.epoch:03d}', exp.config['evaluation']['split']+'_imgs')
-        mpp_imgs = pred.est.ds.imgs[exp.config['evaluation']['split']]
-        # add latent space to mpp_imgs + subset
-        try:
-            mpp_imgs.add_data_from_dir(img_save_dir, keys=[self.config['cluster_rep']], subset=True, base_dir='')
-        except FileNotFoundError:
-            self.log.warn(f"Did not find {self.config['cluster_rep']} in {img_save_dir}. Run create_clustering first.")
-            return 
+        if exp.is_trainable:
+            # create Predictor
+            pred = Predictor(exp)
+            # predict clustering on imgs
+            img_save_dir = os.path.join(exp.full_path, f'results_epoch{pred.est.epoch:03d}', exp.config['evaluation']['split']+'_imgs')
+            mpp_imgs = pred.est.ds.imgs[exp.config['evaluation']['split']]
+            # add latent space to mpp_imgs + subset
+            try:
+                mpp_imgs.add_data_from_dir(img_save_dir, keys=[self.config['cluster_rep']], subset=True, base_dir='')
+            except FileNotFoundError:
+                self.log.warn(f"Did not find {self.config['cluster_rep']} in {img_save_dir}. Run create_clustering first.")
+                return 
+        else:
+            img_save_dir = os.path.join(exp.full_path, 'results_epoch000', exp.config['evaluation']['split']+'_imgs')
+            mpp_imgs = MPPData.from_data_dir(img_save_dir, base_dir='')
         self.log.info(f'Projecting cluster_imgs for {exp.dir}/{exp.name}')
         return self.project_clustering(mpp_imgs, save_dir=img_save_dir)

@@ -65,7 +65,8 @@ class GradReverse(tf.keras.layers.Layer):
     def call(self, x):
         return grad_reverse(x)
                                         
-# --- Model classes ---                                
+# --- Model classes ---   
+
 BASE_MODEL_CONFIG = {
     'name': None,
     # input definition

@@ -4,19 +4,43 @@ from miann.tl import Estimator, Experiment, Predictor, Cluster, ModelComparator
 import argparse
 import os
 
+def prepare_exp_split(exp):
+    """
+    set up exp split data for non trainable model. Mimicks results folders created with predictor
+    """
+    from miann.data import MPPData
+    import numpy as np
+    # create results mpp_data for not trainable experiment to allow usage with Cluster
+    for split in [exp.config['evaluation']['split'], exp.config['evaluation']['split']+'_imgs']:
+        base_data_dir = os.path.join('datasets', exp.data_params['dataset_name'], split)
+        mpp_params = {'base_data_dir':base_data_dir, 'subset': True}
+        mpp_data = MPPData.from_data_dir(base_data_dir)
+        if '_imgs' in split:
+            # choose random img_ids from availalbe ones
+            rng = np.random.default_rng(seed=42)
+            img_ids = rng.choice(mpp_data.unique_obj_ids, exp.config['evaluation']['img_ids'], replace=False)
+            # subset mpp_data to these img_ids
+            mpp_data.subset(obj_ids=img_ids)
+        mpp_data.write(save_dir=os.path.join(exp.full_path, 'results_epoch000', split), mpp_params=mpp_params, save_keys=[])
+
+
 def run_experiments(mode, exps):
     exp_names = [exp.name for exp in exps]
     print(f'Running experiment for {exp_names} with mode {mode}')
     for exp_name, exp in zip(exp_names, exps):
         if mode in ('all', 'train', 'trainval'):
-            print('Training model for {}'.format(exp_name))
-            est = Estimator(exp)
-            _ = est.train_model()
+            if exp.is_trainable:
+                print('Training model for {}'.format(exp_name))
+                est = Estimator(exp)
+                _ = est.train_model()
         if mode in ('all', 'evaluate', 'trainval'):
-            # evaluate model
-            print('Evaluating model for {}'.format(exp_name))
-            pred = Predictor(exp)
-            pred.evaluate_model()
+            if exp.is_trainable:
+                # evaluate model
+                print('Evaluating model for {}'.format(exp_name))
+                pred = Predictor(exp)
+                pred.evaluate_model()
+            else:
+                prepare_exp_split(exp)
             # cluster model
             print(f'Clustering results for {exp_name}')
             cl = Cluster.from_exp_split(exp)

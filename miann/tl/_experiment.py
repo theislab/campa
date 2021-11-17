@@ -100,6 +100,10 @@ class Experiment:
         return self
 
     @property
+    def is_trainable(self):
+        return self.config['model'] is not None and self.config['training'] is not None
+
+    @property
     def name(self):
         return self.config['experiment']['name']
 
@@ -206,12 +210,12 @@ class Experiment:
         return exps
 
     @staticmethod
-    def get_experiments_from_dir(exp_dir, exp_names=None, trainable=True):
+    def get_experiments_from_dir(exp_dir, exp_names=None, only_trainable=False):
         exps = []
         for exp_name in next(os.walk(os.path.join(EXPERIMENT_DIR, exp_dir)))[1]:
             config_fname = os.path.join(EXPERIMENT_DIR, exp_dir, exp_name, 'config.json')
             if os.path.exists(config_fname) and ((exp_names is None) or (exp_name in exp_names)):
                 exp = Experiment.from_dir(os.path.join(exp_dir, exp_name))
-                if not trainable or (exp.config['model'] is not None and exp.config['training'] is not None):
+                if not only_trainable or exp.is_trainable:
                     exps.append(exp)
         return exps
