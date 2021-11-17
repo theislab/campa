@@ -15,22 +15,23 @@ def prepare_full_dataset(args):
         mpp_data = MPPData.from_data_dir(data_dir)
         # params for partial saving of mpp_data
         mpp_params = {'base_data_dir':data_dir, 'subset': True}
-        if mpp_data.data(rep) is not None:
-            # just save mpp_data, rep is already present
-            mpp_data.write(os.path.join(exp.full_path, args.save_dir, data_dir), mpp_params=mpp_params, save_keys=[])
+        # need to predict rep
+        # prepare mpp_data
+        print('Preparing data')
+        data_config = get_data_config(exp.config['data']['data_config'])
+        data_params = json.load(open(os.path.join(data_config.DATASET_DIR, exp.config['data']['dataset_name'], 'params.json'), 'r'))
+        mpp_data.prepare(data_params)
+        if exp.config['cluster']['cluster_rep'] == 'mpp':
+            # just save mpp
+            mpp_data.write(os.path.join(exp.full_path, args.save_dir, data_dir), mpp_params=mpp_params, save_keys=['mpp'])
         else:
-            # need to predict rep
-            # prepare mpp_data
-            print('Preparing data')
-            data_config = get_data_config(exp.config['data']['data_config'])
-            data_params = json.load(open(os.path.join(data_config.DATASET_DIR, exp.config['data']['dataset_name'], 'params.json'), 'r'))
-            mpp_data.prepare(data_params)
             if data_params['neighborhood']:
                 mpp_data.add_neighborhood(data_params['neighborhood_size'])
             # predict rep
             print('Predicting latent')
             pred = Predictor(exp)
             pred.predict(mpp_data, reps=[exp.config['cluster']['cluster_rep']], save_dir=os.path.join(exp.full_path, args.save_dir, data_dir), mpp_params=mpp_params)
+
 
 
 def create_cluster_data(args):

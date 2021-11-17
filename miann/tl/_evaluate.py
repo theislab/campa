@@ -12,7 +12,7 @@ from miann.data._conditions import process_condition_desc
 
 class Predictor:
     """
-    predict MPPData with trained model.    
+    predict MPPData with trained model.
     """
 
     def __init__(self, exp, batch_size=None):
@@ -163,6 +163,13 @@ class ModelComparator:
         exps = [Experiment.from_dir(os.path.join(exp_dir, exp_name)) for exp_name in exp_names]
         return cls(exps, save_dir=exp_dir)
 
+    def _filter_trainable_exps(self, exp_names):
+        """
+        return exp_names that are trainable.
+        Needed for some plotting fns that only make sense for trainable exps
+        """
+        return [exp_name for exp_name in exp_names if self.exps[exp_name].is_trainable]
+
     def plot_history(self, values=['loss'], exp_names=None, save_prefix=''):
         """line plot of values against epochs for different experiments
         Args:
@@ -171,6 +178,8 @@ class ModelComparator:
         """
         if exp_names is None:
             exp_names = self.exp_names
+        exp_names = self._filter_trainable_exps(exp_names)
+
         cmap = plt.get_cmap('tab10')
         cnorm  = colors.Normalize(vmin=0, vmax=10)
         fig, axes = plt.subplots(1,len(values), figsize=(len(values)*5,5), sharey=True)
@@ -192,6 +201,8 @@ class ModelComparator:
     def plot_final_score(self, score='loss', fallback_score='loss', exp_names=None, save_prefix=''):
         if exp_names is None:
             exp_names = self.exp_names
+        exp_names = self._filter_trainable_exps(exp_names)
+
         scores = []
         for exp_name in exp_names:
             hist = self.exps[exp_name].get_history()
@@ -211,6 +222,7 @@ class ModelComparator:
         # setup: get experiments + mpps
         if exp_names is None:
             exp_names = self.exp_names
+        exp_names = self._filter_trainable_exps(exp_names)
         if channels is None:
             channels = self.channels[exp_names[0]]
 
@@ -237,6 +249,7 @@ class ModelComparator:
         """
         if exp_names is None:
             exp_names = self.exp_names
+        exp_names = self._filter_trainable_exps(exp_names)
         if channels is None:
             channels = self.channels[exp_names[0]]
         output_channels = self.exps[exp_names[0]].config['data'].get('output_channels', None)
