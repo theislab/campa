@@ -489,14 +489,21 @@ class MPPData:
             mpp_data._data['mpp'] = neighbor_mpp
         return mpp_data
         
-    def add_neighborhood(self, size=3):
+    def add_neighborhood(self, size=3, copy=False):
         # TODO need copy flag?
-        assert not self.has_neighbor_data, "cannot add neighborhood, already has neighbor data"
         self.log.info('Adding neighborhood of size {}'.format(size))
         mpp = self._get_neighborhood(self.obj_ids, self.x, self.y, size=size)
-        # TODO Nastassya: this should be in a unittest of self.get_neighborhood
-        assert (mpp[:,size//2,size//2,:] == self.center_mpp).all()
-        self._data['mpp'] = mpp
+        assert (mpp[:, size // 2, size // 2, :] == self.center_mpp).all()
+
+        if copy:
+            data = self._data.copy()
+            data['mpp'] = mpp
+            return MPPData(metadata=self.metadata, channels=self.channels, data=data,
+                           seed=self.seed, data_config=self.data_config_name)
+        else:
+            assert not self.has_neighbor_data, "cannot add neighborhood, already has neighbor data"
+            # TODO Nastassya: this should be in a unittest of self.get_neighborhood
+            self._data['mpp'] = mpp
         
     def normalise(self, background_value=None, percentile=None, rescale_values=[]):
         """
@@ -715,6 +722,24 @@ class MPPData:
         if len(values.shape) == 1:
             values = values[:, np.newaxis]
         return MPPData._get_img_from_data(x, y, values, **kwargs)
+
+    def get_img(self, data='mpp', channel_ids=None, **kwargs):
+        """
+        Calculate data image of all mpp data.
+        data: key in self._data that should be plotted on the image
+        channel_ids: only if key == 'mpp'. Channels that the image should have.
+            If None, all channels are returned.
+        kwargs: arguments for self._get_img_from_data
+        """
+        if data == 'mpp':
+            values = self.center_mpp
+            if channel_ids is not None:
+                values = values[:, channel_ids]
+        else:
+            values = self._data[data]
+        if len(values.shape) == 1:
+            values = values[:, np.newaxis]
+        return MPPData._get_img_from_data(self.x, self.y, values, **kwargs)
     
     def get_object_imgs(self, data='mpp', channel_ids=None, **kwargs):
         """
