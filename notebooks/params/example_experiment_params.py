@@ -7,7 +7,6 @@ base_config = {
         'save_config': True,
     },
     'data': {
-        'load_dataset': True,
         'data_config': 'NascentRNA',
         'dataset_name': '184A1_test_dataset',
         'output_channels': None,
@@ -62,21 +61,35 @@ base_config = {
 
 variable_config = [
     # unconditional model
-    {
-        'experiment': {'name': 'VAE'},
-        'model': {
-            'model_cls': ModelEnum.VAEModel,
-        },
-    },
+    #{
+    #    'experiment': {'name': 'VAE'},
+    #    'model': {
+    #        'model_cls': ModelEnum.VAEModel,
+    #    },
+    #},
     # conditional model
+    #{
+    #    'experiment': {'name': 'CondVAE_pert-CC'},
+    #    'model': {
+    #        'model_cls': ModelEnum.VAEModel,
+    #        'model_kwargs': {
+    #            'num_conditions': 14,
+    #            'encode_condition': [10,10],
+    #        },
+    #    },
+    #}, 
+    # MPPleiden model (non-trainable)
     {
-        'experiment': {'name': 'CondVAE_pert-CC'},
-        'model': {
-            'model_cls': ModelEnum.VAEModel,
-            'model_kwargs': {
-                'num_conditions': 14,
-                'encode_condition': [10,10],
-            },
+        'experiment': {'name': 'MPPleiden'},
+        'model': None,
+        'training': None,
+        'evaluation': {
+            'predict_reps':[], 
+            'predict_imgs': False
         },
-    }, 
+        'cluster': {
+            'cluster_rep': 'mpp', 
+            'leiden_resolution': 2
+        },
+    }
 ]

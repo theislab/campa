@@ -132,7 +132,11 @@ class Estimator:
             # first need to compile the model
             self._compile_model()
             self.log.info('Initializing model with weights from {}'.format(weights_path))
-            self.model.model.load_weights(weights_path)
+            w1 = self.model.model.layers[5].get_weights()
+            self.model.model.load_weights(weights_path).assert_nontrivial_match().assert_existing_objects_matched()
+            w2 = self.model.model.layers[5].get_weights()
+            assert (w1[0] != w2[0]).any()
+            assert (w1[1] != w2[1]).any()
             self.epoch = self.exp.epoch
             # TODO when fine-tuning need to reset self.epoch!     
     
