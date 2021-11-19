@@ -759,6 +759,20 @@ class MPPData:
             img = annotate_img(img, from_col=data, **annotation_kwargs)
         return img
 
+    def get_object_imgs(self, data='mpp', channel_ids=None, annotation_kwargs=None, **kwargs):
+        """
+        Return images for each obj_id in current data.
+        Args: arguments for get_object_img
+        """
+        imgs = []
+        for obj_id in self.metadata[self.data_config.OBJ_ID]:
+            res = self.get_object_img(obj_id=obj_id, data=data, channel_ids=channel_ids, annotation_kwargs=annotation_kwargs, **kwargs)
+            if kwargs.get('img_size', None) is None:
+                # fn also returns padding info, which we don't need here
+                res = res[0]
+            imgs.append(res)
+        return imgs
+
     def get_img(self, data='mpp', channel_ids=None, **kwargs):
         """
         Calculate data image of all mpp data.
@@ -776,6 +790,8 @@ class MPPData:
         if len(values.shape) == 1:
             values = values[:, np.newaxis]
         return MPPData._get_img_from_data(self.x, self.y, values, **kwargs)
+
+
 
 def _try_mmap_load(fname, mmap_mode='r', allow_not_existing=False):
     """
