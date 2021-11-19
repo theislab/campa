@@ -637,7 +637,7 @@ class MPPData:
         import anndata as ad
         if isinstance(obsm, list):
             obsm = {o: o for o in obsm}
-        obsm = {k: self.data(v) for k,v in obsm.items()}
+        obsm = {k: self.data(v).astype(np.float32) for k,v in obsm.items()}
         if X == 'mpp':
             var = self.channels
             X = self.center_mpp
@@ -645,7 +645,7 @@ class MPPData:
             var = None
             X = self.data(X)
         # add spatial coords as obsm['spatial']
-        obsm['spatial'] = np.stack([self.x, self.y]).T
+        obsm['spatial'] = np.stack([self.x, self.y]).T.astype(np.float32)
         # get per-pixel obs
         obs_ = self._get_per_mpp_value(self.metadata.to_dict(orient='list'))
         for o in obs:
