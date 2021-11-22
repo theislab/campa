@@ -204,7 +204,7 @@ class Cluster:
             return None
         # load data
         try:
-            mpp_data = MPPData.from_data_dir(data_dir, base_dir=EXPERIMENT_DIR, optional_keys=[rep, name, 'umap'])
+            mpp_data = MPPData.from_data_dir(data_dir, base_dir=EXPERIMENT_DIR, optional_keys=['mpp', rep, name, 'umap'])
             self.log.info(f'Loaded cluster_mpp {mpp_data}')
             return mpp_data
         except FileNotFoundError as e:
@@ -234,13 +234,72 @@ class Cluster:
             # create empty annnotation from unique clusters and empty cluster for background in images
             annotation = pd.DataFrame({self.config['cluster_name']: sorted(list(np.unique(self.cluster_mpp.data(self.config['cluster_name']))), key=int)+[""]})
             annotation.index.name = 'index'
-            # add cluster_colors to annotation
-            cmap = plt.get_cmap('tab20', len(annotation)-1)
-            cluster_colors = [rgb2hex(cmap(i)) for i in range(cmap.N)] + ['#ffffff']  # add white color for background
-            annotation[self.config['cluster_name']+'_colors'] = cluster_colors
             # save annotation
             annotation.to_csv(fname)
+            self._cluster_annotation = annotation
+            # add colors
+            self.add_cluster_colors(colors=None)
             return annotation
+
+    # --- fns modifying annotation ---
+    def add_cluster_annotation(self, annotation, to_col, from_col=None, colors=None):
+        """
+        add annotation and colormap to clustering. 
+        
+        Is saved in cluster_name_annotation.csv
+        
+        Args:
+            annotation: dict with keys from "from_col" and values the annotation.
+            to_col: name under which the annotation should be saved
+            from_col: optionally set the annotation name from which to annotate. Default is cluster_name.
+            colors: color dict, with annotation as keys and hex colors as values. Default is using tab20 colormap
+        """
+        if from_col is None:
+            from_col = self.config['cluster_name']
+        df = pd.DataFrame.from_dict(annotation, orient='index', columns=[to_col])
+        # remove to_col and to_col_colors if present
+        annotation = self.cluster_annotation
+        annotation.drop(columns=[to_col], errors='ignore', inplace=True)
+        # add annotation col
+        annotation = pd.merge(annotation, df, how='left', left_on=from_col, right_index=True)
+        self._cluster_annotation = annotation
+        # save to disk
+        fname = os.path.join(EXPERIMENT_DIR, self.config['cluster_data_dir'], f"{self.config['cluster_name']}_annotation.csv")
+        self._cluster_annotation.to_csv(fname)
+        # add colors
+        self.add_cluster_colors(colors, to_col)
+                                
+    def add_cluster_colors(self, colors, from_col=None):
+        """
+        add colors to clustering or to annotation.
+        
+        adds column from_col"_colors" to self.cluster_annotation and saves it to cluster_name"_annotation.csv"
+        
+        Args:
+            colors: color dict, with unique clustering values from from_col as keys and hex colors as values. 
+                Default is using tab20 colormap
+            from_col: optionally set clustering name for which to add colors. Default is cluster_name.
+        """
+        if from_col is None:
+            from_col = self.config['cluster_name']
+        to_col = from_col+'_colors'
+        # remove previous colors
+        annotation = self.cluster_annotation
+        annotation.drop(columns=[to_col], errors='ignore', inplace=True)
+        # add colors
+        if colors is None:
+            values = np.unique(annotation[from_col].dropna())
+            N = len(values)
+            cmap = plt.get_cmap('tab20', N)
+            colors = {k:rgb2hex(cmap(i)) for i,k in enumerate(values)}
+        df = pd.DataFrame.from_dict(colors, orient='index', columns=[to_col])
+        annotation = pd.merge(annotation, df, how='left', left_on=from_col, right_index=True)
+        # fill nan values with white background color
+        annotation[to_col] = annotation[to_col].fillna('#ffffff')
+        self._cluster_annotation = annotation
+        # save to disk
+        fname = os.path.join(EXPERIMENT_DIR, self.config['cluster_data_dir'], f"{self.config['cluster_name']}_annotation.csv")
+        self._cluster_annotation.to_csv(fname)
 
     # --- getters ---
     def get_nndescent_index(self, recreate=False):
@@ -411,8 +470,9 @@ class Cluster:
             self.log.info(f'processing chunk {i}')
             cur_samples = samples[i:i+batch_size]
             neighs = index.query(cur_samples.astype(np.float32), k=15)[0]
-            clustering.append(np.apply_along_axis(most_frequent, 
-                arr=self.cluster_mpp.data(self.config['cluster_name'])[neighs], axis=1))
+            # NOTE: do not use apply_along_axis, because dtype is inferred incorrectly!
+            clustering.append(np.array([most_frequent(row) for row in self.cluster_mpp.data(self.config['cluster_name'])[neighs]],
+                dtype=self.cluster_mpp.data(self.config['cluster_name']).dtype))
         clustering = np.concatenate(clustering)
         mpp_data._data[self.config['cluster_name']] = clustering
 

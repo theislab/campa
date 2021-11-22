@@ -34,7 +34,7 @@ class ImageData():
 from typing import Mapping
 
 class MPPData:
-
+    # TODO: in initialisers: make x,y, obj_ids required, but add automatically to keys when not specified
     def __init__(self, metadata: pd.DataFrame, channels: pd.DataFrame, data: Mapping[str,np.ndarray], **kwargs):
         """
         data: dictionary containing MPPData, at least containing required_keys: x, y, obj_ids.
@@ -309,6 +309,9 @@ class MPPData:
             self._data[key] = mpp_to_add.data(key)
         for key in optional_keys:
             if mpp_to_add.data(key) is not None:
+                # check if mpp is not only zeros
+                if key == 'mpp' and (mpp_to_add.data('mpp') == np.zeros_like(mpp_to_add.data('mpp'))).all():
+                    continue
                 self._data[key] = mpp_to_add.data(key)
         # update channels if added mpp
         if 'mpp' in keys + optional_keys:
