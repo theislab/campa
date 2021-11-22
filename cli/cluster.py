@@ -53,7 +53,7 @@ def project_data(args):
     data_dirs = exp.data_params['data_dirs'] if args.data_dir is None else [args.data_dir]
     for data_dir in data_dirs:
         # load mpp_data with cluster_rep
-        mpp_data = MPPData.from_data_dir(data_dir, base_dir=os.path.join(exp.full_path, args.save_dir), keys=['x', 'y', 'mpp', 'obj_ids', cl.config['cluster_rep']])
+        mpp_data = MPPData.from_data_dir(data_dir, base_dir=os.path.join(exp.full_path, args.save_dir), keys=['x', 'y', 'obj_ids', cl.config['cluster_rep']])
         cl.project_clustering(mpp_data, save_dir=os.path.join(exp.full_path, args.save_dir, data_dir))
 
 

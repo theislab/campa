@@ -239,7 +239,7 @@ class Cluster:
             self._cluster_annotation = annotation
             # add colors
             self.add_cluster_colors(colors=None)
-            return annotation
+            return self._cluster_annotation
 
     # --- fns modifying annotation ---
     def add_cluster_annotation(self, annotation, to_col, from_col=None, colors=None):
@@ -288,7 +288,9 @@ class Cluster:
         annotation.drop(columns=[to_col], errors='ignore', inplace=True)
         # add colors
         if colors is None:
-            values = np.unique(annotation[from_col].dropna())
+            # get unique values, removing nan and empty string
+            values = list(np.unique(annotation[from_col].dropna()))
+            values.remove('')
             N = len(values)
             cmap = plt.get_cmap('tab20', N)
             colors = {k:rgb2hex(cmap(i)) for i,k in enumerate(values)}
