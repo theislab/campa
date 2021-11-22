@@ -408,11 +408,12 @@ class MPPData:
             selected_obj_ids = selected_obj_ids[mask]
         # select ids based on nona conditions
         if nona_condition: # TODO test this!
-            mask = ~np.isnan(self.conditions).any(axis=1)
-            mpp_df = self.metadata.set_index(self.data_config.OBJ_ID).loc[self.obj_ids][mask]
-            nona_obj_ids = mpp_df.reset_index().groupby(self.data_config.OBJ_ID).first().index
-            selected_obj_ids = np.array(list(set(selected_obj_ids).intersection(nona_obj_ids)))
-            self.log.info(f'Subsetting to objects with NO_NAN condition: {len(selected_obj_ids)}')
+            if self.conditions is not None:
+                mask = ~np.isnan(self.conditions).any(axis=1)
+                mpp_df = self.metadata.set_index(self.data_config.OBJ_ID).loc[self.obj_ids][mask]
+                nona_obj_ids = mpp_df.reset_index().groupby(self.data_config.OBJ_ID).first().index
+                selected_obj_ids = np.array(list(set(selected_obj_ids).intersection(nona_obj_ids)))
+                self.log.info(f'Subsetting to objects with NO_NAN condition: {len(selected_obj_ids)}')
         # select ids based on ramdom subset
         if frac is not None:
             num = int(len(selected_obj_ids)*frac)

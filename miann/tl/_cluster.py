@@ -280,8 +280,11 @@ class Cluster:
         mpp_data = []
         for data_dir in self.config['data_dirs']:
             mpp_data.append(MPPData.from_data_dir(data_dir, seed=self.config['seed'], data_config=self.config['data_config']))
+            # subset if necessary (do before subsampling, to get expected # of samples)
+            if data_params['subset']:
+                mpp_data[-1].subset(**data_params['subset_kwargs'])
         mpp_data = MPPData.concat(mpp_data)
-        # TODO after have reproduced data, could do subsampling in for loop
+        # TODO after have reproduced data, could do subsampling inside for loop (after subsetting)
         if self.config['subsample']:
             mpp_data = mpp_data.subsample(add_neighborhood=data_params['neighborhood'], 
                 neighborhood_size=data_params['neighborhood_size'],  **self.config['subsample_kwargs'])
