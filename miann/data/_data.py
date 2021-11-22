@@ -37,13 +37,13 @@ class MPPData:
 
     def __init__(self, metadata: pd.DataFrame, channels: pd.DataFrame, data: Mapping[str,np.ndarray], **kwargs):
         """
-        data: dictionary containing MPPData, at least containing required_keys
+        data: dictionary containing MPPData, at least containing required_keys: x, y, obj_ids.
+
+        If mpp is not present, is replaced with zero-value array of shape: #pixels x 1 x 1 x #channels
    
         kwargs:
-            data_config (defualt NascentRNA)
+            data_config (default NascentRNA)
             seed (default 42)
-            _skip_initialisation (default True): can skip checking if has all keys - WARNING: skipping this might
-                result in a not well defined MPPData.
         """
         # set up logger
         self.log = getLogger(self.__class__.__name__)
@@ -57,12 +57,7 @@ class MPPData:
         self.channels = channels
         self._data = data
 
-        if kwargs.get('_skip_initialisation', False):
-            self.metadata = metadata
-            self.log.debug(f"Created unitialised MPPData")
-            return
-
-        for required_key in ['x', 'y', 'mpp', 'obj_ids']:
+        for required_key in ['x', 'y', 'obj_ids']:
             assert required_key in data.keys(), f"required key {required_key} missing from data"
         # subset metadata to obj_ids in data
         self.metadata = metadata[metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))]
@@ -78,8 +73,8 @@ class MPPData:
 
     @classmethod
     def from_data_dir(cls, data_dir, mode='r', base_dir=None, 
-        keys=['x', 'y', 'mpp', 'obj_ids'], 
-        optional_keys=['labels', 'latent', 'conditions'], **kwargs):
+        keys=['x', 'y', 'obj_ids'], 
+        optional_keys=['mpp', 'labels', 'latent', 'conditions'], **kwargs):
         """
         Read MPPData from directory.
 
@@ -122,8 +117,8 @@ class MPPData:
     
     @classmethod
     def _from_data_dir(cls, data_dir, mode='r', base_dir=None, 
-        keys=['x', 'y', 'mpp', 'obj_ids'], 
-        optional_keys=['labels', 'latent', 'conditions'], **kwargs):
+        keys=['x', 'y', 'obj_ids'], 
+        optional_keys=['mpp', 'labels', 'latent', 'conditions'], **kwargs):
         """
         Helper function to read MPPData from directory. Ignores mpp_params.json
         """
@@ -173,6 +168,9 @@ class MPPData:
     # --- Properties ---
     @property
     def mpp(self):
+        if 'mpp' not in self._data.keys():
+            self.log.info('Setting mpp to empty array')
+            self._data['mpp'] = np.zeros((len(self.x), 1, 1, len(self.channels)))
         return self._data['mpp']
 
     @property
@@ -195,7 +193,7 @@ class MPPData:
         """
         Information contained in MPPData.
 
-        Required keys are: mpp, x, y, obj_ids.
+        Required keys are: x, y, obj_ids.
 
         Args;
             key: identifier for data that should be returned
@@ -255,8 +253,11 @@ class MPPData:
                 self.log.warn("Saving partial keys of mpp data without a base_data_dir to enable correct loading")
             else:
                 # save mpp_params
-                mpp_params = {'base_data_dir':mpp_params['base_data_dir'], 'subset': mpp_params.get('subset', False)}
-                json.dump(mpp_params, open(os.path.join(save_dir, 'mpp_params.json'), 'w'))
+                mpp_params = {
+                    'base_data_dir':mpp_params['base_data_dir'], 
+                    'subset': mpp_params.get('subset', False)
+                }
+                json.dump(mpp_params, open(os.path.join(save_dir, 'mpp_params.json'), 'w'), indent=4)
         # add required save_keys
         save_keys = list(set(save_keys).union(["x", "y", "obj_ids"]))
         self.log.info(f'Saving mpp data to {save_dir} (keys: {save_keys})')
@@ -293,9 +294,7 @@ class MPPData:
         
         """
         mpp_to_add = MPPData._from_data_dir(data_dir, keys=list(set(['x', 'y', 'obj_ids']+keys)), optional_keys=optional_keys,
-             _skip_initialisation=True, data_config=self.data_config_name, **kwargs)
-        # subset metadata to obj_ids in data
-        mpp_to_add.metadata = mpp_to_add.metadata[mpp_to_add.metadata[self.data_config.OBJ_ID].isin(np.unique(mpp_to_add.obj_ids))]
+            data_config=self.data_config_name, **kwargs)
         # check that obj_ids from mpp_to_add are the same / a subset of the current obj_ids
         if subset:
             assert set(self.unique_obj_ids).issuperset(mpp_to_add.unique_obj_ids)
@@ -368,7 +367,6 @@ class MPPData:
         self._data['conditions'] = np.concatenate(conditions, axis=-1)
 
     # TODO: Nastassya: write tests for this   
-    # TODO might want to subset based on condition non nan - use apply_mask for this?
     def subset(self, frac=None, num=None, obj_ids=None, nona_condition=False, copy=False, **kwargs):
         """
         Restrict objects to those with specified value(s) for key in the metadata table
@@ -736,7 +734,11 @@ class MPPData:
         # color image if necessary
         img = MPPData._get_img_from_data(x, y, values, **kwargs)
         if annotation_kwargs is not None:
-            img = annotate_img(img, from_col=data, **annotation_kwargs)
+            if isinstance(img, tuple):  # have padding info in img
+                img_ = annotate_img(img[0], from_col=data, **annotation_kwargs)
+                img = (img_, img[1])
+            else: 
+                img = annotate_img(img, from_col=data, **annotation_kwargs)
         return img
     
     def get_object_imgs(self, data='mpp', channel_ids=None, annotation_kwargs=None, **kwargs):
