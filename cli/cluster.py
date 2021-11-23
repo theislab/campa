@@ -2,33 +2,30 @@ import argparse
 from miann.utils import init_logging
 from miann.tl import Experiment, Cluster, Predictor
 from miann.data import MPPData
-from miann.constants import get_data_config
 import os
-import json
+import logging
 
 def prepare_full_dataset(args):
+    log = logging.getLogger('prepare full dataset')
     exp = Experiment.from_dir(args.experiment_dir)
-    rep = exp.config['cluster']['cluster_rep']
     # iterate over all data dirs
     for data_dir in exp.data_params['data_dirs']:
-        print(f"Processing data_dir {data_dir}")
+        log.info(f"Processing data_dir {data_dir}")
         mpp_data = MPPData.from_data_dir(data_dir)
         # params for partial saving of mpp_data
         mpp_params = {'base_data_dir':data_dir, 'subset': True}
-        # need to predict rep
         # prepare mpp_data
-        print('Preparing data')
-        data_config = get_data_config(exp.config['data']['data_config'])
-        data_params = json.load(open(os.path.join(data_config.DATASET_DIR, exp.config['data']['dataset_name'], 'params.json'), 'r'))
-        mpp_data.prepare(data_params)
+        log.info('Preparing data')
+        mpp_data.prepare(exp.data_params)
         if exp.config['cluster']['cluster_rep'] == 'mpp':
             # just save mpp
             mpp_data.write(os.path.join(exp.full_path, args.save_dir, data_dir), mpp_params=mpp_params, save_keys=['mpp'])
         else:
-            if data_params['neighborhood']:
-                mpp_data.add_neighborhood(data_params['neighborhood_size'])
+            # need to predict rep - prepare neighborhood
+            if exp.data_params['neighborhood']:
+                mpp_data.add_neighborhood(exp.data_params['neighborhood_size'])
             # predict rep
-            print('Predicting latent')
+            log.info('Predicting latent')
             pred = Predictor(exp)
             pred.predict(mpp_data, reps=[exp.config['cluster']['cluster_rep']], save_dir=os.path.join(exp.full_path, args.save_dir, data_dir), mpp_params=mpp_params)
 
@@ -56,7 +53,7 @@ def project_data(args):
     data_dirs = exp.data_params['data_dirs'] if args.data_dir is None else [args.data_dir]
     for data_dir in data_dirs:
         # load mpp_data with cluster_rep
-        mpp_data = MPPData.from_data_dir(data_dir, base_dir=os.path.join(exp.full_path, args.save_dir), keys=['x', 'y', 'mpp', 'obj_ids', cl.config['cluster_rep']])
+        mpp_data = MPPData.from_data_dir(data_dir, base_dir=os.path.join(exp.full_path, args.save_dir), keys=['x', 'y', 'obj_ids', cl.config['cluster_rep']])
         cl.project_clustering(mpp_data, save_dir=os.path.join(exp.full_path, args.save_dir, data_dir))
 
 
@@ -92,5 +89,4 @@ if __name__ == "__main__":
         func = args.func
     except AttributeError:
         parser.error("too few arguments")
-    print(args)
     func(args)
