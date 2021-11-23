@@ -1,7 +1,7 @@
 # --- Plotting functions for evaluating experiments ---
 import numpy as np
 
-# TODO remove?
+# TODO remove? TODO don't think its needed anymore
 def map_img(imgs, value_map=None):
     """
     maps list of images containing map keys to map values.
