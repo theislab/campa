@@ -475,6 +475,7 @@ class Cluster:
             # NOTE: do not use apply_along_axis, because dtype is inferred incorrectly!
             clustering.append(np.array([most_frequent(row) for row in self.cluster_mpp.data(self.config['cluster_name'])[neighs]],
                 dtype=self.cluster_mpp.data(self.config['cluster_name']).dtype))
+        # convert from str to int to save space when saving full data NOTE new
         clustering = np.concatenate(clustering)
         mpp_data._data[self.config['cluster_name']] = clustering
 
