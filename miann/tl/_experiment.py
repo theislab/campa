@@ -9,6 +9,7 @@ import pandas as pd
 import re
 import tensorflow as tf
 from miann.data import MPPData
+import glob
 
 class Experiment:
     # base experiment config
@@ -187,12 +188,18 @@ class Experiment:
         # TODO this reading is duplicated in Cluster (where annotation is first created)
         return pd.read_csv(fname, index_col=0, dtype=str, keep_default_na=False)
 
-    def get_cluster_annotation(self, cluster_name='clustering'):
+    def get_cluster_annotation(self, cluster_name='clustering', cluster_dir=None):
         """
         Read cluster_annotation for full data from disk
+        If cluster_dir is none, is inferred from filesystem
         """
         # TODO need to somehow figure out sub dir!
-        fname = os.path.join(self.full_path, 'aggregated/sub-0.005', f'{cluster_name}_annotation.csv')
+        if cluster_dir is None:
+            for f in glob.glob(os.path.join(self.full_path, 'aggregated/sub-*')):
+                cluster_dir = 'aggregated/'+os.path.basename(f)
+                self.log.info(f"Cluster annotation: using cluster data in {cluster_dir}")
+                break
+        fname = os.path.join(self.full_path, cluster_dir, f'{cluster_name}_annotation.csv')
         return pd.read_csv(fname, index_col=0, dtype=str, keep_default_na=False)
 
 
