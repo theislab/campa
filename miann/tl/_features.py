@@ -42,10 +42,10 @@ class FeatureExtractor:
             # ensure that cluster data is string
             self._mpp_data._data[self.params['cluster_name']] = self._mpp_data._data[self.params['cluster_name']].astype(str)
             # prepare according to data_params
-            # but do not rescale intensities. Leave at original intensities
+            # but do not rescale intensities. Leave at original intensities NOTE now: do rescale!
             data_params = deepcopy(self.exp.data_params)
-            data_params['normalise_kwargs']['percentile'] = None
-            self._mpp_data.prepare(self.exp.data_params)
+            #data_params['normalise_kwargs']['percentile'] = None
+            self._mpp_data.prepare(data_params)
         return self._mpp_data
 
     @classmethod
@@ -107,7 +107,7 @@ class FeatureExtractor:
             self.log.debug(f'processing {c}')
             # get cluster ids to mask
             c_ids = list(self.annotation[self.annotation[self.params['cluster_col']] == c][self.params['cluster_name']])
-            mask = np.where(np.isin(self.mpp_data.data(self.params['cluster_col']), c_ids))
+            mask = np.where(np.isin(self.mpp_data.data(self.params['cluster_name']), c_ids))
             cur_df = df.iloc[mask]
             # group by obj_id  
             grouped = cur_df.groupby(cur_df.index)

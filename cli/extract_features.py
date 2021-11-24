@@ -20,7 +20,7 @@ def extract_features(args):
             extr = FeatureExtractor(exp, data_dir=data_dir, cluster_name=args.cluster_name, cluster_dir=args.cluster_dir, cluster_col=args.cluster_col)
         # extract features
         if 'intensity' in args.mode:
-            extr.extract_intensity_size(force=args.force)
+            extr.extract_intensity_size(force=args.force, fname=args.save_name)
         # TODO add more features here (spatial co-occurence + blob counts)
 
 
