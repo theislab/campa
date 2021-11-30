@@ -305,16 +305,19 @@ class MPPData:
         assert (self.x == mpp_to_add.x).all()
         assert (self.y == mpp_to_add.y).all()
         # finally, add keys
+        added_mpp = False
         for key in keys:
             self._data[key] = mpp_to_add.data(key)
+            added_mpp = added_mpp if key != 'mpp' else True
         for key in optional_keys:
             if mpp_to_add.data(key) is not None:
                 # check if mpp is not only zeros
                 if key == 'mpp' and (mpp_to_add.data('mpp') == np.zeros_like(mpp_to_add.data('mpp'))).all():
                     continue
                 self._data[key] = mpp_to_add.data(key)
+                added_mpp = added_mpp if key != 'mpp' else True
         # update channels if added mpp
-        if 'mpp' in keys + optional_keys:
+        if added_mpp:
             self.channels = mpp_to_add.channels
         self.log.info(f'Updated data to keys {list(self._data.keys())}')
     
