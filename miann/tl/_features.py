@@ -1,7 +1,7 @@
 
 from miann.tl import Experiment
 from miann.data import MPPData
-from miann.constants import EXPERIMENT_DIR
+from miann.constants import get_data_config
 import os
 import numpy as np
 import pandas as pd
@@ -42,9 +42,7 @@ class FeatureExtractor:
             # ensure that cluster data is string
             self._mpp_data._data[self.params['cluster_name']] = self._mpp_data._data[self.params['cluster_name']].astype(str)
             # prepare according to data_params
-            # but do not rescale intensities. Leave at original intensities NOTE now: do rescale!
             data_params = deepcopy(self.exp.data_params)
-            #data_params['normalise_kwargs']['percentile'] = None
             self._mpp_data.prepare(data_params)
         return self._mpp_data
 
@@ -148,5 +146,26 @@ class FeatureExtractor:
         comb_adata = ad.concat(adatas, uns_merge='same', index_unique='-', label='cluster')
         return comb_adata
 
-    def extract_intensity_csv(self, kwargs):
-        raise NotImplementedError
+    def extract_intensity_csv(self, obs=None):
+        """
+        extract csv file containing obj_id, mean cluster intensity and size for each channel.
+
+        saves csv as fname.csv
+        obs: column names from metadata.csv that should be additionally stored.
+        """
+        if self.adata is None:
+            self.log.warn("Intensity and size information is not present. Calculate extract_intensity_size first! Exiting.")
+            return
+        adata = self.get_intensity_adata()
+        df = pd.DataFrame(data=adata.X, columns=adata.var_names)
+        # add size
+        df['size'] = np.array(adata.obs['size'])
+        # add cluster and obj_id
+        OBJ_ID = get_data_config(self.exp.config['data']['data_config']).OBJ_ID
+        df['cluster'] = np.array(adata.obs['cluster'])
+        df[OBJ_ID] = np.array(adata.obs[OBJ_ID])
+        # add additional obs
+        for col in obs:
+            df[col] = np.array(adata.obs[col])
+        # save csv
+        df.to_csv(os.path.splitext(self.fname)[0]+'.csv')
