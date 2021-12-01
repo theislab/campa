@@ -127,6 +127,7 @@ class FeatureExtractor:
 
         # write to disk
         fname = os.path.join(self.exp.full_path, "aggregated/full_data", self.params['data_dir'], fname)
+        self.log.info(f'saving adata to {fname}')
         self.fname = fname
         self.adata.write(self.fname)
 
@@ -146,3 +147,6 @@ class FeatureExtractor:
             adatas[c] = cur_adata
         comb_adata = ad.concat(adatas, uns_merge='same', index_unique='-', label='cluster')
         return comb_adata
+
+    def extract_intensity_csv(self, kwargs):
+        raise NotImplementedError
