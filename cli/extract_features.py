@@ -5,6 +5,7 @@ from miann.data import MPPData
 import os
 import logging
 from miann.tl import FeatureExtractor, Experiment
+import numpy as np
 
 def extract_features(args):
     # set up FeatureExtractor
@@ -21,7 +22,13 @@ def extract_features(args):
         # extract features
         if 'intensity' in args.mode:
             extr.extract_intensity_size(force=args.force, fname=args.save_name)
-        # TODO add more features here (spatial co-occurence + blob counts)
+        if 'co-occurence' in args.mode:
+            if args.co_logspace:
+                interval = np.logspace(np.log2(args.co_minval),np.log2(args.co_maxval),args.co_nsteps, base=2).astype(np.float32)
+            else:
+                interval = np.linspace(args.co_minval,args.co_maxval,args.co_nsteps).astype(np.float32)
+            extr.extract_co_occurrence(interval=interval)
+        # TODO add more features here (blob counts)
 
 
 def parse_arguments():
@@ -35,7 +42,11 @@ def parse_arguments():
     parser.add_argument('--cluster-col', help='cluster annotation to use. Defaults to cluster_name')
     parser.add_argument('--save-name', default='features.h5ad', help='filename to use for saving extracted features. Default is features.h5ad')
     parser.add_argument('--force', action='store_true', help='force calculation even when adata exists')
-    parser.add_argument('mode', nargs="+", choices=['intensity'], help='type of features to extract. Intensity: per-cluster mean and size features. Use this first to set up the adata.')
+    parser.add_argument('--co-minval', type=float, default=2)
+    parser.add_argument('--co-maxval', type=float, default=80)
+    parser.add_argument('--co-nsteps', type=int, default=10)
+    parser.add_argument('--co-logspace', action='store_true', help="use log spacing of co-occurrence intervals")
+    parser.add_argument('mode', nargs="+", choices=['intensity', 'co-occurence'], help='type of features to extract. Intensity: per-cluster mean and size features. Use this first to set up the adata. Co-occurrence: spatial co-occurrence between pairs of clusters at different distances')
     
     return(parser.parse_args())
 
