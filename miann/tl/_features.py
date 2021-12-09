@@ -176,9 +176,9 @@ class FeatureExtractor:
                 # ensure obj_ids are in correct order
                 df = pd.merge(df, self.adata.obs, how='right', left_index=True, right_on='mapobject_id', suffixes=('','right'))[df.columns]
                 # add to adata.obsm
-                self.adata.obsm[f'co_occurence_{c1}_{c2}'] = df
+                self.adata.obsm[f'co_occurrence_{c1}_{c2}'] = df
 
-        self.adata.uns['co_occurence_params'] = {'interval': list(interval)}
+        self.adata.uns['co_occurrence_params'] = {'interval': list(interval)}
         self.log.info(f'saving adata to {self.fname}')
         self.adata.write(self.fname)
 
