@@ -268,7 +268,14 @@ class MPPData:
 
     
     def copy(self):
-        raise(NotImplementedError)
+        import copy
+        data = copy.deepcopy(self._data)
+        metadata=copy.deepcopy(self.metadata)
+        mpp_copy= MPPData(metadata=copy.deepcopy(self.metadata), channels=copy.deepcopy(self.channels), data=copy.deepcopy(self._data),
+                       seed=copy.deepcopy(self.seed), data_config=copy.deepcopy(self.data_config_name))
+
+        return mpp_copy
+        # raise(NotImplementedError)
         #pass
 
     # TODO Nastassya: ensure that each function logs what its doing with log.info
@@ -401,6 +408,7 @@ class MPPData:
         # select ids based on kwargs
         for key, value in kwargs.items():
             cur_metadata = self.metadata.set_index(self.data_config.OBJ_ID).loc[selected_obj_ids]
+            assert (key in cur_metadata.columns), f'provided column {key} was not found in the metadata table!'
             if value == 'NO_NAN':
                 mask = ~cur_metadata[key].isnull() # TODO check!
                 self.log.info(f'Subsetting to NO_NAN {key}: {sum(mask)} objects')
@@ -439,7 +447,7 @@ class MPPData:
         """
         # TODO need copy argument?
         self.log.info('Subsetting from {} channels'.format(len(self.channels)))
-
+        assert len(np.intersect1d(self.channels.name.values,channels))!=0, "mpp object does not contain provided channels!"
         cids = list(self.channels.reset_index().set_index('name').loc[channels]['channel_id'])
         raw_channels = self.channels
         self.channels = self.channels.loc[cids].reset_index(drop=True)
@@ -800,7 +808,20 @@ class MPPData:
             values = values[:, np.newaxis]
         return MPPData._get_img_from_data(self.x, self.y, values, **kwargs)
 
+    def compare(self, object):
 
+        assert np.array_equal(list(self._data.keys()), list(object._data.keys()))
+        same_data={}
+        for key in self._data.keys():
+            issame=np.array_equal(self._data[key],object._data[key])
+            same_data[key]=issame
+
+        same_data["channels"]=self.channels.equals(object.channels)
+        if len(self.metadata)==len(object.metadata):
+            same_data["metadata"]=self.metadata.reset_index(drop=True).equals(object.metadata.reset_index(drop=True))
+        else:
+            same_data["metadata"] = False
+        return np.all(list(same_data.values())), same_data
 
 def _try_mmap_load(fname, mmap_mode='r', allow_not_existing=False):
     """

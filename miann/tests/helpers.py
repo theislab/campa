@@ -24,36 +24,45 @@ def gen_vstr_recarray(m, n, dtype=None):
     )
 
 
-def gen_metadata_df(n, obj_ids):
+def gen_metadata_df(n, obj_ids, possible_cell_cycles = None, ensure_None=True):
     # TODO: Think about allowing index to be passed for n
 
     lengths = np.random.randint(3, 5, 6)
     letters = np.array(list(ascii_letters))
     gen_word = lambda l: "".join(np.random.choice(letters, l))
-    cell_cycle = [gen_word(l) for l in lengths]
-    cell_cycle[0]=None
+    if possible_cell_cycles is None:
+        possible_cell_cycles = [gen_word(l) for l in lengths]
+
+    if ensure_None:
+        cell_cycle = np.array([None for i in range(n)])
+        non_None_size = int(0.85 * n)
+        idx = np.random.choice(np.arange(0, n), non_None_size)
+        cell_cycle[idx] = np.random.choice(possible_cell_cycles, non_None_size)
+    else:
+        cell_cycle = np.random.choice(possible_cell_cycles, n)
+
 
     letters = np.fromiter(iter(ascii_letters), "U1")
     if n > len(letters):
         letters = letters[: n // 2]  # Make sure categories are repeated
 
-    return pd.DataFrame(
-        dict(
+    metadata_dict=dict(
             mapobject_id=obj_ids,
-            cell_cycle=np.random.choice(cell_cycle, n),
+            cell_cycle=cell_cycle,
             cat=pd.Categorical(np.random.choice(letters, n)),
             int64=np.random.randint(-50, 50, n),
             float64=np.random.random(n),
             uint16=np.random.randint(255, size=n, dtype="uint8"),
         )
-    )
 
-def gen_obj(shape, bounding_box,  num_channels, mpp_dtype, x_dtype, y_dtype):
+    return pd.DataFrame(metadata_dict)
+
+def gen_obj(shape, bounding_box,  num_channels, mpp_dtype):
     mean = np.random.randint(0+bounding_box, shape-bounding_box, 2)
     cov = [[int(bounding_box*0.5), 0], [0, bounding_box]]
     num_values = np.random.randint(100, 200)
     x, y = np.random.multivariate_normal(mean, cov, num_values).T
-    x, y = x.astype(x_dtype), y.astype(y_dtype)
+    x, y = x.astype(np.uint8), y.astype(np.uint8)
     x = x[(x > 0) & (x < shape)]
     y = y[(y > 0) & (y < shape)]
     if len(x!=len(y)):
@@ -66,11 +75,11 @@ def gen_obj(shape, bounding_box,  num_channels, mpp_dtype, x_dtype, y_dtype):
         values=np.array([np.random.randint(100, 5000, num_values) for ch in range(num_channels)]).T
     return x, y, values
 
-def gen_objs(shape, bounding_box, num_channels, obj_ids, mpp_dtype, x_dtype, y_dtype):
+def gen_objs(shape, bounding_box, num_channels, obj_ids, mpp_dtype):
     x_all, y_all, values_all = np.empty((0), dtype=np.uint8), np.empty((0), dtype=np.uint8), np.empty((0, num_channels), dtype=np.uint8)
     obj_ids_all=np.empty((0), dtype=obj_ids.dtype)
     for i, obj_id in enumerate(obj_ids):
-        x, y, values = gen_obj(shape, bounding_box, num_channels, mpp_dtype, x_dtype, y_dtype)
+        x, y, values = gen_obj(shape, bounding_box, num_channels, mpp_dtype)
         obj_ids_all=np.append(obj_ids_all, [obj_id]*len(x))
         x_all = np.append(x_all, x)
         y_all = np.append(y_all, y)
@@ -79,16 +88,15 @@ def gen_objs(shape, bounding_box, num_channels, obj_ids, mpp_dtype, x_dtype, y_d
     return x_all, y_all, values_all, obj_ids_all
 
 def gen_mppdata(
-    X_dtype=np.uint8,
-    Y_dtype=np.uint8,
-    obj_id_type=np.array,
-    obj_id_dtype=np.uint32,
     mpp_dtype=np.uint32,
     shape: int = 100,
     bounding_box:int = 10,
     num_channels: int = 5,
     num_obj_ids: int = 5,
-    data_config:str='NascentRNA_mpp_data'
+    possible_cell_cycles: list = None,
+    channels:list = None,
+    data_config:str='NascentRNA_mpp_data',
+    **kwargs
 ) -> MPPData:
     """\
     generate several obj ids, for each - generate X, Y, MPP withing bounding box:
@@ -105,17 +113,21 @@ def gen_mppdata(
 
     """
 
-    obj_ids=obj_id_type([obj_id_dtype(i) for i in range (num_obj_ids)])
+    obj_ids=np.array([np.uint32(i) for i in range (num_obj_ids)])
 
     #generate channel names
     lengths = np.random.randint(3, 5, num_channels)
     letters = np.array(list(ascii_letters))
     gen_word = lambda l: "".join(np.random.choice(letters, l))
-    channels = pd.DataFrame(np.array([gen_word(l) for l in lengths]), columns=["name"])
+    if channels is not None:
+        num_channels=len(channels)
+        channels = pd.DataFrame(np.array(channels), columns=["name"])
+    else:
+        channels = pd.DataFrame(np.array([gen_word(l) for l in lengths]), columns=["name"])
 
-    metadata=gen_metadata_df(num_obj_ids, obj_ids)
+    metadata=gen_metadata_df(num_obj_ids, obj_ids, possible_cell_cycles, **kwargs)
 
-    X, Y, mpp, obj_ids=gen_objs(shape, bounding_box, num_channels, obj_ids,  mpp_dtype, X_dtype, Y_dtype)
+    X, Y, mpp, obj_ids=gen_objs(shape, bounding_box, num_channels, obj_ids,  mpp_dtype)
 
     data={
         "x":X,
@@ -128,6 +140,10 @@ def gen_mppdata(
 
 if __name__=="__main__":
     # tmp1=gen_mppdata()
-    tmp2=gen_mppdata(num_obj_ids=160)
-    tmp2=gen_mppdata(num_obj_ids=160, mpp_dtype=np.float64)
+
+    channels = [str(i) for i in range(5)]
+    mpp_data = gen_mppdata(num_obj_ids=20, channels=channels)
+    channels = str(len(channels) + 1)
+    with pytest.raises(AssertionError) as exc:
+        mpp_data.subset_channels(channels)
 
