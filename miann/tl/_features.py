@@ -1,13 +1,15 @@
 
 from miann.tl import Experiment
 from miann.data import MPPData
-from miann.constants import EXPERIMENT_DIR
+from miann.constants import get_data_config
 import os
 import numpy as np
 import pandas as pd
 import anndata as ad
 import logging
 from copy import deepcopy
+import squidpy as sq
+from miann.tl._cluster import annotate_clustering
 
 class FeatureExtractor:
     """
@@ -42,9 +44,7 @@ class FeatureExtractor:
             # ensure that cluster data is string
             self._mpp_data._data[self.params['cluster_name']] = self._mpp_data._data[self.params['cluster_name']].astype(str)
             # prepare according to data_params
-            # but do not rescale intensities. Leave at original intensities NOTE now: do rescale!
             data_params = deepcopy(self.exp.data_params)
-            #data_params['normalise_kwargs']['percentile'] = None
             self._mpp_data.prepare(data_params)
         return self._mpp_data
 
@@ -127,7 +127,59 @@ class FeatureExtractor:
 
         # write to disk
         fname = os.path.join(self.exp.full_path, "aggregated/full_data", self.params['data_dir'], fname)
+        self.log.info(f'saving adata to {fname}')
         self.fname = fname
+        self.adata.write(self.fname)
+
+    def extract_co_occurrence(self, interval):
+        """FeatureExtractor
+        Extract co_occurrence for each cell invididually. 
+
+        Adds obsm co_occurrence_CLUSTER1_CLUSTER2 to adata and saves to self.fname
+
+        Args:
+            interval: distance intervals for which to calculate co-occurrence score
+        """
+        self.log.info(f"calculating co-occurrence for intervals {interval} and clustering {self.params['cluster_name']} (col: {self.params['cluster_col']})")
+        cluster_names = {n: i for i,n in enumerate(self.clusters)}
+        obj_ids = []
+        co_occs = []
+        for obj_id in self.mpp_data.unique_obj_ids:
+            adata = self.mpp_data.subset(obj_ids=[obj_id], copy=True).get_adata(obs=[self.params['cluster_name']])
+            # ensure that cluster annotation is present in adata
+            if self.params['cluster_name'] != self.params['cluster_col']:
+                adata.obs[self.params['cluster_col']] = annotate_clustering(adata.obs[self.params['cluster_name']], self.annotation, 
+                    self.params['cluster_name'], self.params['cluster_col'])
+            adata.obs[self.params['cluster_col']] = adata.obs[self.params['cluster_col']].astype('category')
+            self.log.info(f'co-occurrence for {obj_id}, with shape {adata.shape}')
+            cur_co_occ, _ = sq.gr.co_occurrence(
+                adata,
+                cluster_key=self.params['cluster_col'],
+                spatial_key='spatial',
+                interval=interval,
+                copy=True, show_progress_bar=False,
+            )
+            # ensure that co_occ has correct format incase of missing clusters
+            co_occ = np.zeros((len(self.clusters),len(self.clusters),len(interval)-1))
+            cur_clusters = np.vectorize(cluster_names.__getitem__)(np.array(adata.obs[self.params['cluster_col']].cat.categories))
+            grid = np.meshgrid(cur_clusters, cur_clusters)
+            co_occ[grid[0].flat, grid[1].flat] = cur_co_occ.reshape(-1, len(interval)-1)
+            co_occs.append(co_occ.copy())
+            obj_ids.append(obj_id)
+
+        # add info to adata
+        co_occ = np.array(co_occs)
+        for i,c1 in enumerate(self.clusters):
+            for j,c2 in enumerate(self.clusters):
+                df = pd.DataFrame(co_occ[:,i,j], index=obj_ids, columns=np.arange(len(interval)-1).astype(str))
+                df.index = df.index.astype(str)
+                # ensure obj_ids are in correct order
+                df = pd.merge(df, self.adata.obs, how='right', left_index=True, right_on='mapobject_id', suffixes=('','right'))[df.columns]
+                # add to adata.obsm
+                self.adata.obsm[f'co_occurrence_{c1}_{c2}'] = df
+
+        self.adata.uns['co_occurrence_params'] = {'interval': list(interval)}
+        self.log.info(f'saving adata to {self.fname}')
         self.adata.write(self.fname)
 
     def get_intensity_adata(self):
@@ -146,3 +198,27 @@ class FeatureExtractor:
             adatas[c] = cur_adata
         comb_adata = ad.concat(adatas, uns_merge='same', index_unique='-', label='cluster')
         return comb_adata
+
+    def extract_intensity_csv(self, obs=None):
+        """
+        extract csv file containing obj_id, mean cluster intensity and size for each channel.
+
+        saves csv as fname.csv
+        obs: column names from metadata.csv that should be additionally stored.
+        """
+        if self.adata is None:
+            self.log.warn("Intensity and size information is not present. Calculate extract_intensity_size first! Exiting.")
+            return
+        adata = self.get_intensity_adata()
+        df = pd.DataFrame(data=adata.X, columns=adata.var_names)
+        # add size
+        df['size'] = np.array(adata.obs['size'])
+        # add cluster and obj_id
+        OBJ_ID = get_data_config(self.exp.config['data']['data_config']).OBJ_ID
+        df['cluster'] = np.array(adata.obs['cluster'])
+        df[OBJ_ID] = np.array(adata.obs[OBJ_ID])
+        # add additional obs
+        for col in obs:
+            df[col] = np.array(adata.obs[col])
+        # save csv
+        df.to_csv(os.path.splitext(self.fname)[0]+'.csv')
