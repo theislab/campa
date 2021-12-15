@@ -11,7 +11,10 @@ def extract_features(args):
     # set up FeatureExtractor
     log = logging.getLogger('extract_features')
     exp = Experiment.from_dir(args.experiment_dir)
-    for data_dir in exp.data_params['data_dirs']:
+    data_dirs = args.data_dir
+    if len(data_dirs) == 0:
+        data_dirs = exp.data_params['data_dirs']
+    for data_dir in data_dirs:
         log.info(f'extracting features {args.mode} from {data_dir}')
         adata_fname = os.path.join(exp.full_path, 'aggregated/full_data', data_dir, args.save_name)
         if os.path.exists(adata_fname):
@@ -22,7 +25,7 @@ def extract_features(args):
         # extract features
         if 'intensity' in args.mode:
             extr.extract_intensity_size(force=args.force, fname=args.save_name)
-        if 'co-occurence' in args.mode:
+        if 'co-occurrence' in args.mode:
             if args.co_logspace:
                 interval = np.logspace(np.log2(args.co_minval),np.log2(args.co_maxval),args.co_nsteps, base=2).astype(np.float32)
             else:
@@ -40,18 +43,20 @@ def parse_arguments():
     parser.add_argument('cluster_name', metavar='cluster-name', help='name of clustering to use')
     parser.add_argument('--cluster-dir', help='dir of subsampled clustering to load annotation. Relative to experiment_dir. Default is taking first of experiment_dir/aggregated/sub-*')
     parser.add_argument('--cluster-col', help='cluster annotation to use. Defaults to cluster_name')
+    parser.add_argument('--data-dir', nargs='*', help='data dirs to be processed. Relative to experiment_dir/aggregated/full_data. If none, all available data_dirs will be processed')
     parser.add_argument('--save-name', default='features.h5ad', help='filename to use for saving extracted features. Default is features.h5ad')
     parser.add_argument('--force', action='store_true', help='force calculation even when adata exists')
     parser.add_argument('--co-minval', type=float, default=2)
     parser.add_argument('--co-maxval', type=float, default=80)
     parser.add_argument('--co-nsteps', type=int, default=10)
     parser.add_argument('--co-logspace', action='store_true', help="use log spacing of co-occurrence intervals")
-    parser.add_argument('mode', nargs="+", choices=['intensity', 'co-occurence'], help='type of features to extract. Intensity: per-cluster mean and size features. Use this first to set up the adata. Co-occurrence: spatial co-occurrence between pairs of clusters at different distances')
+    parser.add_argument('mode', nargs="+", choices=['intensity', 'co-occurrence'], help='type of features to extract. Intensity: per-cluster mean and size features. Use this first to set up the adata. Co-occurrence: spatial co-occurrence between pairs of clusters at different distances')
     
     return(parser.parse_args())
 
 
 if __name__ == "__main__":
     args = parse_arguments()
+    print(args)
     init_logging()
     extract_features(args)

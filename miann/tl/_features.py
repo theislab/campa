@@ -74,6 +74,7 @@ class FeatureExtractor:
         """
         if self.adata is not None and not force:
             self.log.info('extract_intensity_size: adata is not None. Specify force=True to overwrite. Exiting.')
+            return
         self.log.info(f"Calculating {self.params['cluster_name']} (col: {self.params['cluster_col']}) mean and size for {self.params['data_dir']}")
         df = pd.DataFrame(data=self.mpp_data.center_mpp, columns=list(self.mpp_data.channels.name), 
                              index=self.mpp_data.obj_ids)
@@ -140,6 +141,9 @@ class FeatureExtractor:
         Args:
             interval: distance intervals for which to calculate co-occurrence score
         """
+        if self.adata is None:
+            self.log.info('extract_co_occurrence: adata is None. Calculate it with extract_intensity_size before extracting co_occurrence. Exiting.')
+            return
         self.log.info(f"calculating co-occurrence for intervals {interval} and clustering {self.params['cluster_name']} (col: {self.params['cluster_col']})")
         cluster_names = {n: i for i,n in enumerate(self.clusters)}
         obj_ids = []
@@ -158,6 +162,7 @@ class FeatureExtractor:
                 spatial_key='spatial',
                 interval=interval,
                 copy=True, show_progress_bar=False,
+                n_splits=1
             )
             # ensure that co_occ has correct format incase of missing clusters
             co_occ = np.zeros((len(self.clusters),len(self.clusters),len(interval)-1))
