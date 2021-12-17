@@ -12,7 +12,7 @@ def extract_features(args):
     log = logging.getLogger('extract_features')
     exp = Experiment.from_dir(args.experiment_dir)
     data_dirs = args.data_dir
-    if len(data_dirs) == 0:
+    if data_dirs is None or len(data_dirs) == 0:
         data_dirs = exp.data_params['data_dirs']
     for data_dir in data_dirs:
         log.info(f'extracting features {args.mode} from {data_dir}')
