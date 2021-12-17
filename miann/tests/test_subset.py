@@ -11,7 +11,7 @@ LOGGER = logging.getLogger(__name__)
 class TestSubset:
 
     @pytest.mark.parametrize("frac", (np.linspace(0.1, 0.9, 5)))
-    @pytest.mark.parametrize("num_objects", np.arange(20, 200, 50))
+    @pytest.mark.parametrize("num_objects", np.arange(20, 150, 50))
     def test_random_fraction_nonemptyRes(self, frac, num_objects):
         mpp_data = gen_mppdata(num_obj_ids=num_objects)
         # fracs=np.random.rand(20)
@@ -45,14 +45,14 @@ class TestSubset:
         assert np.array_equal(np.sort(mpp_data_sub.unique_obj_ids), np.sort(unique_ids))
 
 
-    @pytest.mark.parametrize("num_objects", np.arange(1, 10))
+    @pytest.mark.parametrize("num_objects", np.arange(1, 10, 3))
     def test_all_existing_obj_ids(self, num_objects):
         mpp_data = gen_mppdata(num_obj_ids=num_objects)
         ids=np.arange(0, num_objects)
         mpp_data_sub = mpp_data.subset(obj_ids=ids, copy=True)
         assert np.array_equal(np.sort(mpp_data_sub.unique_obj_ids), np.sort(ids))
 
-    @pytest.mark.parametrize("num_objects", np.arange(1, 10))
+    @pytest.mark.parametrize("num_objects", np.arange(1, 10, 3))
     def test_nonExisting_obj_ids(self, num_objects):
         mpp_data = gen_mppdata(num_obj_ids=num_objects)
         ids=[num_objects+10]
@@ -62,7 +62,7 @@ class TestSubset:
         assert len(mpp_data_sub.y) == 0
         assert len(mpp_data_sub.mpp) == 0
 
-    @pytest.mark.parametrize("num_ids", np.arange(1,10,5))
+    @pytest.mark.parametrize("num_ids", np.arange(1,10,3))
     def test_frac_1(self, num_ids):
         mpp_data = gen_mppdata(num_obj_ids=num_ids)
         mpp_data_sub = mpp_data.subset(frac=1, copy=True)
@@ -77,7 +77,7 @@ class TestSubset:
         assert isequal
         assert isequal_dict["channels"]
 
-    def test_frac_falseCopy_flag_(self):
+    def test_frac_falseCopy_flag(self):
         num_objects_orig_intended=10
         mpp_data = gen_mppdata(num_obj_ids=num_objects_orig_intended)
         mpp_data_orig=mpp_data.copy()
@@ -88,13 +88,13 @@ class TestSubset:
         assert num_objects_orig_intended==num_objects_orig==len(mpp_data_orig.unique_obj_ids)
         assert num_objects_orig!=len(mpp_data.unique_obj_ids)
 
-    @pytest.mark.parametrize("frac", (np.linspace(0.1, 0.9, 10)))
+    @pytest.mark.parametrize("frac", (np.linspace(0.1, 0.9, 3)))
     def test_frac_same_seed(self, frac):
         num_objects_orig_intended=10
         mpp_data = gen_mppdata(num_obj_ids=num_objects_orig_intended)
         mpp_data_orig=mpp_data.copy()
         mpp_data_subset_1=mpp_data.subset(frac=frac, copy=True)
-        mpp_data_subset_2=mpp_data.subset(frac=frac, copy=True)
+        mpp_data_subset_2=mpp_data_orig.subset(frac=frac, copy=True)
 
         isequal, isequal_dict=mpp_data_subset_1.compare(mpp_data_subset_2)
         assert isequal
@@ -146,7 +146,7 @@ class TestSubset:
 
         mpp_data_subset = mpp_data.subset(cell_cycle='NO_NAN', copy=True)
         isequal, isequal_dict = mpp_data.compare(mpp_data_subset)
-        assert isequal==True
+        assert isequal
         assert not mpp_data_subset.metadata.cell_cycle.isnull().values.any()
         assert (None not in mpp_data_subset.metadata.cell_cycle.unique())
 
@@ -159,7 +159,6 @@ class TestSubset:
         assert not mpp_data_subset.metadata.cell_cycle.isnull().values.any()
         assert (None not in mpp_data_subset.metadata.cell_cycle.unique())
 
-
 class TestSubsetChannels:
     def test_nonExistingChannels(self):
         channels=[str(i) for i in range(5)]
@@ -169,8 +168,41 @@ class TestSubsetChannels:
             mpp_data.subset_channels(channels)
         assert f'mpp object does not contain provided channels!' in str(exc.value)
 
+    def test_filterNoChannels(self):
+        channels=[str(i) for i in range(5)]
+        mpp_data = gen_mppdata(num_obj_ids=20,channels=channels)
+        mpp_data_orig=mpp_data.copy()
+        mpp_data.subset_channels(channels)
+        isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
+        assert isequal
+        assert np.array_equal(mpp_data.channels["name"].values, channels)
+        assert mpp_data.mpp.shape[-1]==len(channels)
 
+    @pytest.mark.parametrize("num_channels", np.arange(1, 4))
+    def test_filterSubsetChannels(self, num_channels):
+        channels=[str(i) for i in range(5)]
+        mpp_data = gen_mppdata(num_obj_ids=20,channels=channels)
+        mpp_data_orig=mpp_data.copy()
+        channels_to_subset=np.random.choice(channels, num_channels, replace=False)
+        mpp_data.subset_channels(channels_to_subset)
+        isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
+        assert isequal==False
+        assert np.array_equal(np.sort(mpp_data.channels["name"].values), np.sort(channels_to_subset))
+        assert mpp_data.mpp.shape[-1]==len(channels_to_subset)
 
+    def test_filterOverlapChannels(self):
+        channels = [str(i) for i in range(5)]
+        mpp_data = gen_mppdata(num_obj_ids=20, channels=channels)
+        mpp_data_orig = mpp_data.copy()
+        channels_to_subset = [str(i) for i in range(3, 7)]
+        overlap_channels=['3', '4']
+        non_existing_channels=['5', '6']
+
+        mpp_data.subset_channels(channels_to_subset)
+        isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
+        assert isequal == False
+        assert np.array_equal(np.sort(mpp_data.channels["name"].values), ['3', '4'])
+        assert mpp_data.mpp.shape[-1] == len(overlap_channels)
 
 if __name__ == '__main__':
 

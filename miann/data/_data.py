@@ -447,8 +447,9 @@ class MPPData:
         """
         # TODO need copy argument?
         self.log.info('Subsetting from {} channels'.format(len(self.channels)))
+        channels_overlap=np.intersect1d(self.channels.name.values,channels)
         assert len(np.intersect1d(self.channels.name.values,channels))!=0, "mpp object does not contain provided channels!"
-        cids = list(self.channels.reset_index().set_index('name').loc[channels]['channel_id'])
+        cids = list(self.channels.reset_index().set_index('name').loc[channels_overlap]['channel_id'])
         raw_channels = self.channels
         self.channels = self.channels.loc[cids].reset_index(drop=True)
         self.channels.index.name = 'channel_id'

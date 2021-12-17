@@ -125,6 +125,9 @@ def gen_mppdata(
     else:
         channels = pd.DataFrame(np.array([gen_word(l) for l in lengths]), columns=["name"])
 
+    channels.index.name = 'channel_id'
+    # .reset_index().set_index('name').loc[channels]['channel_id']
+
     metadata=gen_metadata_df(num_obj_ids, obj_ids, possible_cell_cycles, **kwargs)
 
     X, Y, mpp, obj_ids=gen_objs(shape, bounding_box, num_channels, obj_ids,  mpp_dtype)
@@ -141,9 +144,11 @@ def gen_mppdata(
 if __name__=="__main__":
     # tmp1=gen_mppdata()
 
-    channels = [str(i) for i in range(5)]
-    mpp_data = gen_mppdata(num_obj_ids=20, channels=channels)
-    channels = str(len(channels) + 1)
-    with pytest.raises(AssertionError) as exc:
-        mpp_data.subset_channels(channels)
+    mpp_data = gen_mppdata(num_obj_ids=5)
+    mpp_data_sub = mpp_data.subsample(frac=-1)
+
+    assert len(mpp_data_sub.unique_obj_ids) == 0
+    assert len(mpp_data_sub.x) == 0
+    assert len(mpp_data_sub.y) == 0
+    assert len(mpp_data_sub.mpp) == 0
 
