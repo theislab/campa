@@ -86,7 +86,12 @@ class MPPData:
         If present, will also read key.npy for each key in optional_keys
 
         Args:
+            data_dir: Path to the specific directory containing one set of npy and csv files as described above.
+            Note that this path should be relative to the 'base_dir',which is either provided implicitly in the function or set
+            to data_dir path specified in config.ini otherwise.
             mode: mmap_mode for np.load. Set to None to load data in memory.
+            data_config: Name of the constant in the [data] field of config.ini file, which contains path to the python file
+            with configuration parameters for loading the data.
             base_dir: look for data in base_dir/data_dir. Default in DATA_DIR
         """
         # load data_config
@@ -371,6 +376,29 @@ class MPPData:
     def add_conditions(self, cond_desc, cond_params={}):
         """
         Add conditions informations by aggregating over channels (per cell) or reading data from cell cycle file.
+
+        Withing a framework of conditional VAE training, a conditional vector is passed alongside the input vector.
+        This vector could represent e.g. perturbation or a cell cycle.
+        The vector is constructed for each input sample (here, we refer to an input sample is a pixel or a pixel's neighbourhood)
+        from a metadata table as a concatenation of vectors each representing separate condition.
+
+        In order to create a conditions table, method add_conditions(), which takes the following parameters:
+
+        cond_desc: a list of conditions descriptions, represented as string values. Conditions can be represented in one of the following formats:
+            - columnName - if this column is specified in data_config.CONDITIONS, then a value in that column gets numerically encoded into a class value (1, 2, ...).
+           Note that the class is assigned to the value only if the values is contained in range of values that column could take (as specified in data_config.CONDITIONS[columnName]).
+           Note that one can also provide a special entrie "UNKNOWN" there. In that case, all values with conditions that are not listed are mapped to the additional last class.
+        If the column name is not provided in the data_config.CONDITIONS, values are assumed to be continious and stored as they are in the conditions table.
+            - columnName_postrpocess, where postprocess can be set to one of the following values:
+                - lowhigh_bin_2: bins all values in the specified column in 4 quantiles, encodes values in the
+           lowest quantile as one class and values in the high quantile as teh second class (one-hot encoded), and all values in-between sets to None
+                - bin_3: bin values in .33 and .66 quantiles and one-hot encodes each of them into 3 classes according to quantile where the value belongs to
+                - zscore: normalizes a continuous set of values by mean and std of train subset, supposed to be used only after a train-test split up
+                - one_hot: same as when only ***columnName*** is provided as a condition description, but additionally one-hot encodes the class values.
+
+        cond_params: Dictionary with parameters needed for some conditions, e.g. for classyfying values into bins. If empty, these values are calculated and stored into this dict (where appropriate).
+
+        NOTE: Operation is performed inplace.
         """
         self.log.info(f'Adding conditions: {cond_desc}')
         conditions = []
@@ -390,7 +418,11 @@ class MPPData:
             num (int): number of objects to randomly subsample. frac takes precedence
                 Applied after the other subsetting.
             obj_ids (list of str): ids of objects to subset to
+            nona_condition: if set to True,  all values having nan conditions will be filtered out. Note that the way condition's creation
+             is implemented allows one to e.g. leave only entries which values in the specified column were in the low and high quantilies,
+             and filter out everything else.
             copy: return new MPPData object or modify in place
+            
             kwargs:
                 key: name of column used to select objects
                 value (str or list of str): allowed entries for selected objects, 
@@ -465,9 +497,22 @@ class MPPData:
     # TODO Nastassya: write tests for this
     def subsample(self, frac=None, frac_per_obj=None, num=None, num_per_obj=None, add_neighborhood=False, neighborhood_size=3):
         """
-        Subsample MPPData based on selecting mpps.
+        Performs MPP-level subsampling by selecting mpps (could be thought of as pixels)
         All other information is updated accordingly (to save RAM/HDD-memory).
-        Before subsampling, can add neighborhood.
+        Additionally, can extend mpps' representations by their neighbourhoods before subsampling. Note that several conditions for subsampling can be provided, 
+        and the resulting MPP Dataset will be computed as combination of all the provided conditions.
+
+        args:
+            frac: subsample a random number of mpps (pixels) from the whole dataset by a specified fraction.
+            Should be in range [0, 1].
+            num: subsample a random number of mpps (pixels) from the whole dataset by a specified number of mpps to be chosen.
+            frac_per_obj: allows to subsample a fraction of mpps on the object level - that is, for each object (cell) to subsample 
+                the same fraction of mpps independently.
+            num_per_obj: same as frac_per_obj, but a number of mpps to be left instead of fraction is provided
+            add_neighborhood: if set to True, extends mpp representation with a square neighbourhood around it
+            neighborhood_size: size of the neighborhood
+
+        Note that at least one of four parameters that indicate subsampling (frac, num, frac_per_obj, num_per_obj) size should be provided
 
         Returns: new subsampled MPPData. Operation cannot be done in place
         """
@@ -512,6 +557,13 @@ class MPPData:
         return mpp_data
         
     def add_neighborhood(self, size=3, copy=False):
+        """
+        Extends mpp representation with a square neighbourhood around it. 
+        
+        args:
+            neighborhood_size: size n of the neighborhood. The resulting mpp representation will then be set to a nXn square around each pixel.
+            copy: return new MPPData object or modify in place
+        """
         # TODO need copy flag?
         self.log.info('Adding neighborhood of size {}'.format(size))
         mpp = self._get_neighborhood(self.obj_ids, self.x, self.y, size=size)
@@ -529,8 +581,28 @@ class MPPData:
         
     def normalise(self, background_value=None, percentile=None, rescale_values=[]):
         """
-            background_value: float value to be subtracted, or name of column in CHANNELS_METADATA
-            percentile:
+            To prepare the data, pixel values can be normalized. For that, pixel values can be e.g. shifted and rescaled so that they end up
+             ranging between 0 and 1:
+            
+            args:
+                background_value: shifts all values (contained in .data field) by that value. Note that all resulting
+                negative values are cut off to zero. Several shift options are possible, depending on a background_value, which could be in one of the following formats:
+                   - single value (float): then data is shifted by this number in every channels
+                   - list of predifined values (floats): data in each channel is shifted separately by a corresponding value in that list. Note: in that case, number of shifted
+                    values should be the same as number of channels.
+                   - string: list of values for shifting are loaded from the channels_metadata table (should be located in the folder data_config.DATA_DIR
+                    in a file self.data_config.CHANNELS_METADATA). The values are then loaded from the column corresponding to a provided string value.
+                
+                percentile: after (optional) shifting data can be rescaled by a specified value separately for each channel.
+                The value could be in one of the following formats:
+                    - float: value from 0 to 100, which represents a quantile by which data should be rescaled.
+                    Quantiles are then calculated for each channel separately, and data is rescaled independently in each channel
+                    by the calculated respective quantile value.
+                    - list of predifined values (floats): data in each channel is rescaled separately for each channel by a corresponding value in that list.
+                
+                rescale_values: A dictionary with values used for normalization. If empty, parameters calculated for rescaling would be optionally be stored into this dictionary.
+                
+            NOTE: this operation is performed **inplace**.
         """
         if background_value is not None:
             self._subtract_background(background_value)
@@ -750,11 +822,18 @@ class MPPData:
     def get_object_img(self, obj_id, data='mpp', channel_ids=None, annotation_kwargs=None, **kwargs):
         """
         Calculate data image of given object id.
-        data: key in self._data that should be plotted on the image
-        channel_ids: only if key == 'mpp'. Channels that the image should have. 
-            If None, all channels are returned.
-        annotation_kwargs: arguments for self.annotate_img. (annotation, to_col, color)
-        kwargs: arguments for self._get_img_from_data
+        args:
+            obj_id: an ID of the object (cell)
+            data: key in self._data that should be plotted on the image
+            channel_ids: only if key == 'mpp'. Channels that the image should have.
+                If None, all channels are returned.
+            annotation_kwargs: arguments for self.annotate_img. (annotation, to_col, color):
+                img_size: size of returned image. If provided, image is padded or cropped to the desired size, and returns resulting image.
+                    If not provided, returns image and pad parameters from padding (pad set to 0 by default)
+                pad: amount of padding added to returned image (only used when img_size is None). If  provided,
+                 returns image and a list of padding parameters used for image padding.
+            kwargs: arguments for self._get_img_from_data
+
         """
         mask = self.obj_ids == obj_id
         x = self.x[mask]
