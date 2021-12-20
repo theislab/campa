@@ -3,9 +3,8 @@ import pytest
 from miann.tests.helpers import gen_mppdata
 import numpy as np
 # content of test_subset.py
-import logging
 import os
-LOGGER = logging.getLogger(__name__)
+
 
 
 class TestSubset:

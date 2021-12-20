@@ -2,11 +2,9 @@ import pytest
 
 from miann.tests.helpers import gen_mppdata
 import numpy as np
-# content of test_subset.py
-import logging
 import os
 import math
-LOGGER = logging.getLogger(__name__)
+
 
 class TestSubset:
     @pytest.mark.parametrize("frac", (np.linspace(0.1, 0.9, 3)))
@@ -73,3 +71,5 @@ class TestSubset:
 
         isequal, isequal_dict = mpp_data_subset_1.compare(mpp_data_subset_2)
         assert isequal
+
+
