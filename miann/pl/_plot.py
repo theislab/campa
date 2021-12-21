@@ -37,7 +37,7 @@ def annotate_img(img, annotation=None, from_col='clustering', to_col=None, color
         if from_col == to_col:
             # no need to change anything
             return img
-        res = np.zeros_like(img)
+        res = np.zeros_like(img, dtype=annotation[to_col].dtype)
     for _, row in annotation.iterrows():
         to_value = row[to_col]
         if color:
