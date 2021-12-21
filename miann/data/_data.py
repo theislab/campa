@@ -661,6 +661,29 @@ class MPPData:
             adata.var_names = adata.var['name']
         return adata
 
+    def extract_csv(self, data='mpp', obs=[]):
+        """
+        extract mpp_data.data into csv file.
+
+        Per default, files contain data, x and y coordinates, object_id.
+        Args:
+            obs: name of metadat columns that should be additionally added
+        """
+        # TODO: column names are tuples
+        columns=None
+        if data == 'mpp':
+            columns = self.channels
+            X = self.center_mpp
+        else:
+            X = self.data(data)
+        df = pd.DataFrame(data=X, columns=columns)
+        # add x,y,obj_id
+        df['x'] = self.x
+        df['y'] = self.y
+        obs_ = self._get_per_mpp_value({o: self.metadata[o] for o in obs + [self.data_config.OBJ_ID]})
+        df[self.data_config.OBJ_ID] = obs_[self.data_config.OBJ_ID]
+        return df
+
     # TODO nastassya: test
     def _get_neighborhood(self, obj_ids, xs, ys, size=3, border_mode='center'):
         """return neighborhood information for given obj_ids + xs + ys"""
@@ -762,6 +785,7 @@ class MPPData:
                 res = res[0]
             imgs.append(res)
         return imgs
+
 
 
 

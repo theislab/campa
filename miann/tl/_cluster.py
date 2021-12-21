@@ -3,8 +3,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from miann.tl import Experiment
 
-# TODO working on evaluation + clustering pipeline for exp model. 
-# TODO when finished: create fns for how to aggregate - should easily be possible with this code!
 import numpy as np
 import os
 import tensorflow as tf
@@ -56,8 +54,6 @@ def add_clustering_to_adata(data_dir, cluster_name, adata, annotation, added_nam
     adata.uns[added_name+"_colors"] = list(cmap.loc[adata.obs[added_name].cat.categories])
 
 
-# TODO aggregator should use Cluster to get the clustering on all data
-# TODO aggregator deals with multiple data dirs etc
 class Cluster:
     """
     cluster MPPData.
