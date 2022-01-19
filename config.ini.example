@@ -7,3 +7,8 @@ experiment_dir = /home/icb/hannah.spitzer/projects/pelkmans/local_experiments/Na
 ; register individual constants files for different data sources here
 ; they will be referenced by the chosen name in the code
 NascentRNA = /home/icb/hannah.spitzer/projects/pelkmans/software_new/miann_ana/NascentRNA_constants.py
+
+[co_occ]
+; maximal size of co-occ matrix. If number of coordinates that need to be checked is larger, co-occ is computed in chunks.
+; set to lower values when using multi-processing to compute co-occurrence scores
+co_occ_chunk_size = 1e7

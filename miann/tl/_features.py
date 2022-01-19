@@ -1,7 +1,7 @@
 
 from miann.tl import Experiment
 from miann.data import MPPData
-from miann.constants import get_data_config
+from miann.constants import get_data_config, CoOccAlgo, CO_OCC_CHUNK_SIZE
 import os
 import numpy as np
 import pandas as pd
@@ -10,6 +10,11 @@ import logging
 from copy import deepcopy
 import squidpy as sq
 from miann.tl._cluster import annotate_clustering
+from typing import Union
+import time
+import multiprocessing
+from functools import partial
+import tqdm
 
 class FeatureExtractor:
     """
@@ -132,7 +137,7 @@ class FeatureExtractor:
         self.fname = fname
         self.adata.write(self.fname)
 
-    def extract_co_occurrence(self, interval, kind='opt'):
+    def extract_co_occurrence(self, interval, algorithm: Union[str,CoOccAlgo] = CoOccAlgo.OPT, num_processes = None):
         """
         Extract co_occurrence for each cell invididually. 
 
@@ -140,23 +145,32 @@ class FeatureExtractor:
 
         Args:
             interval: distance intervals for which to calculate co-occurrence score
+            algorithm: co-occurrence function to use. 
+                squidpy: use sq.gr.co_occurrence
+                opt: use custom implementation which is optimised for a large number of pixels. 
+                    This implementation avoids recalculation of distances, using the fact that coordinates
+                    in given images lie on a regular grid.
+                Use opt for very large inputs
+            num_processes: only for algorithm='opt'. Number if processes to use to compute scores.
         """
         if self.adata is None:
             self.log.info('extract_co_occurrence: adata is None. Calculate it with extract_intensity_size before extracting co_occurrence. Exiting.')
             return
         self.log.info(f"calculating co-occurrence for intervals {interval} and clustering {self.params['cluster_name']} (col: {self.params['cluster_col']})")
-        if kind == 'opt':
+        if CoOccAlgo(algorithm) == CoOccAlgo.OPT:
             cluster_names = {n: i for i,n in enumerate(self.clusters + [''])}
             coords2_list = _prepare_co_occ(interval)
-        elif kind == 'squidpy':
+        elif CoOccAlgo(algorithm) == CoOccAlgo.SQUIDPY:
             cluster_names = {n: i for i,n in enumerate(self.clusters)}
         
         obj_ids = []
         co_occs = []
         chunks = 20
         i=0
-        for obj_id in self.mpp_data.unique_obj_ids:
-            if kind == 'opt':
+        missing_obj_ids = self._missing_co_occ_obj_ids()
+        self.log.info(f'calculating co-occurrence for {len(missing_obj_ids)} objects')
+        for obj_id in missing_obj_ids:
+            if CoOccAlgo(algorithm) == CoOccAlgo.OPT:
                 mpp_data = self.mpp_data.subset(obj_ids=[obj_id], copy=True)
                 img, (pad_x, pad_y) = mpp_data.get_object_img(obj_id, data=self.params['cluster_name'], annotation_kwargs={'annotation': self.annotation, 'to_col': self.params['cluster_col']})
                 # convert labels to numbers
@@ -165,8 +179,8 @@ class FeatureExtractor:
                 # shift coords according to image padding, st coords correspond to img coords
                 coords1 = (np.array([mpp_data.x, mpp_data.y]) - np.array([pad_x, pad_y])[:,np.newaxis]).astype(np.int64)
                 self.log.info(f'co-occurrence for {obj_id}, with {len(mpp_data.x)} elements')
-                co_occ = _co_occ_opt(coords1, coords2_list, clusters1, img, num_clusters=len(self.clusters))
-            elif kind == 'squidpy':
+                co_occ = _co_occ_opt(coords1, coords2_list, clusters1, img, num_clusters=len(self.clusters), num_processes=num_processes)
+            elif CoOccAlgo(algorithm) == CoOccAlgo.SQUIDPY:
                 adata = self.mpp_data.subset(obj_ids=[obj_id], copy=True).get_adata(obs=[self.params['cluster_name']])
                 # ensure that cluster annotation is present in adata
                 if self.params['cluster_name'] != self.params['cluster_col']:
@@ -191,7 +205,7 @@ class FeatureExtractor:
             obj_ids.append(obj_id)
 
             i+=1
-            if (i%chunks == 0) or (obj_id == self.mpp_data.unique_obj_ids[-1]):
+            if (i%chunks == 0) or (obj_id == missing_obj_ids[-1]):
                 # save
                 self.log.info(f'Saving chunk {i-chunks}-{i}')
                 # add info to adata
@@ -210,6 +224,8 @@ class FeatureExtractor:
                             self.adata.obsm[f'co_occurrence_{c1}_{c2}'] = df
                 self.adata.uns['co_occurrence_params'] = {'interval': list(interval)}
                 self.log.info(f'saving adata to {self.fname}')
+                self.log.info(f'adata params {self.adata.uns["params"]}')
+                self.adata.uns['params'] = self.params # add params to adata again, because exp_name keeps getting lost for some reason (this is a really weird bug...)
                 self.adata.write(self.fname)
                 # reset co_occ list and obj_ids
                 co_occs = []
@@ -256,12 +272,29 @@ class FeatureExtractor:
         # save csv
         df.to_csv(os.path.splitext(self.fname)[0]+'.csv')
 
+    def _missing_co_occ_obj_ids(self):
+        """
+        Return those obj_ids that do not yet have co-occurence scores calculated
+        """
+        n = f'co_occurrence_{self.clusters[0]}_{self.clusters[0]}'
+        if n not in self.adata.obsm.keys():
+            # no co-occ calculated
+            return self.mpp_data.unique_obj_ids
+        else:
+            OBJ_ID = get_data_config(self.exp.config['data']['data_config']).OBJ_ID
+            masks = []
+            for c1 in self.clusters:
+                for c2 in self.clusters:
+                    arr = self.adata.obsm[f'co_occurrence_{c1}_{c2}']
+                    masks.append((self.adata.obsm[f'co_occurrence_{c1}_{c2}']==0).all(axis=1))
+            obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
+            return obj_ids
 
-from numba import njit, jit
+
+from numba import jit
 import numba.types as nt
 ft = nt.float32
 it = nt.int64
-import time
 
 @jit(ft[:,:](it[:],it[:],it), fastmath=True)
 def _count_co_occ(clus1:np.ndarray, clus2:np.ndarray, num_clusters:int) -> np.ndarray:
@@ -270,49 +303,102 @@ def _count_co_occ(clus1:np.ndarray, clus2:np.ndarray, num_clusters:int) -> np.nd
         co_occur[i, j] += 1
     return co_occur
 
+
+def _co_occ_opt_helper(coords2, coords1, clusters1, img, num_clusters):
+    """
+    Helper function for co_occ scores. Counts occurrence of cluster pairs given lists of coords.
+    """
+    # NOTE: order of arguments is important here, because of call to multiprocessing.Pool.map 
+    # (coords2 is iterated over and therefore needs to be first argument)
+    # get img coords to consider for this interval (len(interval_coords), num obs)
+    cur_coords = np.expand_dims(coords2, 2) + np.expand_dims(coords1, 1)
+
+    # get cluster of center pixel + repeat for len(interval_coords)
+    clus1 = np.tile(clusters1, [cur_coords.shape[1], 1])
+    # reshape to (2, xxx)
+    cur_coords = cur_coords.reshape((2,-1))
+    clus1 = clus1.reshape([-1])
+
+    # filter cur_coords that are outside image
+    shape = np.expand_dims(np.array([img.shape[1],img.shape[0]]), 1)
+    mask = np.all((cur_coords >= 0) & (cur_coords < shape), axis=0)
+    cur_coords = cur_coords[:,mask]
+    clus1 = clus1[mask]
+
+    # get cluster of cur_coords
+    clus2 = img[cur_coords[1], cur_coords[0]].flatten()
+
+    # remove those pairs where clus2 is outside of this image (cluster id is not a valid id)
+    mask = clus2 < num_clusters
+    #assert (clus1 < num_clusters).all()
+    clus1 = clus1[mask]
+    clus2 = clus2[mask]
+
+    co_occur = _count_co_occ(clus1, clus2, num_clusters)
+    return co_occur
+
 def _co_occ_opt(coords1: np.ndarray, # int64
                coords2_list: np.ndarray, # int64
                clusters1: np.ndarray, # int64
                img: np.ndarray, # int64
-               num_clusters: int
+               num_clusters: int,
+               num_processes = None
               ) -> np.ndarray:
-
-    out = np.zeros((num_clusters, num_clusters, len(coords2_list)), dtype=np.float32)
-    for idx, coords2 in enumerate(coords2_list):
-        #t1 = time.time()
+    """
+    Calculate co-occurrence scores for several intervals.
+    
+    For decreased memory usage coords1 x coords2 pairs are chunked in CO_OCC_CHUNK_SIZE chunks and processed.
+    If num_processes is specified, uses multiprocessing to calculate co-occurrence scores
+    
+    Args:
+        coords1: first list of coordiantes
+        coords2_list: second list of coordinates, for different intervals
+        clusters1: cluster assigments of coords1
+        img: cluster image used to look up cluster assigments of coords2
+        num_clusters: total number of clusters. 
+            Every cluster assigment greater than this number is filtered (assuming eg background values)
+        num_processes: if not none, uses multiprocessing.Pool to calculate co-occurrence scores
         
-        #co_occur = np.zeros((num_clusters, num_clusters), dtype=np.float32)
-        probs_con = np.zeros((num_clusters, num_clusters), dtype=np.float32)
+    Returns:
+        co-occurrence scores in num_clusters x num_clusters x num_intervals matrix
+    """
+    log = logging.getLogger('_co_occ_opt')
+    if num_processes is not None:
+        pool = multiprocessing.Pool(num_processes)
+        log.info(f'using {num_processes} processes to calculate co-occ scores.')
+    if coords1.shape[1] > CO_OCC_CHUNK_SIZE:
+        raise ValueError(f'coords1 with size {coords1.shape[1]} is larger than CO_OCC_CHUNK_SIZE {CO_OCC_CHUNK_SIZE}. Cannot compute _co_occ_opt')
+    out = np.zeros((num_clusters, num_clusters, len(coords2_list)), dtype=np.float32)
+    # iterate over each interval
+    for idx, coords2 in enumerate(coords2_list):
+        log.info(f'co occ for interval {idx+1}/{len(coords2_list)}, with {coords1.shape[1]} x {coords2.shape[1]} coord pairs')
+        if (coords1.shape[1] * coords2.shape[1]) > CO_OCC_CHUNK_SIZE:
+            chunk_size = int(CO_OCC_CHUNK_SIZE / coords1.shape[1])
+            coords2_chunks = np.split(coords2, np.arange(0,coords2.shape[1],chunk_size), axis=1)
+            log.info(f'splitting coords2 in {len(coords2_chunks)} chunks')
+        else:
+            coords2_chunks = [coords2]
 
-        # get img coords to consider for this interval (len(interval_coords), num obs)
-        cur_coords = np.expand_dims(coords2, 2) + np.expand_dims(coords1, 1)
+        # calculate pairwise cluster counts
+        t1 = time.time()
+        co_occur = np.zeros((num_clusters, num_clusters), dtype=np.float32)
+        map_fn = partial(_co_occ_opt_helper, coords1=coords1, clusters1=clusters1, img=img, num_clusters=num_clusters)
+        if num_processes is not None:
+            #for res in tqdm.tqdm(pool.imap_unordered(map_fn, coords2_chunks), total=len(coords2_chunks)):
+            for res in pool.imap_unordered(map_fn, coords2_chunks):
+                co_occur += res
+        else:
+            for res in map(map_fn, coords2_chunks):
+                co_occur += res
 
-        # get cluster of center pixel + repeat for len(interval_coords)
-        clus1 = np.tile(clusters1, [cur_coords.shape[1], 1])
-        # reshape to (2, xxx)
-        cur_coords = cur_coords.reshape((2,-1))
-        clus1 = clus1.reshape([-1])
+        t2 = time.time()
+        log.info(f'calculating co_occur for these coords took {t2-t1:.0f}s.')
 
-        # filter cur_coords that are outside image
-        shape = np.expand_dims(np.array([img.shape[1],img.shape[0]]), 1)
-        mask = np.all((cur_coords >= 0) & (cur_coords < shape), axis=0)
-        cur_coords = cur_coords[:,mask]
-        clus1 = clus1[mask]
-
-        # get cluster of cur_coords
-        clus2 = img[cur_coords[1], cur_coords[0]].flatten()
-
-        # remove those pairs where clus2 is outside of this image (cluster id is not a valid id)
-        mask = clus2 < num_clusters
-        #assert (clus1 < num_clusters).all()
-        clus1 = clus1[mask]
-        clus2 = clus2[mask]
-
-        co_occur = _count_co_occ(clus1, clus2, num_clusters)
-
+        # calculate co-occ scores
         probs_matrix = co_occur / np.sum(co_occur)
         probs = np.sum(probs_matrix, axis=1)
 
+        probs_con = np.zeros((num_clusters, num_clusters), dtype=np.float32)
         for c in np.unique(img):
             # do not consider background value in img
             if c >= num_clusters:
@@ -321,8 +407,6 @@ def _co_occ_opt(coords1: np.ndarray, # int64
             probs_con[c, :] = probs_conditional / probs
 
         out[:, :, idx] = probs_con
-        #t2 = time.time()
-        #print(idx, coords2.shape, t1-t2, (t1-t2)/coords2.shape[1])
     return out
 
 def _prepare_co_occ(interval):
