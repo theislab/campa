@@ -371,11 +371,11 @@ def _co_occ_opt(coords1: np.ndarray, # int64
     out = np.zeros((num_clusters, num_clusters, len(coords2_list)), dtype=np.float32)
     # iterate over each interval
     for idx, coords2 in enumerate(coords2_list):
-        log.info(f'co occ for interval {idx+1}/{len(coords2_list)}, with {coords1.shape[1]} x {coords2.shape[1]} coord pairs')
+        #log.info(f'co occ for interval {idx+1}/{len(coords2_list)}, with {coords1.shape[1]} x {coords2.shape[1]} coord pairs')
         if (coords1.shape[1] * coords2.shape[1]) > CO_OCC_CHUNK_SIZE:
             chunk_size = int(CO_OCC_CHUNK_SIZE / coords1.shape[1])
             coords2_chunks = np.split(coords2, np.arange(0,coords2.shape[1],chunk_size), axis=1)
-            log.info(f'splitting coords2 in {len(coords2_chunks)} chunks')
+            #log.info(f'splitting coords2 in {len(coords2_chunks)} chunks')
         else:
             coords2_chunks = [coords2]
 
@@ -392,7 +392,7 @@ def _co_occ_opt(coords1: np.ndarray, # int64
                 co_occur += res
 
         t2 = time.time()
-        log.info(f'calculating co_occur for these coords took {t2-t1:.0f}s.')
+        #log.info(f'calculating co_occur for these coords took {t2-t1:.0f}s.')
 
         # calculate co-occ scores
         probs_matrix = co_occur / np.sum(co_occur)
