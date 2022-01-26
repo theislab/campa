@@ -15,6 +15,7 @@ import time
 import multiprocessing
 from functools import partial
 import tqdm
+from skimage.measure import label, regionprops
 
 class FeatureExtractor:
     """
@@ -135,6 +136,69 @@ class FeatureExtractor:
         fname = os.path.join(self.exp.full_path, "aggregated/full_data", self.params['data_dir'], fname)
         self.log.info(f'saving adata to {fname}')
         self.fname = fname
+        self.adata.write(self.fname)
+
+    def extract_object_stats(self, area_threshold=0):
+        """
+        Extract number and area of connected components per cluster for each cell.
+
+        Adds obsm object_area_mean, object_area_std, object_count, object_S1, object_S2, with
+
+        object_S1 = sum(area) 
+        object_S2 = sum(area**2)
+
+        object_area_mean = object_S1 / object_count
+        object_area_std = sqrt(object_S2/object_count - (object_S1/object_count)**2)
+
+        Args:
+            area_threshold: all components smaller than this threshold are discarded
+        """
+        if self.adata is None:
+            self.log.info('extract_object_stats: adata is None. Calculate it with extract_intensity_size before extracting object stats. Exiting.')
+            return
+        self.log.info(f"calculating object stats with area threshold {area_threshold} for clustering {self.params['cluster_name']} (col: {self.params['cluster_col']})")
+        cluster_names = {n: i for i,n in enumerate(self.clusters + [''])}
+        
+        counts = []
+        S1 = []
+        S2 = []
+        obj_ids = []
+        for obj_id in self.mpp_data.unique_obj_ids[:10]:
+            mpp_data = self.mpp_data.subset(obj_ids=[obj_id], copy=True)
+            img, (pad_x, pad_y) = mpp_data.get_object_img(obj_id, data=self.params['cluster_name'], annotation_kwargs={'annotation': self.annotation, 'to_col': self.params['cluster_col']})
+            # convert labels to numbers
+            img = np.vectorize(cluster_names.__getitem__)(img)
+            label_img = label(img, background=len(self.clusters))
+
+            # iterate over all regions in this image
+            obj_counts = np.zeros(len(self.clusters))
+            obj_S1 = np.zeros(len(self.clusters))
+            obj_S2 = np.zeros(len(self.clusters))
+            for region in regionprops(label_img, intensity_image=img):
+                if region.area > area_threshold:
+                    assert region.min_intensity == region.max_intensity
+                    obj_counts[region.min_intensity] += 1
+                    obj_S1[region.min_intensity] += region.area
+                    obj_S2[region.min_intensity] += region.area**2
+            counts.append(obj_counts)
+            S1.append(obj_S1)
+            S2.append(obj_S2)
+            obj_ids.append(obj_id)
+
+        # save to adata
+        for res, name in zip([counts, S1, S2], ['object_count', 'object_S1', 'object_S2']):
+            df = pd.DataFrame(np.array(res), index=obj_ids, columns=self.clusters)
+            df.index = df.index.astype(str)
+            # ensure obj_ids are in correct order
+            df = pd.merge(df, self.adata.obs, how='right', left_index=True, right_on='mapobject_id', suffixes=('','right'))[df.columns]
+            df = df.fillna(0)
+            # add to adata.obsm
+            self.adata.obsm[name] = df
+        # add mean and std of object size
+        self.adata.obsm['object_size_mean'] = self.adata.obsm['object_S1']/self.adata.obsm['object_count']
+        self.adata.obsm['object_size_std'] = np.sqrt(self.adata.obsm['object_S2'] / self.adata.obsm['object_count'] - self.adata.obsm['object_size_mean']**2)
+        self.adata.uns['object_stats_params'] = {'area_threshold': area_threshold}
+        # write adata
         self.adata.write(self.fname)
 
     def extract_co_occurrence(self, interval, algorithm: Union[str,CoOccAlgo] = CoOccAlgo.OPT, num_processes = None):

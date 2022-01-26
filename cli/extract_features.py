@@ -31,7 +31,8 @@ def extract_features(args):
             else:
                 interval = np.linspace(args.co_minval,args.co_maxval,args.co_nsteps).astype(np.float32)
             extr.extract_co_occurrence(interval=interval, num_processes=args.num_processes)
-        # TODO add more features here (blob counts)
+        if 'object-stats' in args.mode:
+            extr.extract_object_stats(args.area_threshold)
 
 
 def parse_arguments():
@@ -51,7 +52,8 @@ def parse_arguments():
     parser.add_argument('--co-nsteps', type=int, default=10)
     parser.add_argument('--co-logspace', action='store_true', help="use log spacing of co-occurrence intervals")
     parser.add_argument('--num-processes', type=int, help='number of processes to use to compute co-occurrence scores')
-    parser.add_argument('mode', nargs="+", choices=['intensity', 'co-occurrence'], help='type of features to extract. Intensity: per-cluster mean and size features. Use this first to set up the adata. Co-occurrence: spatial co-occurrence between pairs of clusters at different distances')
+    parser.add_argument('--area-threshold', type=int, default=20, help='minimun size of connected components to be counted of object-stats')
+    parser.add_argument('mode', nargs="+", choices=['intensity', 'co-occurrence', 'object-stats'], help='type of features to extract. Intensity: per-cluster mean and size features. Use this first to set up the adata. Co-occurrence: spatial co-occurrence between pairs of clusters at different distances. Object stats: number and area of connected components per cluster')
     
     return(parser.parse_args())
 
