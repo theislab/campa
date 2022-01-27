@@ -1,5 +1,5 @@
-# miann
-Multiplexed Image Analysis with Neural Networks
+# campa
+Conditional Autoencoder for Muliplexed Pixel Analysis
 
 ## Installation
 TODO: scanpy, squidpy
