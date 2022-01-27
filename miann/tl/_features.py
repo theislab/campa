@@ -163,7 +163,7 @@ class FeatureExtractor:
         S1 = []
         S2 = []
         obj_ids = []
-        for obj_id in self.mpp_data.unique_obj_ids[:10]:
+        for obj_id in self.mpp_data.unique_obj_ids:
             mpp_data = self.mpp_data.subset(obj_ids=[obj_id], copy=True)
             img, (pad_x, pad_y) = mpp_data.get_object_img(obj_id, data=self.params['cluster_name'], annotation_kwargs={'annotation': self.annotation, 'to_col': self.params['cluster_col']})
             # convert labels to numbers
@@ -199,6 +199,9 @@ class FeatureExtractor:
         self.adata.obsm['object_size_std'] = np.sqrt(self.adata.obsm['object_S2'] / self.adata.obsm['object_count'] - self.adata.obsm['object_size_mean']**2)
         self.adata.uns['object_stats_params'] = {'area_threshold': area_threshold}
         # write adata
+        self.log.info(f'saving adata to {self.fname}')
+        self.log.info(f'adata params {self.adata.uns["params"]}')
+        self.adata.uns['params'] = self.params # add params to adata again, because exp_name keeps getting lost for some reason (this is a really weird bug...)
         self.adata.write(self.fname)
 
     def extract_co_occurrence(self, interval, algorithm: Union[str,CoOccAlgo] = CoOccAlgo.OPT, num_processes = None):
