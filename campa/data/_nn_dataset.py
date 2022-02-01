@@ -1,4 +1,4 @@
-from miann.constants import get_data_config
+from campa.constants import get_data_config
 from ._data import MPPData
 import json
 import logging

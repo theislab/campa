@@ -1,16 +1,16 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from miann.tl import Experiment
+    from campa.tl import Experiment
 
 import tensorflow as tf
 import pandas as pd
 import os
 import logging
 import re
-from miann.tl import LossEnum, ModelEnum
-from miann.tl._layers import UpdateSparsityLevel
-from miann.data import NNDataset
+from campa.tl import LossEnum, ModelEnum
+from campa.tl._layers import UpdateSparsityLevel
+from campa.data import NNDataset
 
     
 # --- Callbacks ---

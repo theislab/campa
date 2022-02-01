@@ -1,6 +1,6 @@
 # read constants defined in config.ini
 from configparser import ConfigParser, NoOptionError, NoSectionError
-from miann.utils import load_config
+from campa.utils import load_config
 import os
 
 def get_value(config, key, section="DEFAULT"):
@@ -10,7 +10,7 @@ def get_value(config, key, section="DEFAULT"):
         print(f'WARNING: {key} not defined in {config_fname}')
         return None
 
-# scripts dir is parent dir of this file (miann folder)
+# scripts dir is parent dir of this file (campa folder)
 SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # expect config in scripts dir
 config_fname = os.path.abspath(os.path.join(SCRIPTS_DIR, 'config.ini'))

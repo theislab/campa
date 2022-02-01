@@ -4,11 +4,11 @@ import numpy as np
 import os
 import tensorflow as tf
 import logging
-from miann.tl import Estimator, Experiment
+from campa.tl import Estimator, Experiment
 import matplotlib.pyplot as plt
 from matplotlib import cm, colors
 import scanpy as sc
-from miann.data._conditions import process_condition_desc
+from campa.data._conditions import process_condition_desc
 
 class Predictor:
     """
@@ -335,7 +335,7 @@ class ModelComparator:
             plt.savefig(os.path.join(self.save_dir, '{}cluster_images.png'.format(save_prefix)), dpi=100)
 
     def plot_umap(self, exp_names=None, save_prefix=''):
-        from miann.tl._cluster import add_clustering_to_adata
+        from campa.tl._cluster import add_clustering_to_adata
         for exp_name in self.exps.keys():
             # prepare adata, add clustering with correct colors
             adata = self.mpps[exp_name].get_adata(obsm={'X_umap': 'umap'})

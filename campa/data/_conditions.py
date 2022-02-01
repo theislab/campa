@@ -1,5 +1,5 @@
 # functions for converting conditions to strings or one-hot encoded vectors
-from miann.constants import get_data_config
+from campa.constants import get_data_config
 import numpy as np
 import logging
 

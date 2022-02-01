@@ -1,14 +1,14 @@
 import os
-from miann.constants import EXPERIMENT_DIR, get_data_config
-from miann.utils import merged_config, load_config
-from miann.tl import LossEnum, ModelEnum
+from campa.constants import EXPERIMENT_DIR, get_data_config
+from campa.utils import merged_config, load_config
+from campa.tl import LossEnum, ModelEnum
 import json
 from copy import deepcopy
 import logging
 import pandas as pd
 import re
 import tensorflow as tf
-from miann.data import MPPData
+from campa.data import MPPData
 import glob
 
 class Experiment:
