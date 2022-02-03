@@ -171,7 +171,7 @@ class FeatureExtractor:
             img, (pad_x, pad_y) = mpp_data.get_object_img(obj_id, data=self.params['cluster_name'], annotation_kwargs={'annotation': self.annotation, 'to_col': self.params['cluster_col']})
             # convert labels to numbers
             img = np.vectorize(cluster_names.__getitem__)(img[:,:,0])
-            label_img = label(img, background=len(self.clusters))
+            label_img = label(img, background=len(self.clusters), connectivity=2)
             # iterate over all regions in this image
             obj_counts = np.zeros(len(self.clusters))
             obj_features = {feature: [[] for _ in self.clusters] for feature in ['area', 'circularity', 'elongation', 'extent']}
@@ -181,7 +181,8 @@ class FeatureExtractor:
                     c = region.min_intensity
                     obj_counts[c] += 1
                     obj_features['area'][c].append(region.area)
-                    obj_features['circularity'][c].append(4*np.pi*region.area/region.perimeter**2)
+                    # circularity can max be 1, larger values are due to tiny regions where perimeter is overestimated
+                    obj_features['circularity'][c].append(min(4*np.pi*region.area/(region.perimeter**2), 1))
                     obj_features['elongation'][c].append((region.major_axis_length - region.minor_axis_length) / region.major_axis_length)
                     obj_features['extent'][c].append(region.extent)
             counts.append(obj_counts)

@@ -7,7 +7,7 @@ from campa.data._img_utils import pad_border, BoundingBox
 from campa.data._conditions import get_one_hot, convert_condition, get_combined_one_hot, get_bin_3_condition, get_lowhigh_bin_2_condition, get_zscore_condition, process_condition_desc
 import json
 from copy import copy
-from campa.pl._plot import annotate_img
+from campa.pl import annotate_img
 
 from tensorflow.python.ops.gen_nn_ops import data_format_dim_map_eager_fallback
 
