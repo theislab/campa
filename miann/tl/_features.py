@@ -140,15 +140,17 @@ class FeatureExtractor:
 
     def extract_object_stats(self, area_threshold=0):
         """
-        Extract number and area of connected components per cluster for each cell.
+        Extract features from connected components per cluster for each cell.
+        
+        Extracts number, area, circlularity, elongation, and extent of connected components per cluster for each cell.
+        For every feature except count the mean, std, and median of this feature per cell is calculated.
 
-        Adds obsm object_area_mean, object_area_std, object_count, object_S1, object_S2, with
+        Adds obsm entries: object_count, object_area_{mean|std|median}, object_circularity_{mean|std|median}, 
+            object_elongation_{mean|std|median}, object_extent_{mean|std|median}
 
-        object_S1 = sum(area) 
-        object_S2 = sum(area**2)
 
-        object_area_mean = object_S1 / object_count
-        object_area_std = sqrt(object_S2/object_count - (object_S1/object_count)**2)
+        object_circularity_{mean|std|median} = (4 * pi * Area) / Perimeter^2, 
+        object_elongation_{mean|std|median} = (major_axis - minor_axis) / major_axis
 
         Args:
             area_threshold: all components smaller than this threshold are discarded
@@ -160,49 +162,53 @@ class FeatureExtractor:
         cluster_names = {n: i for i,n in enumerate(self.clusters + [''])}
         
         counts = []
-        S1 = []
-        S2 = []
+        features = {
+            feature: {agg: [] for agg in ['mean', 'std', 'median']} for feature in ['area', 'circularity', 'elongation', 'extent']
+        }
         obj_ids = []
         for obj_id in self.mpp_data.unique_obj_ids:
             mpp_data = self.mpp_data.subset(obj_ids=[obj_id], copy=True)
             img, (pad_x, pad_y) = mpp_data.get_object_img(obj_id, data=self.params['cluster_name'], annotation_kwargs={'annotation': self.annotation, 'to_col': self.params['cluster_col']})
             # convert labels to numbers
-            img = np.vectorize(cluster_names.__getitem__)(img)
+            img = np.vectorize(cluster_names.__getitem__)(img[:,:,0])
             label_img = label(img, background=len(self.clusters))
-
             # iterate over all regions in this image
             obj_counts = np.zeros(len(self.clusters))
-            obj_S1 = np.zeros(len(self.clusters))
-            obj_S2 = np.zeros(len(self.clusters))
+            obj_features = {feature: [[] for _ in self.clusters] for feature in ['area', 'circularity', 'elongation', 'extent']}
             for region in regionprops(label_img, intensity_image=img):
                 if region.area > area_threshold:
                     assert region.min_intensity == region.max_intensity
-                    obj_counts[region.min_intensity] += 1
-                    obj_S1[region.min_intensity] += region.area
-                    obj_S2[region.min_intensity] += region.area**2
+                    c = region.min_intensity
+                    obj_counts[c] += 1
+                    obj_features['area'][c].append(region.area)
+                    obj_features['circularity'][c].append(4*np.pi*region.area/region.perimeter**2)
+                    obj_features['elongation'][c].append((region.major_axis_length - region.minor_axis_length) / region.major_axis_length)
+                    obj_features['extent'][c].append(region.extent)
             counts.append(obj_counts)
-            S1.append(obj_S1)
-            S2.append(obj_S2)
+            for feature in features.keys():
+                for agg in ['mean', 'std', 'median']:
+                    agg_feature = [eval(f'np.{agg}')(f, axis=0) for f in obj_features[feature]]
+                    features[feature][agg].append(agg_feature)
             obj_ids.append(obj_id)
+        features = {f'{feature}_{agg}': features[feature][agg] for feature in features.keys() for agg in ['mean', 'std', 'median']}
+        features['count'] = counts
 
         # save to adata
-        for res, name in zip([counts, S1, S2], ['object_count', 'object_S1', 'object_S2']):
+        for name, res in features.items():
             df = pd.DataFrame(np.array(res), index=obj_ids, columns=self.clusters)
             df.index = df.index.astype(str)
             # ensure obj_ids are in correct order
             df = pd.merge(df, self.adata.obs, how='right', left_index=True, right_on='mapobject_id', suffixes=('','right'))[df.columns]
             df = df.fillna(0)
             # add to adata.obsm
-            self.adata.obsm[name] = df
-        # add mean and std of object size
-        self.adata.obsm['object_size_mean'] = self.adata.obsm['object_S1']/self.adata.obsm['object_count']
-        self.adata.obsm['object_size_std'] = np.sqrt(self.adata.obsm['object_S2'] / self.adata.obsm['object_count'] - self.adata.obsm['object_size_mean']**2)
+            self.adata.obsm['object_'+name] = df
         self.adata.uns['object_stats_params'] = {'area_threshold': area_threshold}
         # write adata
         self.log.info(f'saving adata to {self.fname}')
         self.log.info(f'adata params {self.adata.uns["params"]}')
         self.adata.uns['params'] = self.params # add params to adata again, because exp_name keeps getting lost for some reason (this is a really weird bug...)
         self.adata.write(self.fname)
+
 
     def extract_co_occurrence(self, interval, algorithm: Union[str,CoOccAlgo] = CoOccAlgo.OPT, num_processes = None):
         """
