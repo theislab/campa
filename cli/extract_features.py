@@ -1,10 +1,10 @@
 import argparse
-from miann.utils import init_logging
-from miann.tl import Experiment, Cluster, Predictor
-from miann.data import MPPData
+from campa.utils import init_logging
+from campa.tl import Experiment, Cluster, Predictor
+from campa.data import MPPData
 import os
 import logging
-from miann.tl import FeatureExtractor, Experiment
+from campa.tl import FeatureExtractor, Experiment
 import numpy as np
 
 def extract_features(args):

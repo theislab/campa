@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
-setup(name='miann',
+setup(name='campa',
       version='0.1',
       packages=find_packages(),
-      package_dir={'miann':'miann'},
+      package_dir={'campa':'campa'},
       install_requires=[]
      )

@@ -1,7 +1,7 @@
 
-from miann.tl import Experiment
-from miann.data import MPPData
-from miann.constants import get_data_config, CoOccAlgo, CO_OCC_CHUNK_SIZE
+from campa.tl import Experiment
+from campa.data import MPPData
+from campa.constants import get_data_config, CoOccAlgo, CO_OCC_CHUNK_SIZE
 import os
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ import anndata as ad
 import logging
 from copy import deepcopy
 import squidpy as sq
-from miann.tl._cluster import annotate_clustering
+from campa.tl._cluster import annotate_clustering
 from typing import Union
 import time
 import multiprocessing

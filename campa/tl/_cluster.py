@@ -1,16 +1,16 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from miann.tl import Experiment
+    from campa.tl import Experiment
 
 import numpy as np
 import os
 import tensorflow as tf
 import logging
-from miann.constants import EXPERIMENT_DIR, get_data_config
-from miann.tl import Predictor
-from miann.data import MPPData
-from miann.utils import merged_config
+from campa.constants import EXPERIMENT_DIR, get_data_config
+from campa.tl import Predictor
+from campa.data import MPPData
+from campa.utils import merged_config
 import json
 from copy import deepcopy
 import scanpy as sc

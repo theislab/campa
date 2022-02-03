@@ -1,5 +1,5 @@
-from miann.data import create_dataset
-from miann.utils import load_config, init_logging
+from campa.data import create_dataset
+from campa.utils import load_config, init_logging
 import argparse
 
 def parse_arguments():
