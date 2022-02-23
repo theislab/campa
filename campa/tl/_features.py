@@ -63,7 +63,7 @@ class FeatureExtractor:
             fname: full path to adata object
         """
         adata = ad.read(fname)
-        params = adata.uns['params']
+        params = deepcopy(adata.uns['params'])
         exp = Experiment.from_dir(params.pop('exp_name'))
         self = cls(exp, adata=adata, **params)
         self.fname = fname
@@ -138,75 +138,91 @@ class FeatureExtractor:
         self.fname = fname
         self.adata.write(self.fname)
 
-    def extract_object_stats(self, area_threshold=0):
+    def extract_object_stats(self, features=['area', 'circularity', 'elongation', 'extent'], intensity_channels=[]):
         """
         Extract features from connected components per cluster for each cell.
         
-        Extracts number, area, circlularity, elongation, and extent of connected components per cluster for each cell.
-        For every feature except count the mean, std, and median of this feature per cell is calculated.
+        Implemented features area: area, circlularity, elongation, and extent of connected components per cluster for each cell.
+        In addition, the mean intensity per component/region of channels specified in intensity_channels is calculated. This is stored in columns "mean_{channel_name}"
+        Per component/region features are calculated and stored in uns['object_stats'] together with OBJ_ID and cluster that this region belongs to.
+        To aggregate these computed stats in a mean/median values per OBJ_ID, use extr.get_object_stats()
 
-        Adds obsm entries: object_count, object_area_{mean|std|median}, object_circularity_{mean|std|median}, 
-            object_elongation_{mean|std|median}, object_extent_{mean|std|median}
+        Adds uns entry: object_stats and object_stats_params
 
-
-        object_circularity_{mean|std|median} = (4 * pi * Area) / Perimeter^2, 
-        object_elongation_{mean|std|median} = (major_axis - minor_axis) / major_axis
+        circularity = (4 * pi * Area) / Perimeter^2, 
+        elongation = (major_axis - minor_axis) / major_axis
 
         Args:
-            area_threshold: all components smaller than this threshold are discarded
+            features: list of features to be calculated
+            intensity_channels: list of channels for which the mean intensity should be extracted
         """
         if self.adata is None:
             self.log.info('extract_object_stats: adata is None. Calculate it with extract_intensity_size before extracting object stats. Exiting.')
             return
-        self.log.info(f"calculating object stats with area threshold {area_threshold} for clustering {self.params['cluster_name']} (col: {self.params['cluster_col']})")
+        if features is None:
+            features = []
+        if intensity_channels is None:
+            intensity_channels = []
+        assert len(features) + len(intensity_channels) > 0, "nothing to compute"
+        self.log.info(f"calculating object stats {features} and channels {intensity_channels} for clustering {self.params['cluster_name']} (col: {self.params['cluster_col']})")
         cluster_names = {n: i for i,n in enumerate(self.clusters + [''])}
         
-        counts = []
+        feature_names = features
+        intensity_feature_names = [f'mean_{ch}' for ch in intensity_channels]
         features = {
-            feature: {agg: [] for agg in ['mean', 'std', 'median']} for feature in ['area', 'circularity', 'elongation', 'extent']
+            #feature: {agg: [] for agg in ['mean', 'std', 'median']} for feature in ['area', 'circularity', 'elongation', 'extent']
+            feature: [] for feature in feature_names + intensity_feature_names + ['mapobject_id', 'clustering']
         }
-        obj_ids = []
         for obj_id in self.mpp_data.unique_obj_ids:
             mpp_data = self.mpp_data.subset(obj_ids=[obj_id], copy=True)
             img, (pad_x, pad_y) = mpp_data.get_object_img(obj_id, data=self.params['cluster_name'], annotation_kwargs={'annotation': self.annotation, 'to_col': self.params['cluster_col']})
             # convert labels to numbers
             img = np.vectorize(cluster_names.__getitem__)(img[:,:,0])
             label_img = label(img, background=len(self.clusters))
+             # define intensity image
+            intensity_img = img[:,:,np.newaxis]
+            if len(intensity_channels) > 0:
+                obj_img, _ = mpp_data.get_object_img(obj_id, data='mpp', channel_ids=mpp_data.get_channel_ids(intensity_channels))
+                intensity_img = np.concatenate([intensity_img, obj_img], axis=-1)
             # iterate over all regions in this image
-            obj_counts = np.zeros(len(self.clusters))
-            obj_features = {feature: [[] for _ in self.clusters] for feature in ['area', 'circularity', 'elongation', 'extent']}
-            for region in regionprops(label_img, intensity_image=img):
-                if region.area > area_threshold:
-                    assert region.min_intensity == region.max_intensity
-                    c = region.min_intensity
-                    obj_counts[c] += 1
-                    obj_features['area'][c].append(region.area)
-                    obj_features['circularity'][c].append(4*np.pi*region.area/region.perimeter**2)
-                    obj_features['elongation'][c].append((region.major_axis_length - region.minor_axis_length) / region.major_axis_length)
-                    obj_features['extent'][c].append(region.extent)
-            counts.append(obj_counts)
-            for feature in features.keys():
-                for agg in ['mean', 'std', 'median']:
-                    agg_feature = [eval(f'np.{agg}')(f, axis=0) for f in obj_features[feature]]
-                    features[feature][agg].append(agg_feature)
-            obj_ids.append(obj_id)
-        features = {f'{feature}_{agg}': features[feature][agg] for feature in features.keys() for agg in ['mean', 'std', 'median']}
-        features['count'] = counts
+            for region in regionprops(label_img, intensity_image=intensity_img):
+                # filter out single pixel regions, they cause problems in elongation and circularity calculation
+                if region.area > 1:
+                    # get cluster label for this region
+                    assert region.min_intensity[0] == region.max_intensity[0]
+                    c = int(region.min_intensity[0])
+                    # add clustering and obj_id
+                    features['clustering'].append((self.clusters+[''])[c])
+                    features['mapobject_id'].append(obj_id)
+                    # add all other features
+                    for feature in feature_names:
+                        if feature == 'area':
+                            features[feature].append(region.area)
+                        elif feature == 'circularity':
+                            # circularity cannot be larger than 1
+                            # perimeter is unstable for very small areas, might result in values > 1
+                            features[feature].append(min(4*np.pi*region.area/region.perimeter**2, 1))
+                        elif feature == 'elongation':
+                            features[feature].append((region.major_axis_length - region.minor_axis_length) / region.major_axis_length)
+                        elif feature == 'extent':
+                            features[feature].append(region.extent)
+                        else:
+                            raise NotImplementedError(feature)
+                    # get intensity features for this region
+                    for i, ch in enumerate(intensity_channels):
+                        # mean intensity is in channel i+1 of intensity_img (channel 0 is cluster image)
+                        features[intensity_feature_names[i]].append(region.mean_intensity[i+1])
 
-        # save to adata
-        for name, res in features.items():
-            df = pd.DataFrame(np.array(res), index=obj_ids, columns=self.clusters)
-            df.index = df.index.astype(str)
-            # ensure obj_ids are in correct order
-            df = pd.merge(df, self.adata.obs, how='right', left_index=True, right_on='mapobject_id', suffixes=('','right'))[df.columns]
-            df = df.fillna(0)
-            # add to adata.obsm
-            self.adata.obsm['object_'+name] = df
-        self.adata.uns['object_stats_params'] = {'area_threshold': area_threshold}
+
+        df = pd.DataFrame(features)
+        self.adata.uns['object_stats'] = df
+        self.adata.uns['object_stats_params'] = {'features':feature_names, 'intensity_channels':intensity_channels}
+
         # write adata
         self.log.info(f'saving adata to {self.fname}')
         self.log.info(f'adata params {self.adata.uns["params"]}')
-        self.adata.uns['params'] = self.params # add params to adata again, because exp_name keeps getting lost for some reason (this is a really weird bug...)
+        # TODO bug should be fixed, deepcopy of params in init
+        #self.adata.uns['params'] = self.params # add params to adata again, because exp_name keeps getting lost for some reason (this is a really weird bug...)
         self.adata.write(self.fname)
 
 
@@ -298,7 +314,7 @@ class FeatureExtractor:
                 self.adata.uns['co_occurrence_params'] = {'interval': list(interval)}
                 self.log.info(f'saving adata to {self.fname}')
                 self.log.info(f'adata params {self.adata.uns["params"]}')
-                self.adata.uns['params'] = self.params # add params to adata again, because exp_name keeps getting lost for some reason (this is a really weird bug...)
+                #self.adata.uns['params'] = self.params # add params to adata again, because exp_name keeps getting lost for some reason (this is a really weird bug...)
                 self.adata.write(self.fname)
                 # reset co_occ list and obj_ids
                 co_occs = []
@@ -320,6 +336,47 @@ class FeatureExtractor:
             adatas[c] = cur_adata
         comb_adata = ad.concat(adatas, uns_merge='same', index_unique='-', label='cluster')
         return comb_adata
+
+    def get_object_stats(self, area_threshold=10, agg=['median'], save=False):
+        """
+        aggregate object stats per obj_id
+        Returns obj_id x (clustering, feature) dataframe and stores result in self.adata.obsm['object_stats_agg']
+
+        Args:
+            area_threshold: all components smaller than this threshold are discarded
+            agg: list of aggregation function or dict with {feature: function}. Passed to pd.GroupBy.agg
+            save: save adata object with object_stats_agg
+
+        """
+        assert 'object_stats' in self.adata.uns.keys(), "No object stats found. Use self.extract_object_stats to calculate."
+        OBJ_ID = get_data_config(self.exp.config['data']['data_config']).OBJ_ID
+        df = self.adata.uns['object_stats']
+        # filter out small regions
+        df = df[df['area'] > area_threshold]
+        grp = df.groupby(['clustering', OBJ_ID])
+        agg_stats = grp.agg(agg)
+        # rename columns to feature_agg
+        agg_stats.columns = [f'{i}_{j}' for i,j in agg_stats.columns]
+        # add count column
+        agg_stats['count'] = grp.count()['area']
+        # reshape to obj_id x (clustering, feature)
+        agg_stats = agg_stats.unstack(level=0)
+        # replace nan with 0 (clusters that do not exist in given obj)
+        agg_stats = agg_stats.fillna(0)
+
+        # ensure obj_ids are in correct order
+        agg_stats.index = agg_stats.index.astype(str)
+        agg_stats.columns = [(i,j) for i,j in agg_stats.columns]
+        agg_stats = pd.merge(agg_stats, self.adata.obs, how='right', left_index=True, right_on=OBJ_ID, suffixes=('','right'))[agg_stats.columns]
+        agg_stats = agg_stats.fillna(0)
+        agg_stats.columns = pd.MultiIndex.from_tuples(agg_stats.columns)
+        # store result in adata
+        self.adata.obsm['object_stats_agg'] = deepcopy(agg_stats)
+        # flatten columns to allow saving adata
+        self.adata.obsm['object_stats_agg'].columns =  [f'{i}|{j}' for i,j in self.adata.obsm['object_stats_agg'].columns]
+        if save:
+            self.adata.write(self.fname)
+        return agg_stats
 
     def extract_intensity_csv(self, obs=None):
         """
