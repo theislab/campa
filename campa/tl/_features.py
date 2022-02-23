@@ -178,7 +178,7 @@ class FeatureExtractor:
             img, (pad_x, pad_y) = mpp_data.get_object_img(obj_id, data=self.params['cluster_name'], annotation_kwargs={'annotation': self.annotation, 'to_col': self.params['cluster_col']})
             # convert labels to numbers
             img = np.vectorize(cluster_names.__getitem__)(img[:,:,0])
-            label_img = label(img, background=len(self.clusters))
+            label_img = label(img, background=len(self.clusters), connectivity=2)
              # define intensity image
             intensity_img = img[:,:,np.newaxis]
             if len(intensity_channels) > 0:
@@ -199,8 +199,7 @@ class FeatureExtractor:
                         if feature == 'area':
                             features[feature].append(region.area)
                         elif feature == 'circularity':
-                            # circularity cannot be larger than 1
-                            # perimeter is unstable for very small areas, might result in values > 1
+                            # circularity can max be 1, larger values are due to tiny regions where perimeter is overestimated
                             features[feature].append(min(4*np.pi*region.area/region.perimeter**2, 1))
                         elif feature == 'elongation':
                             features[feature].append((region.major_axis_length - region.minor_axis_length) / region.major_axis_length)
