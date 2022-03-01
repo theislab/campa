@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-def plot_object_stats(adata, group_key, features=None, clusters=None):
+def plot_object_stats(adata, group_key, features=None, clusters=None, figsize_mult=(2,2)):
     """Compare objects stats of groups in group_key.
     
     Uses stats in adata.obsm['object_stats_agg'], resulting from calling extr.get_object_stats()
@@ -21,7 +21,8 @@ def plot_object_stats(adata, group_key, features=None, clusters=None):
         features = agg_stats.columns.levels[0]
     if clusters is None:
         clusters = agg_stats.columns.levels[1]
-    fig, axes = plt.subplots(len(clusters), len(features), figsize=(len(features)*2, len(clusters)*2), sharex=True)
+    fig, axes = plt.subplots(len(clusters), len(features), 
+        figsize=(len(features)*figsize_mult[0], len(clusters)*figsize_mult[1]), sharex=True, squeeze=False)
     for i, row in enumerate(axes):
         for j, ax in enumerate(row):
             cluster = clusters[i]
