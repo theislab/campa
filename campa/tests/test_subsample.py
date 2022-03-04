@@ -1,6 +1,6 @@
 import pytest
 
-from miann.tests.helpers import gen_mppdata
+from campa.tests.helpers import gen_mppdata
 import numpy as np
 import os
 import math

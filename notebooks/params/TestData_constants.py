@@ -2,10 +2,10 @@
 
 # --- dataset specific constants ---
 import os
-from miann.constants import BASE_DATA_DIR
 
 # --- dataset specific constants ---
-DATA_DIR = BASE_DATA_DIR
+# Use fixed data_dir for TestData, for other datasets can use BASE_DATA_DIR defined in config.ini
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'example_data')
 DATASET_DIR = os.path.join(DATA_DIR, 'datasets')
 # name of column in metadata.csv that contains a unique object identifier
 OBJ_ID = 'mapobject_id'

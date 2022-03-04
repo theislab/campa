@@ -10,9 +10,9 @@ import pandas as pd
 import pytest
 from scipy import sparse
 
-from miann.data._data import MPPData
+from campa.data._data import MPPData
 from string import ascii_letters
-from miann.data import MPPData
+from campa.data import MPPData
 def gen_vstr_recarray(m, n, dtype=None):
     size = m * n
     lengths = np.random.randint(3, 5, size)
@@ -95,7 +95,7 @@ def gen_mppdata(
     num_obj_ids: int = 5,
     possible_cell_cycles: list = None,
     channels:list = None,
-    data_config:str='NascentRNA_mpp_data',
+    data_config:str='TestData',
     **kwargs
 ) -> MPPData:
     """\

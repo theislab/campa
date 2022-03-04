@@ -4,7 +4,7 @@ data_params = {
     # name of the resulting dataset that is defined by these params (relative to DATA_DIR/datasets)
     'dataset_name': '184A1_test_dataset',
     # name of data config (registered in config.ini)
-    'data_config': "NascentRNA_test", # TODO change to example data_config
+    'data_config': "TestData",
     # where to read data from (relative to DATA_DIR defined in data config)
     'data_dirs': 
             [os.path.join('184A1_unperturbed', well) for well in ['I09', 'I11']] + \
@@ -42,7 +42,7 @@ data_params = {
     'subsample': True,
     # kwargs for MPPData.subsample() defining the fraction of pixels to be sampled
     'subsample_kwargs': {
-        'frac': 0.01,
+        'frac': 0.1,
         'frac_per_obj': None,
         'num': None,
         'num_per_obj': None,

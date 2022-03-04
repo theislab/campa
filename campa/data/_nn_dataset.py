@@ -185,35 +185,3 @@ class NNDataset:
                 yield (el_x, el_y)
         dataset = tf.data.Dataset.from_generator(gen, tuple(output_types), tuple(output_shapes))
         return dataset
-    
-    # TODO: function to create inputs for imgs? Maybe very easy, and do not need here?
-    # input_data = (val_imgs.mpp, val_imgs.conditions)
-
-    #def get_mapobject_ids(self, split='train', data='data'):
-    #    if data == 'data':
-    #        return self.data[split]['mapobject_id']
-    #    else:
-    #        return self.imgs[split]['mapobject_id']
-    
-    #def get_imgs(self, split='val', img_ids=None, is_conditional=False):
-    #    if img_ids is None:
-    #        img_ids = np.arange(len(self.imgs[split]['img']))
-    #    # randomly select img_ids
-    #    if not isinstance(img_ids, np.ndarray):
-    #        np.random.seed(42)
-    #        img_ids = np.random.choice(range(len(self.imgs[split]['img'])), img_ids)
-    #    imgs = self.imgs[split]['img'][img_ids]
-    #    cond = None
-    #    if is_conditional:
-    #        cond = self.imgs[split]['cond'][img_ids]
-    #    return (imgs, cond), img_ids
-    
-    #def get_metadata(self, split, columns=['mapobject_id', 'well_name', 'cell_type', 'perturbation_duration', 'cell_cycle']):
-    #    mapobject_ids = self.get_mapobject_ids(split)
-    #    wells = pd.read_csv(os.path.join(DATA_DIR, 'wells_metadata.csv'), index_col=0)
-    #    cc = pd.read_csv(os.path.join(DATA_DIR, 'cell_cycle_classification.csv'))
-    #    metadata = self.metadata.set_index('mapobject_id').loc[mapobject_ids]
-    #    metadata = metadata.reset_index()
-    #    metadata = metadata.merge(wells, left_on='well_name', right_on='well_name', how='left', suffixes=('','well_'))
-    #    metadata = metadata.merge(cc, left_on='mapobject_id_cell', right_on='mapobject_id', how='left', suffixes=('','cc_'))
-    #    return metadata[columns]
