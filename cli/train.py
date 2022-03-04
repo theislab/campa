@@ -1,6 +1,6 @@
-from miann.constants import EXPERIMENT_DIR
-from miann.utils import init_logging
-from miann.tl import Estimator, Experiment, Predictor, Cluster, ModelComparator
+from campa.constants import EXPERIMENT_DIR
+from campa.utils import init_logging
+from campa.tl import Estimator, Experiment, Predictor, Cluster, ModelComparator
 import argparse
 import os
 
@@ -8,7 +8,7 @@ def prepare_exp_split(exp):
     """
     set up exp split data for non trainable model. Mimicks results folders created with predictor
     """
-    from miann.data import MPPData
+    from campa.data import MPPData
     import numpy as np
     # create results mpp_data for not trainable experiment to allow usage with Cluster
     for split in [exp.config['evaluation']['split'], exp.config['evaluation']['split']+'_imgs']:

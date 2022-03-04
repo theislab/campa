@@ -1,4 +1,4 @@
-from miann.tl import LossEnum, ModelEnum
+from campa.tl import LossEnum, ModelEnum
 
 base_config = {
     'experiment': {
