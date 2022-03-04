@@ -31,6 +31,9 @@ def convert_condition(arr, desc, one_hot=False, data_config=None):
         if np.isin(arr, cur_conditions).any():
             log.info(f'Converting condition {desc} to numbers')
             conv_arr = np.zeros(arr.shape, dtype=np.uint8)
+            if "UNKNOWN" in cur_conditions:
+                cur_conditions.append(cur_conditions.pop(cur_conditions.index("UNKNOWN")))
+                conv_arr[~np.in1d(arr, cur_conditions)]= cur_conditions.index("UNKNOWN")
             for i,c in enumerate(cur_conditions):
                 conv_arr[arr==c] = i
             if one_hot:
@@ -84,6 +87,8 @@ def get_lowhigh_bin_2_condition(cond, desc, cond_params):
 
 def get_zscore_condition(cond, desc, cond_params):
     # z-score TR
+    #contiinous nbr, normalizes it
+    #should work only after split up
     if cond_params.get(f'{desc}_mean_std', None) is not None:
         tr_mean, tr_std = cond_params[f'{desc}_mean_std']
     else:

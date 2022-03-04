@@ -86,7 +86,12 @@ class MPPData:
         If present, will also read key.npy for each key in optional_keys
 
         Args:
+            data_dir: Path to the specific directory containing one set of npy and csv files as described above.
+            Note that this path should be relative to the 'base_dir',which is either provided implicitly in the function or set
+            to data_dir path specified in config.ini otherwise.
             mode: mmap_mode for np.load. Set to None to load data in memory.
+            data_config: Name of the constant in the [data] field of config.ini file, which contains path to the python file
+            with configuration parameters for loading the data.
             base_dir: look for data in base_dir/data_dir. Default in DATA_DIR
         """
         # load data_config
@@ -268,7 +273,14 @@ class MPPData:
 
     
     def copy(self):
-        raise(NotImplementedError)
+        import copy
+        data = copy.deepcopy(self._data)
+        metadata=copy.deepcopy(self.metadata)
+        mpp_copy= MPPData(metadata=copy.deepcopy(self.metadata), channels=copy.deepcopy(self.channels), data=copy.deepcopy(self._data),
+                       seed=copy.deepcopy(self.seed), data_config=copy.deepcopy(self.data_config_name))
+
+        return mpp_copy
+        # raise(NotImplementedError)
         #pass
 
     # TODO Nastassya: ensure that each function logs what its doing with log.info
@@ -364,6 +376,29 @@ class MPPData:
     def add_conditions(self, cond_desc, cond_params={}):
         """
         Add conditions informations by aggregating over channels (per cell) or reading data from cell cycle file.
+
+        Withing a framework of conditional VAE training, a conditional vector is passed alongside the input vector.
+        This vector could represent e.g. perturbation or a cell cycle.
+        The vector is constructed for each input sample (here, we refer to an input sample is a pixel or a pixel's neighbourhood)
+        from a metadata table as a concatenation of vectors each representing separate condition.
+
+        In order to create a conditions table, method add_conditions(), which takes the following parameters:
+
+        cond_desc: a list of conditions descriptions, represented as string values. Conditions can be represented in one of the following formats:
+            - columnName - if this column is specified in data_config.CONDITIONS, then a value in that column gets numerically encoded into a class value (1, 2, ...).
+           Note that the class is assigned to the value only if the values is contained in range of values that column could take (as specified in data_config.CONDITIONS[columnName]).
+           Note that one can also provide a special entrie "UNKNOWN" there. In that case, all values with conditions that are not listed are mapped to the additional last class.
+        If the column name is not provided in the data_config.CONDITIONS, values are assumed to be continious and stored as they are in the conditions table.
+            - columnName_postrpocess, where postprocess can be set to one of the following values:
+                - lowhigh_bin_2: bins all values in the specified column in 4 quantiles, encodes values in the
+           lowest quantile as one class and values in the high quantile as teh second class (one-hot encoded), and all values in-between sets to None
+                - bin_3: bin values in .33 and .66 quantiles and one-hot encodes each of them into 3 classes according to quantile where the value belongs to
+                - zscore: normalizes a continuous set of values by mean and std of train subset, supposed to be used only after a train-test split up
+                - one_hot: same as when only ***columnName*** is provided as a condition description, but additionally one-hot encodes the class values.
+
+        cond_params: Dictionary with parameters needed for some conditions, e.g. for classyfying values into bins. If empty, these values are calculated and stored into this dict (where appropriate).
+
+        NOTE: Operation is performed inplace.
         """
         self.log.info(f'Adding conditions: {cond_desc}')
         conditions = []
@@ -383,7 +418,11 @@ class MPPData:
             num (int): number of objects to randomly subsample. frac takes precedence
                 Applied after the other subsetting.
             obj_ids (list of str): ids of objects to subset to
+            nona_condition: if set to True,  all values having nan conditions will be filtered out. Note that the way condition's creation
+             is implemented allows one to e.g. leave only entries which values in the specified column were in the low and high quantilies,
+             and filter out everything else.
             copy: return new MPPData object or modify in place
+            
             kwargs:
                 key: name of column used to select objects
                 value (str or list of str): allowed entries for selected objects, 
@@ -401,6 +440,7 @@ class MPPData:
         # select ids based on kwargs
         for key, value in kwargs.items():
             cur_metadata = self.metadata.set_index(self.data_config.OBJ_ID).loc[selected_obj_ids]
+            assert (key in cur_metadata.columns), f'provided column {key} was not found in the metadata table!'
             if value == 'NO_NAN':
                 mask = ~cur_metadata[key].isnull() # TODO check!
                 self.log.info(f'Subsetting to NO_NAN {key}: {sum(mask)} objects')
@@ -438,18 +478,41 @@ class MPPData:
         Updates self.mpp and self.channels
         """
         # TODO need copy argument?
-        cids = list(self.channels.reset_index().set_index('name').loc[channels]['channel_id'])
+        self.log.info('Subsetting from {} channels'.format(len(self.channels)))
+        channels_overlap=np.intersect1d(self.channels.name.values,channels)
+        assert len(np.intersect1d(self.channels.name.values,channels))!=0, "mpp object does not contain provided channels!"
+        cids = list(self.channels.reset_index().set_index('name').loc[channels_overlap]['channel_id'])
+        raw_channels = self.channels
         self.channels = self.channels.loc[cids].reset_index(drop=True)
         self.channels.index.name = 'channel_id'
         self._data['mpp'] = self.mpp[:,:,:,cids]
+        subset_mpp_channels = self.channels
         self.log.info(f'Restricted channels to {len(self.channels)} channels')
-        
+        channels_diff=np.setdiff1d(raw_channels, subset_mpp_channels)
+        if len(channels_diff)>0:
+            self.log.info(f'The following channels were excluded {channels_diff}')
+        else:
+            self.log.info(f'None of the channels were excluded ')
+
     # TODO Nastassya: write tests for this
     def subsample(self, frac=None, frac_per_obj=None, num=None, num_per_obj=None, add_neighborhood=False, neighborhood_size=3):
         """
-        Subsample MPPData based on selecting mpps.
+        Performs MPP-level subsampling by selecting mpps (could be thought of as pixels)
         All other information is updated accordingly (to save RAM/HDD-memory).
-        Before subsampling, can add neighborhood.
+        Additionally, can extend mpps' representations by their neighbourhoods before subsampling. Note that several conditions for subsampling can be provided, 
+        and the resulting MPP Dataset will be computed as combination of all the provided conditions.
+
+        args:
+            frac: subsample a random number of mpps (pixels) from the whole dataset by a specified fraction.
+            Should be in range [0, 1].
+            num: subsample a random number of mpps (pixels) from the whole dataset by a specified number of mpps to be chosen.
+            frac_per_obj: allows to subsample a fraction of mpps on the object level - that is, for each object (cell) to subsample 
+                the same fraction of mpps independently.
+            num_per_obj: same as frac_per_obj, but a number of mpps to be left instead of fraction is provided
+            add_neighborhood: if set to True, extends mpp representation with a square neighbourhood around it
+            neighborhood_size: size of the neighborhood
+
+        Note that at least one of four parameters that indicate subsampling (frac, num, frac_per_obj, num_per_obj) size should be provided
 
         Returns: new subsampled MPPData. Operation cannot be done in place
         """
@@ -493,16 +556,54 @@ class MPPData:
             mpp_data._data['mpp'] = neighbor_mpp
         return mpp_data
         
-    def add_neighborhood(self, size=3):
+    def add_neighborhood(self, size=3, copy=False):
+        """
+        Extends mpp representation with a square neighbourhood around it. 
+        
+        args:
+            neighborhood_size: size n of the neighborhood. The resulting mpp representation will then be set to a nXn square around each pixel.
+            copy: return new MPPData object or modify in place
+        """
         # TODO need copy flag?
-        assert not self.has_neighbor_data, "cannot add neighborhood, already has neighbor data"
         self.log.info('Adding neighborhood of size {}'.format(size))
         mpp = self._get_neighborhood(self.obj_ids, self.x, self.y, size=size)
-        # TODO Nastassya: this should be in a unittest of self.get_neighborhood
-        assert (mpp[:,size//2,size//2,:] == self.center_mpp).all()
-        self._data['mpp'] = mpp
+        assert (mpp[:, size // 2, size // 2, :] == self.center_mpp).all()
+
+        if copy:
+            data = self._data.copy()
+            data['mpp'] = mpp
+            return MPPData(metadata=self.metadata, channels=self.channels, data=data,
+                           seed=self.seed, data_config=self.data_config_name)
+        else:
+            assert not self.has_neighbor_data, "cannot add neighborhood, already has neighbor data"
+            # TODO Nastassya: this should be in a unittest of self.get_neighborhood
+            self._data['mpp'] = mpp
         
     def normalise(self, background_value=None, percentile=None, rescale_values=[]):
+        """
+            To prepare the data, pixel values can be normalized. For that, pixel values can be e.g. shifted and rescaled so that they end up
+             ranging between 0 and 1:
+            
+            args:
+                background_value: shifts all values (contained in .data field) by that value. Note that all resulting
+                negative values are cut off to zero. Several shift options are possible, depending on a background_value, which could be in one of the following formats:
+                   - single value (float): then data is shifted by this number in every channels
+                   - list of predifined values (floats): data in each channel is shifted separately by a corresponding value in that list. Note: in that case, number of shifted
+                    values should be the same as number of channels.
+                   - string: list of values for shifting are loaded from the channels_metadata table (should be located in the folder data_config.DATA_DIR
+                    in a file self.data_config.CHANNELS_METADATA). The values are then loaded from the column corresponding to a provided string value.
+                
+                percentile: after (optional) shifting data can be rescaled by a specified value separately for each channel.
+                The value could be in one of the following formats:
+                    - float: value from 0 to 100, which represents a quantile by which data should be rescaled.
+                    Quantiles are then calculated for each channel separately, and data is rescaled independently in each channel
+                    by the calculated respective quantile value.
+                    - list of predifined values (floats): data in each channel is rescaled separately for each channel by a corresponding value in that list.
+                
+                rescale_values: A dictionary with values used for normalization. If empty, parameters calculated for rescaling would be optionally be stored into this dictionary.
+                
+            NOTE: this operation is performed **inplace**.
+        """
         if background_value is not None:
             self._subtract_background(background_value)
         if percentile is not None:
@@ -546,7 +647,7 @@ class MPPData:
                 if pd.isna(val):
                     self.log.warning(f"Missing background value for channel {ch}")
             background_value = background_value.fillna(0)
-            self.log.debug('use background_value: {background_value}')
+            self.log.debug(f'use background_value: {background_value}')
             self._data['mpp'] = self.mpp.astype(np.float32) - np.array(background_value)
         # cut off at 0 (no negative values)
         self._data['mpp'][self.mpp<0] = 0
@@ -744,11 +845,18 @@ class MPPData:
     def get_object_img(self, obj_id, data='mpp', channel_ids=None, annotation_kwargs=None, **kwargs):
         """
         Calculate data image of given object id.
-        data: key in self._data that should be plotted on the image
-        channel_ids: only if key == 'mpp'. Channels that the image should have. 
-            If None, all channels are returned.
-        annotation_kwargs: arguments for self.annotate_img. (annotation, to_col, color)
-        kwargs: arguments for self._get_img_from_data
+        args:
+            obj_id: an ID of the object (cell)
+            data: key in self._data that should be plotted on the image
+            channel_ids: only if key == 'mpp'. Channels that the image should have.
+                If None, all channels are returned.
+            annotation_kwargs: arguments for self.annotate_img. (annotation, to_col, color):
+                img_size: size of returned image. If provided, image is padded or cropped to the desired size, and returns resulting image.
+                    If not provided, returns image and pad parameters from padding (pad set to 0 by default)
+                pad: amount of padding added to returned image (only used when img_size is None). If  provided,
+                 returns image and a list of padding parameters used for image padding.
+            kwargs: arguments for self._get_img_from_data
+
         """
         mask = self.obj_ids == obj_id
         x = self.x[mask]
@@ -770,11 +878,10 @@ class MPPData:
             else: 
                 img = annotate_img(img, from_col=data, **annotation_kwargs)
         return img
-    
+
     def get_object_imgs(self, data='mpp', channel_ids=None, annotation_kwargs=None, **kwargs):
         """
-        Return images for each obj_id in current data. 
-
+        Return images for each obj_id in current data.
         Args: arguments for get_object_img
         """
         imgs = []
@@ -786,8 +893,38 @@ class MPPData:
             imgs.append(res)
         return imgs
 
+    def get_img(self, data='mpp', channel_ids=None, **kwargs):
+        """
+        Calculate data image of all mpp data.
+        data: key in self._data that should be plotted on the image
+        channel_ids: only if key == 'mpp'. Channels that the image should have.
+            If None, all channels are returned.
+        kwargs: arguments for self._get_img_from_data
+        """
+        if data == 'mpp':
+            values = self.center_mpp
+            if channel_ids is not None:
+                values = values[:, channel_ids]
+        else:
+            values = self._data[data]
+        if len(values.shape) == 1:
+            values = values[:, np.newaxis]
+        return MPPData._get_img_from_data(self.x, self.y, values, **kwargs)
 
+    def compare(self, object):
 
+        assert np.array_equal(list(self._data.keys()), list(object._data.keys()))
+        same_data={}
+        for key in self._data.keys():
+            issame=np.array_equal(self._data[key],object._data[key])
+            same_data[key]=issame
+
+        same_data["channels"]=self.channels.equals(object.channels)
+        if len(self.metadata)==len(object.metadata):
+            same_data["metadata"]=self.metadata.reset_index(drop=True).equals(object.metadata.reset_index(drop=True))
+        else:
+            same_data["metadata"] = False
+        return np.all(list(same_data.values())), same_data
 
 
 def _try_mmap_load(fname, mmap_mode='r', allow_not_existing=False):

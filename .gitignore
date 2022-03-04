@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.idea/
 *.py[cod]
 *$py.class
 
@@ -130,3 +131,4 @@ dmypy.json
 
 # custom
 config.ini
+
