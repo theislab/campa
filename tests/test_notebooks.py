@@ -3,7 +3,7 @@ import pytest
 from nbconvert.preprocessors import ExecutePreprocessor
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent.parent
+ROOT = Path(__file__).parent.parent
 
 @pytest.mark.parametrize("notebook", [
     pytest.param("mpp_data.ipynb", marks=pytest.mark.dependency(name="mpp_data")),

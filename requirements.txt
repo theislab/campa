@@ -1,0 +1,7 @@
+pandas>=1.2.0
+scanpy[leiden]>=1.8.0
+tensorflow>=2.6
+tqdm>=4.50.2
+scikit-learn
+numba
+scikit-learn

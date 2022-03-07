@@ -131,4 +131,5 @@ dmypy.json
 
 # custom
 config.ini
+campa.ini
 

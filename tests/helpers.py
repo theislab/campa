@@ -10,9 +10,8 @@ import pandas as pd
 import pytest
 from scipy import sparse
 
-from campa.data._data import MPPData
-from string import ascii_letters
 from campa.data import MPPData
+from string import ascii_letters
 def gen_vstr_recarray(m, n, dtype=None):
     size = m * n
     lengths = np.random.randint(3, 5, size)

@@ -1,12 +1,12 @@
 [DEFAULT]
-data_dir = /home/icb/hannah.spitzer/projects/pelkmans/local_data
-experiment_dir = /home/icb/hannah.spitzer/projects/pelkmans/local_experiments/NascentRNA_new
+data_dir = 
+experiment_dir = 
 
 
 [data]
 ; register individual constants files for different data sources here
 ; they will be referenced by the chosen name in the code
-NascentRNA = /home/icb/hannah.spitzer/projects/pelkmans/software_new/campa_ana/NascentRNA_constants.py
+TestData =
 
 [co_occ]
 ; maximal size of co-occ matrix. If number of coordinates that need to be checked is larger, co-occ is computed in chunks.

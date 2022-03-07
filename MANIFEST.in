@@ -1,0 +1,2 @@
+include requirements.txt
+include campa/config.ini.example

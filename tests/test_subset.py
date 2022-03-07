@@ -1,6 +1,6 @@
 import pytest
 
-from campa.tests.helpers import gen_mppdata
+from tests.helpers import gen_mppdata
 import numpy as np
 # content of test_subset.py
 import os
