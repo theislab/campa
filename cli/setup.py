@@ -37,8 +37,8 @@ def prepare_config(args):
 
     config_path = Path.home() / '.config' / 'campa' / 'campa.ini'
     # read config file from scripts_dir (parent dir of dir that this file is in)
-    example_config_path = Path(__file__).parent.parent / 'campa' / 'campa.ini.example'
-
+    example_config_path = Path(__file__).resolve().parent.parent / 'campa' / 'campa.ini.example'
+    print(example_config_path)
     # check if custom config exists
     if not config_path.is_file() or args.force:
         print(f'No campa.ini found in {config_path}. Creating default config file.')
@@ -55,7 +55,7 @@ def prepare_config(args):
     if cur_test_data == "" or not Path(cur_test_data).is_file():
         print('setting up TestData config')
         # add test data
-        config.set('data', 'TestData', str(Path(__file__).parent.parent / 'notebooks' / 'params' / 'TestData_constants.py'))
+        config.set('data', 'TestData', str(Path(__file__).resolve().parent.parent / 'notebooks' / 'params' / 'TestData_constants.py'))
         with open(config_path, "w") as configfile:
                 config.write(configfile)
 

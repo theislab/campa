@@ -18,7 +18,7 @@ SCRIPTS_DIR = Path(__file__).parent.parent
 config_fnames = [
     Path.home() / '.config' / 'campa' / 'campa.ini',
     Path.cwd() / 'campa.ini',
-    Path(__file__).parent.parent / 'config.ini' # TODO this is for legacy reasons, should be removed at some point
+    Path(__file__).resolve().parent.parent / 'config.ini' # TODO this is for legacy reasons, should be removed at some point
 ]
 if sum([n.is_file() for n in config_fnames]) == 0:
     print(f'None of {config_fnames} exists. Please create a config with "python cli/setup.py"')
