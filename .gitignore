@@ -132,4 +132,4 @@ dmypy.json
 # custom
 config.ini
 campa.ini
-
+notebooks/example_data

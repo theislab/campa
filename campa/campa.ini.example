@@ -1,6 +1,6 @@
 [DEFAULT]
-data_dir = 
-experiment_dir = 
+data_dir =
+experiment_dir =
 
 
 [data]

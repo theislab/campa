@@ -1,13 +1,15 @@
-from campa.data import create_dataset
-from campa.utils import load_config, init_logging
 import argparse
+
+from campa.data import create_dataset
+from campa.utils import init_logging, load_config
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description=('Create NNDataset using either params file')
+        description=("Create NNDataset using either params file")
     )
-    parser.add_argument('params', help='path to data_params.py')
-    return(parser.parse_args())
+    parser.add_argument("params", help="path to data_params.py")
+    return parser.parse_args()
 
 
 if __name__ == "__main__":

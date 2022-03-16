@@ -1,28 +1,41 @@
-from copy import deepcopy, copy
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
+from copy import copy, deepcopy
 
-def plot_object_stats(adata, group_key, features=None, clusters=None, figsize_mult=(2,2)):
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
+
+def plot_object_stats(
+    adata, group_key, features=None, clusters=None, figsize_mult=(2, 2)
+):
     """Compare objects stats of groups in group_key.
-    
+
     Uses stats in adata.obsm['object_stats_agg'], resulting from calling extr.get_object_stats()
     Args:
         adata: anndata object with 'object_stats_agg' in obsm
         group_key: categorical value in adata.obs to group by
-        features: list of features to display. Must be columns of adata.obsm['object_stats_agg']. If None, all features are displayed.
-        clusters: list of clusters to display. Must be columns of adata.obsm['object_stats_agg']. If None, all clusters are displayed.
+        features: list of features to display. Must be columns of adata.obsm['object_stats_agg'].
+            If None, all features are displayed.
+        clusters: list of clusters to display. Must be columns of adata.obsm['object_stats_agg'].
+            If None, all clusters are displayed.
     """
-    agg_stats = deepcopy(adata.obsm['object_stats_agg'])
+    agg_stats = deepcopy(adata.obsm["object_stats_agg"])
     if not isinstance(agg_stats.columns, pd.MultiIndex):
         # restore multiindex for easier access
-        agg_stats.columns = pd.MultiIndex.from_tuples([tuple(i.split('|')) for i in agg_stats.columns])
+        agg_stats.columns = pd.MultiIndex.from_tuples(
+            [tuple(i.split("|")) for i in agg_stats.columns]
+        )
     if features is None:
         features = agg_stats.columns.levels[0]
     if clusters is None:
         clusters = agg_stats.columns.levels[1]
-    fig, axes = plt.subplots(len(clusters), len(features), 
-        figsize=(len(features)*figsize_mult[0], len(clusters)*figsize_mult[1]), sharex=True, squeeze=False)
+    fig, axes = plt.subplots(
+        len(clusters),
+        len(features),
+        figsize=(len(features) * figsize_mult[0], len(clusters) * figsize_mult[1]),
+        sharex=True,
+        squeeze=False,
+    )
     for i, row in enumerate(axes):
         for j, ax in enumerate(row):
             cluster = clusters[i]

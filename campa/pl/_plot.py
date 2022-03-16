@@ -1,6 +1,7 @@
 # --- Plotting functions for evaluating experiments ---
 import numpy as np
 
+
 # TODO remove? TODO don't think its needed anymore
 def map_img(imgs, value_map=None):
     """
@@ -8,18 +9,18 @@ def map_img(imgs, value_map=None):
     Used for displaying cluster images. If map is None, create and return a default one
     """
     if value_map is None:
-        vals = sorted(list(set(np.concatenate([np.unique(i) for i in imgs]))))
+        vals = sorted(set(np.concatenate([np.unique(i) for i in imgs])))
         value_map = {val: i for i, val in enumerate(vals)}
     outs = []
     for img in imgs:
         out = np.zeros(img.shape)
         for key, val in value_map.items():
-            out[img==key] = val
+            out[img == key] = val
         outs.append(out)
     return outs, value_map
 
 
-def annotate_img(img, annotation=None, from_col='clustering', to_col=None, color=False):
+def annotate_img(img, annotation=None, from_col="clustering", to_col=None, color=False):
     """
     Args:
         img: image to annotate
@@ -31,7 +32,7 @@ def annotate_img(img, annotation=None, from_col='clustering', to_col=None, color
     if to_col is None:
         to_col = from_col
     if color:
-        to_col = to_col + '_colors'
+        to_col = to_col + "_colors"
         res = np.zeros(img.shape + (3,), dtype=np.uint8)
     else:
         if from_col == to_col:
@@ -45,6 +46,7 @@ def annotate_img(img, annotation=None, from_col='clustering', to_col=None, color
         res[img == row[from_col]] = to_value
     return res.squeeze() if color else res
 
+
 def hex2rgb(h):
-    h = h.lstrip('#')
-    return list(int(h[i:i+2], 16) for i in (0, 2, 4))
+    h = h.lstrip("#")
+    return [int(h[i : i + 2], 16) for i in (0, 2, 4)]
