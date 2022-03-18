@@ -21,17 +21,12 @@ repos:
     hooks:
     -   id: isort
         additional_dependencies: [toml]
-        args: [--order-by-type, --profile, black]
+        args: [--order-by-type]
 -   repo: https://github.com/asottile/yesqa
     rev: v1.2.3
     hooks:
     -   id: yesqa
         additional_dependencies: [flake8-tidy-imports, flake8-docstrings, flake8-rst-docstrings, flake8-comprehensions, flake8-bugbear, flake8-logging-format, flake8-blind-except, flake8-builtins, flake8-pytest-style, flake8-mock, flake8-string-format]
--   repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-    rev: v2.1.0
-    hooks:
-    -   id: pretty-format-yaml
-        args: [--autofix, --indent, '4']
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.0.1
     hooks:
@@ -69,7 +64,13 @@ repos:
     -   id: script-must-have-extension
         name: Check executable files use .sh extension
         types: [shell, executable]
-# -   id: shellcheck  # TODO: The hook `shellcheck` specifies `additional_dependencies` but is using language `script` which does not install an environment.  Perhaps you meant to use a specific language?
+# YAML files
+-   repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.1.0
+    hooks:
+    -   id: pretty-format-yaml
+        args: [--autofix, --indent, '4']
+# docs (md/rst files)
 -   repo: https://github.com/myint/rstcheck
     rev: 3f92957478422df87bd730abde66f089cc1ee19b
     hooks:
@@ -97,3 +98,23 @@ repos:
     rev: 0.9.0a1
     hooks:
     -   id: doc8
+# jupyter notebooks
+-   repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.3.1
+    hooks:
+    -   id: nbqa-black
+        additional_dependencies: [black==21.6b0]
+    -   id: nbqa-isort
+        additional_dependencies: [isort==5.9.1]
+        args: [--order-by-type]
+    -   id: nbqa
+        entry: nbqa autoflake
+        name: nbqa-autoflake
+        alias: nbqa-autoflake
+        additional_dependencies: [autoflake==v1.4]
+        args: [--in-place, --remove-all-unused-imports, --remove-unused-variable, --ignore-init-module-imports]
+    -   id: nbqa-flake8
+        additional_dependencies: [flake8==3.9.2, flake8-tidy-imports, flake8-docstrings, flake8-rst-docstrings, flake8-comprehensions, flake8-bugbear, flake8-logging-format, flake8-blind-except, flake8-builtins, flake8-pytest-style, flake8-mock, flake8-string-format]
+    -   id: nbqa-pyupgrade
+        args: [--py3-plus, --py37-plus]
+        additional_dependencies: [pyupgrade==v2.19.4]

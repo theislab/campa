@@ -60,9 +60,7 @@ class BoundingBox:
         return (self.h, self.w)
 
     def __str__(self):
-        return "BoundingBox at ({},{}) with shape ({},{})".format(
-            self.ymin, self.xmin, self.h, self.w
-        )
+        return f"BoundingBox at ({self.ymin},{self.xmin}) with shape ({self.h},{self.w})"
 
     def __repr__(self):
         return f"BoundingBox({self.ymin},{self.xmin},{self.h},{self.w})"

@@ -68,12 +68,7 @@ def gmm_kl_loss(y_true, y_pred):
     # weighted sum of kl divergence between qZ and pZ
     tf.keras.backend.epsilon()
 
-    kl = (
-        p_log_var
-        - q_log_var
-        - 0.5
-        * (1.0 - (tf.exp(q_log_var) ** 2 + (q_mu - p_mu) ** 2) / tf.exp(p_log_var) ** 2)
-    )
+    kl = p_log_var - q_log_var - 0.5 * (1.0 - (tf.exp(q_log_var) ** 2 + (q_mu - p_mu) ** 2) / tf.exp(p_log_var) ** 2)
 
     # kl = tf.math.log(qZ_var / (pZ_var + eps) + eps) + (pZ_var + (pZ_mu - qZ_mu)**2) / (2*qZ_var + eps) - 0.5
     # mean over batch and latent_dim
@@ -88,25 +83,17 @@ def gmm_kl_loss(y_true, y_pred):
 
 # from https://github.com/orybkin/sigma-vae-tensorflow/blob/master/model.py
 def gaussian_nll(mu, log_sigma, x):
-    return (
-        0.5 * ((x - mu) / tf.math.exp(log_sigma)) ** 2
-        + log_sigma
-        + 0.5 * np.log(2 * np.pi)
-    )
+    return 0.5 * ((x - mu) / tf.math.exp(log_sigma)) ** 2 + log_sigma + 0.5 * np.log(2 * np.pi)
 
 
 @tf.function
 def sigma_vae_mse(y_true, y_pred):
 
-    log_sigma = tf.math.log(
-        tf.math.sqrt(tf.reduce_mean((y_true - y_pred) ** 2, [0, 1], keepdims=True))
-    )
+    log_sigma = tf.math.log(tf.math.sqrt(tf.reduce_mean((y_true - y_pred) ** 2, [0, 1], keepdims=True)))
     return tf.reduce_sum(gaussian_nll(y_pred, log_sigma, y_true))
 
 
 @tf.function
 def min_entropy(y_true, y_pred):
-    l_ent = -1 * tf.reduce_mean(
-        tf.math.log(y_pred + tf.keras.backend.epsilon()) * y_pred
-    )
+    l_ent = -1 * tf.reduce_mean(tf.math.log(y_pred + tf.keras.backend.epsilon()) * y_pred)
     return l_ent

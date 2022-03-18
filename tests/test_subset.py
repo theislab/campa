@@ -84,11 +84,7 @@ class TestSubset:
         mpp_data.subset(frac=0.5, copy=False)
         isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
         assert isequal == False
-        assert (
-            num_objects_orig_intended
-            == num_objects_orig
-            == len(mpp_data_orig.unique_obj_ids)
-        )
+        assert num_objects_orig_intended == num_objects_orig == len(mpp_data_orig.unique_obj_ids)
         assert num_objects_orig != len(mpp_data.unique_obj_ids)
 
     @pytest.mark.parametrize("frac", (np.linspace(0.1, 0.9, 3)))
@@ -140,15 +136,11 @@ class TestSubset:
         new_key = "new_key"
         with pytest.raises(AssertionError) as exc:
             mpp_data_copy = mpp_data.subset(new_key=["1", "2"], copy=True)
-        assert f"provided column {new_key} was not found in the metadata table!" in str(
-            exc.value
-        )
+        assert f"provided column {new_key} was not found in the metadata table!" in str(exc.value)
 
     def test_subset_by_metadataKey_NO_NAN_woNone(self):
         cell_cycle = [str(i) for i in range(5)]
-        mpp_data = gen_mppdata(
-            num_obj_ids=20, possible_cell_cycles=cell_cycle, ensure_None=False
-        )
+        mpp_data = gen_mppdata(num_obj_ids=20, possible_cell_cycles=cell_cycle, ensure_None=False)
 
         mpp_data_subset = mpp_data.subset(cell_cycle="NO_NAN", copy=True)
         isequal, isequal_dict = mpp_data.compare(mpp_data_subset)
@@ -194,9 +186,7 @@ class TestSubsetChannels:
         mpp_data.subset_channels(channels_to_subset)
         isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
         assert isequal == False
-        assert np.array_equal(
-            np.sort(mpp_data.channels["name"].values), np.sort(channels_to_subset)
-        )
+        assert np.array_equal(np.sort(mpp_data.channels["name"].values), np.sort(channels_to_subset))
         assert mpp_data.mpp.shape[-1] == len(channels_to_subset)
 
     def test_filterOverlapChannels(self):

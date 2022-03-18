@@ -1,13 +1,11 @@
 from copy import copy, deepcopy
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 
-def plot_object_stats(
-    adata, group_key, features=None, clusters=None, figsize_mult=(2, 2)
-):
+def plot_object_stats(adata, group_key, features=None, clusters=None, figsize_mult=(2, 2)):
     """Compare objects stats of groups in group_key.
 
     Uses stats in adata.obsm['object_stats_agg'], resulting from calling extr.get_object_stats()
@@ -22,9 +20,7 @@ def plot_object_stats(
     agg_stats = deepcopy(adata.obsm["object_stats_agg"])
     if not isinstance(agg_stats.columns, pd.MultiIndex):
         # restore multiindex for easier access
-        agg_stats.columns = pd.MultiIndex.from_tuples(
-            [tuple(i.split("|")) for i in agg_stats.columns]
-        )
+        agg_stats.columns = pd.MultiIndex.from_tuples([tuple(i.split("|")) for i in agg_stats.columns])
     if features is None:
         features = agg_stats.columns.levels[0]
     if clusters is None:

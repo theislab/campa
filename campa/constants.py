@@ -1,7 +1,7 @@
 # read constants defined in config.ini
-from configparser import ConfigParser, NoOptionError, NoSectionError
 from enum import Enum
 from pathlib import Path
+from configparser import ConfigParser, NoOptionError, NoSectionError
 
 from campa.utils import load_config
 
@@ -26,9 +26,7 @@ config_fnames = [
 ]
 config = ConfigParser()
 if sum(n.is_file() for n in config_fnames) == 0:
-    print(
-        f'ERROR: None of {config_fnames} exists. Please create a config with "python cli/setup.py"'
-    )
+    print(f'ERROR: None of {config_fnames} exists. Please create a config with "python cli/setup.py"')
 for n in config_fnames:
     if n.is_file():
         print(f"Reading config from {str(n)}")

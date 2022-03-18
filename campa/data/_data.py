@@ -1,24 +1,24 @@
-import json
-import os
 from copy import copy
-from logging import getLogger
 from typing import Dict
+from logging import getLogger
+import os
+import json
 
 import numpy as np
 import pandas as pd
 
+from campa.pl import annotate_img
 from campa.constants import get_data_config
+from campa.data._img_utils import pad_border, BoundingBox
 from campa.data._conditions import (
+    get_one_hot,
     convert_condition,
     get_bin_3_condition,
     get_combined_one_hot,
-    get_lowhigh_bin_2_condition,
-    get_one_hot,
     get_zscore_condition,
     process_condition_desc,
+    get_lowhigh_bin_2_condition,
 )
-from campa.data._img_utils import BoundingBox, pad_border
-from campa.pl import annotate_img
 
 
 class ImageData:
@@ -72,13 +72,9 @@ class MPPData:
         self._data = data
 
         for required_key in ["x", "y", "obj_ids"]:
-            assert (
-                required_key in data.keys()
-            ), f"required key {required_key} missing from data"
+            assert required_key in data.keys(), f"required key {required_key} missing from data"
         # subset metadata to obj_ids in data
-        self.metadata = metadata[
-            metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))
-        ]
+        self.metadata = metadata[metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))]
         # add neighbor dimensions to mpp if not existing
         if len(self.mpp.shape) == 2:
             self._data["mpp"] = self.mpp[:, np.newaxis, np.newaxis, :]
@@ -129,9 +125,9 @@ class MPPData:
         if os.path.isfile(os.path.join(base_dir, data_dir, "mpp_params.json")):
             # first, load base_mpp_data
             res_keys, res_optional_keys = _get_keys(keys, optional_keys, None)
-            mpp_params = json.load(
-                open(os.path.join(base_dir, data_dir, "mpp_params.json"))
-            )
+            mpp_params = json.load(open(os.path.join(base_dir, data_dir, "mpp_params.json")))
+            # print(f"!!!!!loading base mpp from {data_config.DATA_DIR}, {mpp_params['base_data_dir']}")
+
             self = cls.from_data_dir(
                 mpp_params["base_data_dir"],
                 keys=res_keys,
@@ -140,6 +136,7 @@ class MPPData:
                 mode=mode,
                 **kwargs,
             )
+            # print(f"!!!!!adding from {base_dir}, {data_dir}")
             # second, add mpp_data
             res_keys, res_optional_keys = _get_keys(keys, optional_keys, self)
             self.add_data_from_dir(
@@ -150,18 +147,14 @@ class MPPData:
                 mode=mode,
                 subset=mpp_params["subset"],
             )
-            self.log.info(
-                f"Loaded data from {data_dir}, with base data from {mpp_params['base_data_dir']}"
-            )
+            self.log.info(f"Loaded data from {data_dir}, with base data from {mpp_params['base_data_dir']}")
             self.data_dir = data_dir
             self.base_dir = base_dir
             return self
         else:
             # have reached true base_dir, load data
             # read all data from data_dir
-            self = cls._from_data_dir(
-                data_dir, mode, base_dir, keys, optional_keys, **kwargs
-            )
+            self = cls._from_data_dir(data_dir, mode, base_dir, keys, optional_keys, **kwargs)
             self.log.info(f"Loaded data from {data_dir}.")
         return self
 
@@ -183,9 +176,7 @@ class MPPData:
             data_config = get_data_config(kwargs.get("data_config", "NascentRNA"))
             base_dir = data_config.DATA_DIR
 
-        metadata = pd.read_csv(
-            os.path.join(base_dir, data_dir, "metadata.csv"), index_col=0
-        ).reset_index(drop=True)
+        metadata = pd.read_csv(os.path.join(base_dir, data_dir, "metadata.csv"), index_col=0).reset_index(drop=True)
         channels = pd.read_csv(
             os.path.join(base_dir, data_dir, "channels.csv"),
             names=["channel_id", "name"],
@@ -195,9 +186,7 @@ class MPPData:
         # read npy data
         data = {}
         for fname in keys:
-            data[fname] = _try_mmap_load(
-                os.path.join(base_dir, data_dir, f"{fname}.npy"), mmap_mode=mode
-            )
+            data[fname] = _try_mmap_load(os.path.join(base_dir, data_dir, f"{fname}.npy"), mmap_mode=mode)
         for fname in optional_keys:
             d = _try_mmap_load(
                 os.path.join(base_dir, data_dir, f"{fname}.npy"),
@@ -223,15 +212,11 @@ class MPPData:
 
         channels = objs[0].channels
         # concatenate metadata (pandas)
-        metadata = pd.concat(
-            [mpp_data.metadata for mpp_data in objs], axis=0, ignore_index=True
-        )
+        metadata = pd.concat([mpp_data.metadata for mpp_data in objs], axis=0, ignore_index=True)
         # concatenate numpy arrays
         data = {}
         for key in objs[0]._data.keys():
-            data[key] = np.concatenate(
-                [mpp_data._data[key] for mpp_data in objs], axis=0
-            )
+            data[key] = np.concatenate([mpp_data._data[key] for mpp_data in objs], axis=0)
 
         self = cls(
             metadata=metadata,
@@ -330,9 +315,7 @@ class MPPData:
             save_keys = self._data.keys()
         else:
             if mpp_params is None or mpp_params.get("base_data_dir", None) is None:
-                self.log.warn(
-                    "Saving partial keys of mpp data without a base_data_dir to enable correct loading"
-                )
+                self.log.warn("Saving partial keys of mpp data without a base_data_dir to enable correct loading")
             else:
                 # save mpp_params
                 mpp_params = {
@@ -371,9 +354,7 @@ class MPPData:
 
     # TODO Nastassya: ensure that each function logs what its doing with log.info
     # --- Modify / Add data ---
-    def add_data_from_dir(
-        self, data_dir, keys=(), optional_keys=(), subset=False, **kwargs
-    ):
+    def add_data_from_dir(self, data_dir, keys=(), optional_keys=(), subset=False, **kwargs):
         """
         Add data to MPPData from data_dir.
 
@@ -417,12 +398,7 @@ class MPPData:
         for key in optional_keys:
             if mpp_to_add.data(key) is not None:
                 # check if mpp is not only zeros
-                if (
-                    key == "mpp"
-                    and (
-                        mpp_to_add.data("mpp") == np.zeros_like(mpp_to_add.data("mpp"))
-                    ).all()
-                ):
+                if key == "mpp" and (mpp_to_add.data("mpp") == np.zeros_like(mpp_to_add.data("mpp"))).all():
                     continue
                 self._data[key] = mpp_to_add.data(key)
                 added_mpp = added_mpp if key != "mpp" else True
@@ -441,9 +417,7 @@ class MPPData:
         train_ids = ids[:num_train]
         val_ids = ids[num_train : num_train + num_val]
         test_ids = ids[num_train + num_val :]
-        self.log.info(
-            f"Splitting data in {len(train_ids)} train, {len(val_ids)} val, and {len(test_ids)} test objects"
-        )
+        self.log.info(f"Splitting data in {len(train_ids)} train, {len(val_ids)} val, and {len(test_ids)} test objects")
         splits = []
         for split_ids in (train_ids, val_ids, test_ids):
             ind = np.in1d(self.obj_ids, split_ids)
@@ -559,12 +533,8 @@ class MPPData:
             self.log.info(f"Subsetting to {len(obj_ids)} objects")
         # select ids based on kwargs
         for key, value in kwargs.items():
-            cur_metadata = self.metadata.set_index(self.data_config.OBJ_ID).loc[
-                selected_obj_ids
-            ]
-            assert (
-                key in cur_metadata.columns
-            ), f"provided column {key} was not found in the metadata table!"
+            cur_metadata = self.metadata.set_index(self.data_config.OBJ_ID).loc[selected_obj_ids]
+            assert key in cur_metadata.columns, f"provided column {key} was not found in the metadata table!"
             if value == "NO_NAN":
                 mask = ~cur_metadata[key].isnull()  # TODO check!
                 self.log.info(f"Subsetting to NO_NAN {key}: {sum(mask)} objects")
@@ -578,29 +548,17 @@ class MPPData:
         if nona_condition:  # TODO test this!
             if self.conditions is not None:
                 mask = ~np.isnan(self.conditions).any(axis=1)
-                mpp_df = self.metadata.set_index(self.data_config.OBJ_ID).loc[
-                    self.obj_ids
-                ][mask]
-                nona_obj_ids = (
-                    mpp_df.reset_index().groupby(self.data_config.OBJ_ID).first().index
-                )
-                selected_obj_ids = np.array(
-                    list(set(selected_obj_ids).intersection(nona_obj_ids))
-                )
-                self.log.info(
-                    f"Subsetting to objects with NO_NAN condition: {len(selected_obj_ids)}"
-                )
+                mpp_df = self.metadata.set_index(self.data_config.OBJ_ID).loc[self.obj_ids][mask]
+                nona_obj_ids = mpp_df.reset_index().groupby(self.data_config.OBJ_ID).first().index
+                selected_obj_ids = np.array(list(set(selected_obj_ids).intersection(nona_obj_ids)))
+                self.log.info(f"Subsetting to objects with NO_NAN condition: {len(selected_obj_ids)}")
         # select ids based on ramdom subset
         if frac is not None:
             num = int(len(selected_obj_ids) * frac)
         if num is not None:
             self.log.info(f"Subsetting to {num} random objects")
-            self.rng.seed(
-                self.seed
-            )  # TODO: remove seeding if have duplicated existing datasets
-            selected_obj_ids = selected_obj_ids[
-                self.rng.choice(len(selected_obj_ids), size=num, replace=False)
-            ]
+            self.rng.seed(self.seed)  # TODO: remove seeding if have duplicated existing datasets
+            selected_obj_ids = selected_obj_ids[self.rng.choice(len(selected_obj_ids), size=num, replace=False)]
         # create mpp mask for applying subset
         obj_mask = self.metadata[self.data_config.OBJ_ID].isin(selected_obj_ids)
         mpp_mask = self._get_per_mpp_value(obj_mask)
@@ -619,11 +577,7 @@ class MPPData:
         assert (
             len(np.intersect1d(self.channels.name.values, channels)) != 0
         ), "mpp object does not contain provided channels!"
-        cids = list(
-            self.channels.reset_index()
-            .set_index("name")
-            .loc[channels_overlap]["channel_id"]
-        )
+        cids = list(self.channels.reset_index().set_index("name").loc[channels_overlap]["channel_id"])
         raw_channels = self.channels
         self.channels = self.channels.loc[cids].reset_index(drop=True)
         self.channels.index.name = "channel_id"
@@ -681,9 +635,7 @@ class MPPData:
             )
             == 1
         ), "set only one of the params to a value"
-        assert not (
-            self.has_neighbor_data and add_neighborhood
-        ), "cannot add neighborhood, already has neighbor data"
+        assert not (self.has_neighbor_data and add_neighborhood), "cannot add neighborhood, already has neighbor data"
         if (frac is not None) or (num is not None):
             if frac is not None:
                 num = int(len(self.mpp) * frac)
@@ -711,17 +663,13 @@ class MPPData:
                     cur_num = num_per_obj
                 # TODO replace with self.rng if have reproduced datasets
                 rng = np.random.default_rng(seed=self.seed)
-                selected = rng.choice(
-                    len(obj_mask.nonzero()[0]), cur_num, replace=False
-                )
+                selected = rng.choice(len(obj_mask.nonzero()[0]), cur_num, replace=False)
                 selected_idx = idx[obj_mask][selected]
                 mask[selected_idx] = True
             mpp_data = self.apply_mask(mask, copy=True)
         if add_neighborhood:
             self.log.info(f"Adding neighborhood of size {neighborhood_size}")
-            neighbor_mpp = self._get_neighborhood(
-                mpp_data.obj_ids, mpp_data.x, mpp_data.y, size=neighborhood_size
-            )
+            neighbor_mpp = self._get_neighborhood(mpp_data.obj_ids, mpp_data.x, mpp_data.y, size=neighborhood_size)
             mpp_data._data["mpp"] = neighbor_mpp
         return mpp_data
 
@@ -750,9 +698,7 @@ class MPPData:
                 data_config=self.data_config_name,
             )
         else:
-            assert (
-                not self.has_neighbor_data
-            ), "cannot add neighborhood, already has neighbor data"
+            assert not self.has_neighbor_data, "cannot add neighborhood, already has neighbor data"
             # TODO Nastassya: this should be in a unittest of self.get_neighborhood
             self._data["mpp"] = mpp
 
@@ -802,9 +748,7 @@ class MPPData:
 
         if copy is False:
             self._data = data
-            self.metadata = self.metadata[
-                self.metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))
-            ]
+            self.metadata = self.metadata[self.metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))]
         else:
             return MPPData(
                 metadata=self.metadata,
@@ -821,28 +765,16 @@ class MPPData:
         NOTE: mpp is converted to float
         """
         if isinstance(background_value, float):
-            self.log.info(
-                f"Subtracting constant value {background_value} from all channels"
-            )
+            self.log.info(f"Subtracting constant value {background_value} from all channels")
             self._data["mpp"] = self.mpp.astype(np.float32) - background_value
         elif isinstance(background_value, list):
-            assert len(background_value) == len(
-                self.channels
-            ), "specify one background value per channel"
+            assert len(background_value) == len(self.channels), "specify one background value per channel"
             self.log.info("Subtracting predefined channel specific background value")
             self._data["mpp"] = self.mpp.astype(np.float32) - np.array(background_value)
         else:  # is column name
-            self.log.info(
-                f"Subtracting channel-specific background value defined in column {background_value}"
-            )
-            channels_metadata = pd.read_csv(
-                os.path.join(
-                    self.data_config.DATA_DIR, self.data_config.CHANNELS_METADATA
-                )
-            )
-            background_value = channels_metadata.set_index("name").loc[
-                self.channels.name
-            ][background_value]
+            self.log.info(f"Subtracting channel-specific background value defined in column {background_value}")
+            channels_metadata = pd.read_csv(os.path.join(self.data_config.DATA_DIR, self.data_config.CHANNELS_METADATA))
+            background_value = channels_metadata.set_index("name").loc[self.channels.name][background_value]
             # replace nan with 0
             for ch, val in zip(self.channels.name, background_value):
                 if pd.isna(val):
@@ -862,17 +794,13 @@ class MPPData:
         if rescale_values is None:
             rescale_values = []
         if len(rescale_values) == 0:
-            self.log.info(
-                f"Rescaling MPP intensities per channel with {percentile} percentile"
-            )
+            self.log.info(f"Rescaling MPP intensities per channel with {percentile} percentile")
             rescale_values.extend(np.percentile(self.center_mpp, percentile, axis=0))
         else:
             assert len(rescale_values) == len(
                 self.channels
             ), f"need {len(self.channels)} rescale values, got {len(rescale_values)}"
-            self.log.info(
-                "Rescaling MPP intensities per channels with predefined values"
-            )
+            self.log.info("Rescaling MPP intensities per channels with predefined values")
         self._data["mpp"] = self.mpp / rescale_values
         self._data["mpp"] = self.mpp.astype(np.float32)
 
@@ -900,9 +828,7 @@ class MPPData:
                 }
             )
         df = pd.DataFrame({"MERGE_KEY": self.obj_ids})
-        per_mpp_value = df.merge(
-            per_obj_df, left_on="MERGE_KEY", right_on="MERGE_KEY", how="left"
-        )[val]
+        per_mpp_value = df.merge(per_obj_df, left_on="MERGE_KEY", right_on="MERGE_KEY", how="left")[val]
         return per_mpp_value
 
     def get_condition(self, desc, cond_params=None):
@@ -918,18 +844,14 @@ class MPPData:
         cond = None
         if isinstance(desc, list):
             # check if combining is possible
-            assert np.all(
-                [("one_hot" in d) for d in desc]
-            ), f"all of {desc} need to be one_hot encoded"
+            assert np.all([("one_hot" in d) for d in desc]), f"all of {desc} need to be one_hot encoded"
             conds = [self.get_condition(d, cond_params) for d in desc]
             cond = get_combined_one_hot(conds)
         else:
             # desc is one column in metadata
             # get correct desc name (match to column names)
             desc, postprocess = process_condition_desc(desc)
-            self.log.info(
-                f"Looking up condition {desc}, with postprocess {postprocess}"
-            )
+            self.log.info(f"Looking up condition {desc}, with postprocess {postprocess}")
             cond = self._get_per_mpp_value(np.array(self.metadata[desc]))
             if postprocess == "one_hot":
                 cond = convert_condition(
@@ -1013,27 +935,20 @@ class MPPData:
         # add x,y,obj_id
         df["x"] = self.x
         df["y"] = self.y
-        obs_ = self._get_per_mpp_value(
-            {o: self.metadata[o] for o in list(obs) + [self.data_config.OBJ_ID]}
-        )
+        obs_ = self._get_per_mpp_value({o: self.metadata[o] for o in list(obs) + [self.data_config.OBJ_ID]})
         df[self.data_config.OBJ_ID] = obs_[self.data_config.OBJ_ID]
         return df
 
     # TODO nastassya: test
     def _get_neighborhood(self, obj_ids, xs, ys, size=3, border_mode="center"):
         """return neighborhood information for given obj_ids + xs + ys"""
-        data = np.zeros(
-            (len(obj_ids), size, size, len(self.channels)), dtype=self.mpp.dtype
-        )
+        data = np.zeros((len(obj_ids), size, size, len(self.channels)), dtype=self.mpp.dtype)
         for obj_id in np.unique(obj_ids):
             mask = obj_ids == obj_id
             img, (xoff, yoff) = self.get_object_img(obj_id, data="mpp", pad=size // 2)
             vals = []
             for x, y in zip(xs[mask], ys[mask]):
-                idx = tuple(
-                    slice(pp - size // 2, pp + size // 2 + 1)
-                    for pp in [y - yoff, x - xoff]
-                )
+                idx = tuple(slice(pp - size // 2, pp + size // 2 + 1) for pp in [y - yoff, x - xoff])
                 vals.append(pad_border(img[idx], mode=border_mode))
             data[mask] = np.array(vals)
         return data
@@ -1050,9 +965,7 @@ class MPPData:
             from_channels = self.channels.copy()
             from_channels = from_channels.reset_index().set_index("name")
         if not isinstance(from_channels, pd.DataFrame):
-            from_channels = pd.DataFrame(
-                {"name": from_channels, "channel_id": np.arange(len(from_channels))}
-            )
+            from_channels = pd.DataFrame({"name": from_channels, "channel_id": np.arange(len(from_channels))})
             from_channels = from_channels.set_index("name")
         from_channels = from_channels.reindex(to_channels)
         return list(from_channels["channel_id"])
@@ -1086,9 +999,7 @@ class MPPData:
             # padding info is only relevant when not cropping img to shape
             return img, (x.min() - pad, y.min() - pad)
 
-    def get_object_img(
-        self, obj_id, data="mpp", channel_ids=None, annotation_kwargs=None, **kwargs
-    ):
+    def get_object_img(self, obj_id, data="mpp", channel_ids=None, annotation_kwargs=None, **kwargs):
         """
         Calculate data image of given object id.
         args:
@@ -1126,9 +1037,7 @@ class MPPData:
                 img = annotate_img(img, from_col=data, **annotation_kwargs)
         return img
 
-    def get_object_imgs(
-        self, data="mpp", channel_ids=None, annotation_kwargs=None, **kwargs
-    ):
+    def get_object_imgs(self, data="mpp", channel_ids=None, annotation_kwargs=None, **kwargs):
         """
         Return images for each obj_id in current data.
         Args: arguments for get_object_img
@@ -1176,9 +1085,7 @@ class MPPData:
 
         same_data["channels"] = self.channels.equals(obj.channels)
         if len(self.metadata) == len(obj.metadata):
-            same_data["metadata"] = self.metadata.reset_index(drop=True).equals(
-                obj.metadata.reset_index(drop=True)
-            )
+            same_data["metadata"] = self.metadata.reset_index(drop=True).equals(obj.metadata.reset_index(drop=True))
         else:
             same_data["metadata"] = False
         return np.all(list(same_data.values())), same_data

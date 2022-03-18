@@ -36,17 +36,13 @@ class TestSubset:
         mpp_data = gen_mppdata(num_obj_ids=num_ids)
         mpp_data_sub = mpp_data.subsample(frac=1)
         assert np.array_equal(mpp_data.mpp.shape, mpp_data_sub.mpp.shape)
-        assert np.array_equal(
-            list(mpp_data._data.keys()), list(mpp_data_sub._data.keys())
-        )
+        assert np.array_equal(list(mpp_data._data.keys()), list(mpp_data_sub._data.keys()))
 
     def test_frac_per_obj_1(self):
         mpp_data = gen_mppdata(num_obj_ids=5)
         mpp_data_sub = mpp_data.subsample(frac_per_obj=1)
         assert np.array_equal(mpp_data.mpp.shape, mpp_data_sub.mpp.shape)
-        assert np.array_equal(
-            list(mpp_data._data.keys()), list(mpp_data_sub._data.keys())
-        )
+        assert np.array_equal(list(mpp_data._data.keys()), list(mpp_data_sub._data.keys()))
 
     def test_frac_0(self):
         mpp_data = gen_mppdata(num_obj_ids=5)

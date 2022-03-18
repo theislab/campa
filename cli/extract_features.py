@@ -1,11 +1,11 @@
-import argparse
-import logging
 import os
+import logging
+import argparse
 
 import numpy as np
 
 from campa.tl import Experiment, FeatureExtractor
-from campa.utils import init_logging, load_config, merged_config
+from campa.utils import load_config, init_logging, merged_config
 
 
 def extract_features(params):
@@ -18,9 +18,7 @@ def extract_features(params):
 
     for data_dir in data_dirs:
         log.info(f'extracting features {params["features"]} from {data_dir}')
-        adata_fname = os.path.join(
-            exp.full_path, "aggregated/full_data", data_dir, params["save_name"]
-        )
+        adata_fname = os.path.join(exp.full_path, "aggregated/full_data", data_dir, params["save_name"])
         if os.path.exists(adata_fname):
             log.info(f"initialising from existing adata {adata_fname}")
             extr = FeatureExtractor.from_adata(adata_fname)
@@ -34,9 +32,7 @@ def extract_features(params):
             )
         # extract features
         if "intensity" in params["features"]:
-            extr.extract_intensity_size(
-                force=params["force"], fname=params["save_name"]
-            )
+            extr.extract_intensity_size(force=params["force"], fname=params["save_name"])
         if "co-occurrence" in params["features"]:
             co_occ_params = params["co_occurrence_params"]
             if co_occ_params["logspace"]:
@@ -47,12 +43,10 @@ def extract_features(params):
                     base=2,
                 ).astype(np.float32)
             else:
-                interval = np.linspace(
-                    co_occ_params["min"], co_occ_params["max"], co_occ_params["nsteps"]
-                ).astype(np.float32)
-            extr.extract_co_occurrence(
-                interval=interval, num_processes=co_occ_params["num_processes"]
-            )
+                interval = np.linspace(co_occ_params["min"], co_occ_params["max"], co_occ_params["nsteps"]).astype(
+                    np.float32
+                )
+            extr.extract_co_occurrence(interval=interval, num_processes=co_occ_params["num_processes"])
         if "object-stats" in params["features"]:
             obj_params = params["object_stats_params"]
             extr.extract_object_stats(
@@ -62,9 +56,7 @@ def extract_features(params):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description=("Extract features from clustered dataset. Created features adata.")
-    )
+    parser = argparse.ArgumentParser(description=("Extract features from clustered dataset. Creates features adata."))
     parser.add_argument("params", help="path to feature_params.py")
     return parser.parse_args()
 

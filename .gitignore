@@ -133,3 +133,5 @@ dmypy.json
 config.ini
 campa.ini
 notebooks/example_data
+docs/source/api
+docs/source/classes

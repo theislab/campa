@@ -1,16 +1,14 @@
-# TODO working on evaluation + clustering pipeline for exp model.
-# TODO when finished: create fns for how to aggregate - should easily be possible with this code!
-import logging
 import os
+import logging
 
-import matplotlib.pyplot as plt
+from matplotlib import cm, colors
 import numpy as np
 import scanpy as sc
 import tensorflow as tf
-from matplotlib import cm, colors
+import matplotlib.pyplot as plt
 
-from campa.data._conditions import process_condition_desc
 from campa.tl import Estimator, Experiment
+from campa.data._conditions import process_condition_desc
 
 
 class Predictor:
@@ -25,9 +23,7 @@ class Predictor:
         # set batch size
         self.batch_size = batch_size
         if self.batch_size is None:
-            self.batch_size = self.exp.config["evaluation"].get(
-                "batch_size", self.exp.config["training"]["batch_size"]
-            )
+            self.batch_size = self.exp.config["evaluation"].get("batch_size", self.exp.config["training"]["batch_size"])
 
         # build estimator
         self.est = Estimator(exp)
@@ -106,13 +102,9 @@ class Predictor:
 
         for rep in reps:
             mpp_data._data[rep] = self.get_representation(mpp_data, rep=rep)
-        save_dir = os.path.join(
-            self.exp.full_path, f"results_epoch{self.est.epoch:03d}", split
-        )
+        save_dir = os.path.join(self.exp.full_path, f"results_epoch{self.est.epoch:03d}", split)
         # base data dir for correct recreation of mpp_data
-        base_data_dir = os.path.join(
-            "datasets", self.est.ds.params["dataset_name"], split
-        )
+        base_data_dir = os.path.join("datasets", self.est.ds.params["dataset_name"], split)
         mpp_data.write(
             save_dir,
             save_keys=reps,
@@ -146,9 +138,7 @@ class Predictor:
         elif rep == "entangled":
             # this is only for cVAE models which have an "entangled" layer in the decoder
             # create the model for predicting the latent
-            decoder_to_entangled_latent = tf.keras.Model(
-                self.est.model.decoder.input, self.est.model.entangled_latent
-            )
+            decoder_to_entangled_latent = tf.keras.Model(self.est.model.decoder.input, self.est.model.entangled_latent)
             encoder_to_entangled_latent = tf.keras.Model(
                 self.est.model.input,
                 decoder_to_entangled_latent(
@@ -177,21 +167,13 @@ class ModelComparator:
         self.save_dir = save_dir
 
         # default channels and mpp data
-        self.mpps = {
-            exp_name: self.exps[exp_name].get_split_mpp_data()
-            for exp_name in self.exp_names
-        }
-        self.img_mpps = {
-            exp_name: self.exps[exp_name].get_split_imgs_mpp_data()
-            for exp_name in self.exp_names
-        }
+        self.mpps = {exp_name: self.exps[exp_name].get_split_mpp_data() for exp_name in self.exp_names}
+        self.img_mpps = {exp_name: self.exps[exp_name].get_split_imgs_mpp_data() for exp_name in self.exp_names}
         channels = {
-            exp_name: self.exps[exp_name].config["data"].get("output_channels", None)
-            for exp_name in self.exp_names
+            exp_name: self.exps[exp_name].config["data"].get("output_channels", None) for exp_name in self.exp_names
         }
         self.channels = {
-            key: val if val is not None else self.mpps[key].channels["name"]
-            for key, val in channels.items()
+            key: val if val is not None else self.mpps[key].channels["name"] for key, val in channels.items()
         }
 
     @classmethod
@@ -199,10 +181,7 @@ class ModelComparator:
         """
         Initialise from experiments in experiment dir
         """
-        exps = [
-            Experiment.from_dir(os.path.join(exp_dir, exp_name))
-            for exp_name in exp_names
-        ]
+        exps = [Experiment.from_dir(os.path.join(exp_dir, exp_name)) for exp_name in exp_names]
         return cls(exps, save_dir=exp_dir)
 
     def _filter_trainable_exps(self, exp_names):
@@ -224,9 +203,7 @@ class ModelComparator:
 
         cmap = plt.get_cmap("tab10")
         cnorm = colors.Normalize(vmin=0, vmax=10)
-        fig, axes = plt.subplots(
-            1, len(values), figsize=(len(values) * 5, 5), sharey=True
-        )
+        fig, axes = plt.subplots(1, len(values), figsize=(len(values) * 5, 5), sharey=True)
         if len(values) == 1:
             # make axes iterable, even if there is only one ax
             axes = [axes]
@@ -245,9 +222,7 @@ class ModelComparator:
                 dpi=100,
             )
 
-    def plot_final_score(
-        self, score="loss", fallback_score="loss", exp_names=None, save_prefix=""
-    ):
+    def plot_final_score(self, score="loss", fallback_score="loss", exp_names=None, save_prefix=""):
         if exp_names is None:
             exp_names = self.exp_names
         exp_names = self._filter_trainable_exps(exp_names)
@@ -267,9 +242,7 @@ class ModelComparator:
 
     def plot_per_channel_mse(self, exp_names=None, channels=None, save_prefix=""):
         def mse(mpp_data):
-            return np.mean(
-                (mpp_data.center_mpp - mpp_data.data("decoder")) ** 2, axis=0
-            )
+            return np.mean((mpp_data.center_mpp - mpp_data.data("decoder")) ** 2, axis=0)
 
         # setup: get experiments + mpps
         if exp_names is None:
@@ -280,10 +253,7 @@ class ModelComparator:
 
         # calculate mse
         mse_scores = {exp_name: mse(self.mpps[exp_name]) for exp_name in exp_names}
-        channel_ids = {
-            exp_name: self.mpps[exp_name].get_channel_ids(channels)
-            for exp_name in exp_names
-        }
+        channel_ids = {exp_name: self.mpps[exp_name].get_channel_ids(channels) for exp_name in exp_names}
 
         # plot mse
         offset = 0.9 / len(exp_names)
@@ -306,9 +276,7 @@ class ModelComparator:
                 dpi=100,
             )
 
-    def plot_predicted_images(
-        self, exp_names=None, channels=None, img_ids=None, save_prefix="", **kwargs
-    ):
+    def plot_predicted_images(self, exp_names=None, channels=None, img_ids=None, save_prefix="", **kwargs):
         """
         kwargs passed to mpp_data.get_object_imgs
         """
@@ -317,21 +285,15 @@ class ModelComparator:
         exp_names = self._filter_trainable_exps(exp_names)
         if channels is None:
             channels = self.channels[exp_names[0]]
-        output_channels = (
-            self.exps[exp_names[0]].config["data"].get("output_channels", None)
-        )
+        output_channels = self.exps[exp_names[0]].config["data"].get("output_channels", None)
         output_channel_ids = {
-            exp_name: self.img_mpps[exp_name].get_channel_ids(
-                channels, from_channels=output_channels
-            )
+            exp_name: self.img_mpps[exp_name].get_channel_ids(channels, from_channels=output_channels)
             for exp_name in exp_names
         }
 
         # get input images
         input_channel_ids = self.img_mpps[exp_names[0]].get_channel_ids(channels)
-        input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(
-            channel_ids=input_channel_ids, **kwargs
-        )
+        input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(channel_ids=input_channel_ids, **kwargs)
         if img_ids is None:
             img_ids = range(len(input_imgs))
 
@@ -390,9 +352,7 @@ class ModelComparator:
 
         # get input images
         input_channel_ids = self.img_mpps[exp_names[0]].get_channel_ids([img_channel])
-        input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(
-            channel_ids=input_channel_ids, **kwargs
-        )
+        input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(channel_ids=input_channel_ids, **kwargs)
         if img_ids is None:
             img_ids = np.arange(len(input_imgs))
 
@@ -450,18 +410,11 @@ class ModelComparator:
             adata = self.mpps[exp_name].get_adata(obsm={"X_umap": "umap"})
             print(self.mpps[exp_name].data_dir)
             cluster_name = self.exps[exp_name].config["cluster"]["cluster_name"]
-            cluster_annotation = self.exps[exp_name].get_split_cluster_annotation(
-                cluster_name
-            )
-            add_clustering_to_adata(
-                self.mpps[exp_name].data_dir, cluster_name, adata, cluster_annotation
-            )
+            cluster_annotation = self.exps[exp_name].get_split_cluster_annotation(cluster_name)
+            add_clustering_to_adata(self.mpps[exp_name].data_dir, cluster_name, adata, cluster_annotation)
 
             # plot umap
-            conditions = [
-                process_condition_desc(c)[0]
-                for c in self.exps[exp_name].data_params["condition"]
-            ]
+            conditions = [process_condition_desc(c)[0] for c in self.exps[exp_name].data_params["condition"]]
             print(conditions)
             sc.pl.umap(
                 adata,

@@ -1,23 +1,110 @@
-import logging
-import multiprocessing
+from copy import deepcopy
+from typing import Any, Union, Mapping
+from functools import partial
 import os
 import time
-from copy import deepcopy
-from functools import partial
-from typing import Union
+import logging
+import multiprocessing
 
-import anndata as ad
-import numba.types as nt
+from skimage.measure import label, regionprops
 import numpy as np
 import pandas as pd
+import anndata as ad
 import squidpy as sq
-from numba import jit
-from skimage.measure import label, regionprops
 
-from campa.constants import CO_OCC_CHUNK_SIZE, CoOccAlgo, get_data_config
-from campa.data import MPPData
 from campa.tl import Experiment
+from campa.data import MPPData
+from campa.constants import CoOccAlgo, get_data_config, CO_OCC_CHUNK_SIZE
 from campa.tl._cluster import annotate_clustering
+
+
+def extract_features(params: Mapping[str, Any]):
+    """
+    Extract features from clustered dataset.
+
+    Creates features :class:`anndata.AnnData` object.
+
+    Params determine what features are extracted from a given clustering.
+    The following keys in params are expected:
+
+    - ``experiment_dir``: path to experiment directory relative to EXPERIMENT_DIR
+    - ``cluster_name``: name of clustering to use
+    - ``cluster_dir``: dir of subsampled clustering to load annotation.
+      Relative to experiment_dir.
+      Default is taking first of ``experiment_dir/aggregated/sub-*``
+    - ``cluster_col``: cluster annotation to use. Defaults to cluster_name
+    - ``data_dirs``: data dirs to be processed.
+      Relative to ``experiment_dir/aggregated/full_data``.
+      If None, all available data_dirs will be processed
+    - ``save_name``: filename to use for saving extracted features.
+    - ``force``: force calculation even when adata exists
+    - ``features``: type of features to extract. One or more of `intensity`, `co-occurrence`, `object-stats`
+
+        - Intensity: per-cluster mean and size features. Needs to be calculated first to set up the adata.
+        - Co-occurrence: spatial co-occurrence between pairs of clusters at different distances.
+        - Object stats: number and area of connected components per cluster
+
+    - ``co_occurrence_params``: parameters for co-occurrence calculation
+
+        - ``min``, ``max``, ``nsteps``: size of distances interval
+        - ``logspace``: use log spacing of co-occurrence intervals
+        - ``num_processes``:  number of processes to use to compute co-occurrence scores
+
+    - ``object_stats_params``: parameter dict for object-stats calculation
+
+        - ``features``: features to extract in mode object-stats.
+          Possible features: `area`, `circularity`, `elongation`, `extent`
+        - ``channels``: intensity channels to extract mean per cluster from
+
+    Parameters
+    ----------
+    params
+        parameter dict
+    """
+    # set up FeatureExtractor
+    log = logging.getLogger("extract_features")
+    exp = Experiment.from_dir(params["experiment_dir"])
+    data_dirs = params["data_dirs"]
+    if data_dirs is None or len(data_dirs) == 0:
+        data_dirs = exp.data_params["data_dirs"]
+
+    for data_dir in data_dirs:
+        log.info(f'extracting features {params["features"]} from {data_dir}')
+        adata_fname = os.path.join(exp.full_path, "aggregated/full_data", data_dir, params["save_name"])
+        if os.path.exists(adata_fname):
+            log.info(f"initialising from existing adata {adata_fname}")
+            extr = FeatureExtractor.from_adata(adata_fname)
+        else:
+            extr = FeatureExtractor(
+                exp,
+                data_dir=data_dir,
+                cluster_name=params["cluster_name"],
+                cluster_dir=params["cluster_dir"],
+                cluster_col=params["cluster_col"],
+            )
+        # extract features
+        if "intensity" in params["features"]:
+            extr.extract_intensity_size(force=params["force"], fname=params["save_name"])
+        if "co-occurrence" in params["features"]:
+            co_occ_params = params["co_occurrence_params"]
+            if co_occ_params["logspace"]:
+                interval = np.logspace(
+                    np.log2(co_occ_params["min"]),
+                    np.log2(co_occ_params["max"]),
+                    co_occ_params["nsteps"],
+                    base=2,
+                ).astype(np.float32)
+            else:
+                interval = np.linspace(co_occ_params["min"], co_occ_params["max"], co_occ_params["nsteps"]).astype(
+                    np.float32
+                )
+            extr.extract_co_occurrence(interval=interval, num_processes=co_occ_params["num_processes"])
+        if "object-stats" in params["features"]:
+            obj_params = params["object_stats_params"]
+            extr.extract_object_stats(
+                features=obj_params["features"],
+                intensity_channels=obj_params["channels"],
+            )
 
 
 class FeatureExtractor:
@@ -46,9 +133,7 @@ class FeatureExtractor:
         }
         self.adata = adata
 
-        self.annotation = self.exp.get_cluster_annotation(
-            self.params["cluster_name"], self.params["cluster_dir"]
-        )
+        self.annotation = self.exp.get_cluster_annotation(self.params["cluster_name"], self.params["cluster_dir"])
         clusters = list(np.unique(self.annotation[self.params["cluster_col"]]))
         clusters.remove("")
         self.clusters = clusters
@@ -97,9 +182,7 @@ class FeatureExtractor:
             force: overwrite existing adata
         """
         if self.adata is not None and not force:
-            self.log.info(
-                "extract_intensity_size: adata is not None. Specify force=True to overwrite. Exiting."
-            )
+            self.log.info("extract_intensity_size: adata is not None. Specify force=True to overwrite. Exiting.")
             return
         self.log.info(
             f"Calculating {self.params['cluster_name']} (col: {self.params['cluster_col']})"
@@ -118,15 +201,9 @@ class FeatureExtractor:
         OBJ_ID = self.mpp_data.data_config.OBJ_ID
         metadata = self.mpp_data.metadata.copy()
         metadata[OBJ_ID] = metadata[OBJ_ID].astype(str)
-        metadata = pd.merge(
-            metadata, adata.obs, how="right", left_on=OBJ_ID, right_index=True
-        )
-        metadata = metadata.reset_index(
-            drop=True
-        )  # make new index, keep mapobject_id in column
-        metadata.index = metadata.index.astype(
-            str
-        )  # make index str, because adata does not play nice with int indices
+        metadata = pd.merge(metadata, adata.obs, how="right", left_on=OBJ_ID, right_index=True)
+        metadata = metadata.reset_index(drop=True)  # make new index, keep mapobject_id in column
+        metadata.index = metadata.index.astype(str)  # make index str, because adata does not play nice with int indices
         # add int col of mapobject_id for easier merging
         metadata["obj_id_int"] = metadata[OBJ_ID].astype(int)
         adata.obs = metadata
@@ -134,9 +211,7 @@ class FeatureExtractor:
         # add size of all cluster
         # reindex to ensure all object are present
         size = grouped[list(df.columns)[0]].count().reindex(adata.obs["obj_id_int"])
-        adata.obsm["size"] = pd.DataFrame(
-            columns=["all"] + self.clusters, index=adata.obs.index
-        )
+        adata.obsm["size"] = pd.DataFrame(columns=["all"] + self.clusters, index=adata.obs.index)
         adata.obsm["size"]["all"] = np.array(size)
 
         # add uns metadata
@@ -147,14 +222,8 @@ class FeatureExtractor:
         for c in self.clusters:
             self.log.debug(f"processing {c}")
             # get cluster ids to mask
-            c_ids = list(
-                self.annotation[self.annotation[self.params["cluster_col"]] == c][
-                    self.params["cluster_name"]
-                ]
-            )
-            mask = np.where(
-                np.isin(self.mpp_data.data(self.params["cluster_name"]), c_ids)
-            )
+            c_ids = list(self.annotation[self.annotation[self.params["cluster_col"]] == c][self.params["cluster_name"]])
+            mask = np.where(np.isin(self.mpp_data.data(self.params["cluster_name"]), c_ids))
             cur_df = df.iloc[mask]
             # group by obj_id
             grouped = cur_df.groupby(cur_df.index)
@@ -173,9 +242,7 @@ class FeatureExtractor:
         self.adata = adata
 
         # write to disk
-        fname = os.path.join(
-            self.exp.full_path, "aggregated/full_data", self.params["data_dir"], fname
-        )
+        fname = os.path.join(self.exp.full_path, "aggregated/full_data", self.params["data_dir"], fname)
         self.log.info(f"saving adata to {fname}")
         self.fname = fname
         self.adata.write(self.fname)
@@ -224,12 +291,7 @@ class FeatureExtractor:
 
         feature_names = features
         intensity_feature_names = [f"mean_{ch}" for ch in intensity_channels]
-        features = {
-            feature: []
-            for feature in feature_names
-            + intensity_feature_names
-            + ["mapobject_id", "clustering"]
-        }
+        features = {feature: [] for feature in feature_names + intensity_feature_names + ["mapobject_id", "clustering"]}
         for obj_id in self.mpp_data.unique_obj_ids:
             mpp_data = self.mpp_data.subset(obj_ids=[obj_id], copy=True)
             img, _ = mpp_data.get_object_img(
@@ -269,13 +331,10 @@ class FeatureExtractor:
                         elif feature == "circularity":
                             # circularity can max be 1,
                             # larger values are due to tiny regions where perimeter is overestimated
-                            features[feature].append(
-                                min(4 * np.pi * region.area / region.perimeter ** 2, 1)
-                            )
+                            features[feature].append(min(4 * np.pi * region.area / region.perimeter ** 2, 1))
                         elif feature == "elongation":
                             features[feature].append(
-                                (region.major_axis_length - region.minor_axis_length)
-                                / region.major_axis_length
+                                (region.major_axis_length - region.minor_axis_length) / region.major_axis_length
                             )
                         elif feature == "extent":
                             features[feature].append(region.extent)
@@ -284,9 +343,7 @@ class FeatureExtractor:
                     # get intensity features for this region
                     for i, _ in enumerate(intensity_channels):
                         # mean intensity is in channel i+1 of intensity_img (channel 0 is cluster image)
-                        features[intensity_feature_names[i]].append(
-                            region.mean_intensity[i + 1]
-                        )
+                        features[intensity_feature_names[i]].append(region.mean_intensity[i + 1])
 
         df = pd.DataFrame(features)
         self.adata.uns["object_stats"] = df
@@ -365,13 +422,10 @@ class FeatureExtractor:
                     )
                 )
                 # shift coords according to image padding, st coords correspond to img coords
-                coords1 = (
-                    np.array([mpp_data.x, mpp_data.y])
-                    - np.array([pad_x, pad_y])[:, np.newaxis]
-                ).astype(np.int64)
-                self.log.info(
-                    f"co-occurrence for {obj_id}, with {len(mpp_data.x)} elements"
+                coords1 = (np.array([mpp_data.x, mpp_data.y]) - np.array([pad_x, pad_y])[:, np.newaxis]).astype(
+                    np.int64
                 )
+                self.log.info(f"co-occurrence for {obj_id}, with {len(mpp_data.x)} elements")
                 co_occ = _co_occ_opt(
                     coords1,
                     coords2_list,
@@ -381,9 +435,7 @@ class FeatureExtractor:
                     num_processes=num_processes,
                 )
             elif CoOccAlgo(algorithm) == CoOccAlgo.SQUIDPY:
-                adata = self.mpp_data.subset(obj_ids=[obj_id], copy=True).get_adata(
-                    obs=[self.params["cluster_name"]]
-                )
+                adata = self.mpp_data.subset(obj_ids=[obj_id], copy=True).get_adata(obs=[self.params["cluster_name"]])
                 # ensure that cluster annotation is present in adata
                 if self.params["cluster_name"] != self.params["cluster_col"]:
                     adata.obs[self.params["cluster_col"]] = annotate_clustering(
@@ -392,9 +444,7 @@ class FeatureExtractor:
                         self.params["cluster_name"],
                         self.params["cluster_col"],
                     )
-                adata.obs[self.params["cluster_col"]] = adata.obs[
-                    self.params["cluster_col"]
-                ].astype("category")
+                adata.obs[self.params["cluster_col"]] = adata.obs[self.params["cluster_col"]].astype("category")
                 self.log.info(f"co-occurrence for {obj_id}, with shape {adata.shape}")
                 cur_co_occ, _ = sq.gr.co_occurrence(
                     adata,
@@ -406,16 +456,12 @@ class FeatureExtractor:
                     n_splits=1,
                 )
                 # ensure that co_occ has correct format incase of missing clusters
-                co_occ = np.zeros(
-                    (len(self.clusters), len(self.clusters), len(interval) - 1)
-                )
+                co_occ = np.zeros((len(self.clusters), len(self.clusters), len(interval) - 1))
                 cur_clusters = np.vectorize(cluster_names.__getitem__)(
                     np.array(adata.obs[self.params["cluster_col"]].cat.categories)
                 )
                 grid = np.meshgrid(cur_clusters, cur_clusters)
-                co_occ[grid[0].flat, grid[1].flat] = cur_co_occ.reshape(
-                    -1, len(interval) - 1
-                )
+                co_occ[grid[0].flat, grid[1].flat] = cur_co_occ.reshape(-1, len(interval) - 1)
             co_occs.append(co_occ.copy())
             obj_ids.append(obj_id)
 
@@ -470,9 +516,7 @@ class FeatureExtractor:
             cur_adata.X = adata.layers[f"intensity_{c}"]
             cur_adata.obs["size"] = adata.obsm["size"][c]
             adatas[c] = cur_adata
-        comb_adata = ad.concat(
-            adatas, uns_merge="same", index_unique="-", label="cluster"
-        )
+        comb_adata = ad.concat(adatas, uns_merge="same", index_unique="-", label="cluster")
         return comb_adata
 
     def get_object_stats(self, area_threshold=10, agg=("median",), save=False):
@@ -567,23 +611,23 @@ class FeatureExtractor:
             for c1 in self.clusters:
                 for c2 in self.clusters:
                     self.adata.obsm[f"co_occurrence_{c1}_{c2}"]
-                    masks.append(
-                        (self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1)
-                    )
-            obj_ids = np.array(
-                self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]
-            ).astype(np.uint32)
+                    masks.append((self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1))
+            obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
             return obj_ids
 
+
+from numba import jit
+import numba.types as nt
+
+ft = nt.float32
+it = nt.int64
 
 ft = nt.float32
 it = nt.int64
 
 
 @jit(ft[:, :](it[:], it[:], it), fastmath=True)
-def _count_co_occ(
-    clus1: np.ndarray, clus2: np.ndarray, num_clusters: int
-) -> np.ndarray:
+def _count_co_occ(clus1: np.ndarray, clus2: np.ndarray, num_clusters: int) -> np.ndarray:
     co_occur = np.zeros((num_clusters, num_clusters), dtype=np.float32)
     for i, j in zip(clus1, clus2):
         co_occur[i, j] += 1
@@ -666,9 +710,7 @@ def _co_occ_opt(
         # with {coords1.shape[1]} x {coords2.shape[1]} coord pairs')
         if (coords1.shape[1] * coords2.shape[1]) > CO_OCC_CHUNK_SIZE:
             chunk_size = int(CO_OCC_CHUNK_SIZE / coords1.shape[1])
-            coords2_chunks = np.split(
-                coords2, np.arange(0, coords2.shape[1], chunk_size), axis=1
-            )
+            coords2_chunks = np.split(coords2, np.arange(0, coords2.shape[1], chunk_size), axis=1)
             # log.info(f'splitting coords2 in {len(coords2_chunks)} chunks')
         else:
             coords2_chunks = [coords2]

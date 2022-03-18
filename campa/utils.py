@@ -1,8 +1,8 @@
-import collections.abc
-import logging
-import os
 from copy import deepcopy
 from typing import Any, Dict
+import os
+import logging
+import collections.abc
 
 
 def init_logging(level=logging.INFO):
@@ -28,12 +28,10 @@ def init_logging(level=logging.INFO):
 
 def load_config(config_file):
     """load config file and return config object"""
-    import importlib.machinery
     import importlib.util
+    import importlib.machinery
 
-    loader = importlib.machinery.SourceFileLoader(
-        os.path.basename(config_file), config_file
-    )
+    loader = importlib.machinery.SourceFileLoader(os.path.basename(config_file), config_file)
     spec = importlib.util.spec_from_loader(loader.name, loader)
     config = importlib.util.module_from_spec(spec)
     loader.exec_module(config)

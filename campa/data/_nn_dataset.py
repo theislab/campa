@@ -1,17 +1,49 @@
+from typing import Any, Mapping
+import os
 import json
 import logging
-import os
 
 import numpy as np
 import tensorflow as tf
 
 from campa.constants import get_data_config
-from campa.data import MPPData
+
+from ._data import MPPData
 
 
-def create_dataset(params):
+def create_dataset(params: Mapping[str, Any]):
     """
-    Create a NNDataset from params and save to dataset_name (defined in params).
+    Create a NNDataset
+
+    Params determine how the data should be selected and processed.
+     The following keys in params are expected:
+
+    - ``dataset_name``: name of the resulting dataset that is defined by these params
+      (relative to ``DATA_DIR/datasets``)
+    - ``data_config``: name of data config (registered in campa.ini)
+    - ``data_dirs``: where to read data from (relative to ``DATA_DIR`` defined in data config)
+    - ``channels``: list of channel names to include in this dataset
+    - ``condition``: list of conditions. Should be defined in data config.
+     The suffix `_one_hot` will convert the condition in a one-hot encoded vector.
+     Conditions are concatenated, except when they are defined as a list of lists.
+     In this case the condition is defined as a pairwise combination of the conditions.
+    - ``condition_kwargs``: kwargs to :meth:`MPPData.add_conditions`
+    - ``split_kwargs``: kwargs to :meth:`MPPData.train_val_test_split`
+    - ``test_img_size``: standard size of images in test set. Imaged are padded/truncated to this size
+    - ``subset``: (bool) subset to objects with certain metadata.
+    - ``subset_kwargs``: kwargs to :meth:`MPPData.subset` defining which object to subset to
+    - ``subsample``: (bool) subsampling of pixels (only for train/val)
+    - ``subsample_kwargs``: kwargs for :meth:`MPPData.subsample` defining the fraction of pixels to be sampled
+    - ``neighborhood``: (bool) add local neighborhood to samples in NNDataset
+    - ``neighborhood_size``: size of neighborhood
+    - ``normalise``: (bool) Intensity normalisation
+    - ``normalise_kwargs``: kwargs to :meth:`MPPData.normalise`
+    - ``seed``: random seed to make subsampling reproducible
+
+    Parameters
+    ----------
+    params
+        parameter dict
     """
     log = logging.getLogger()
     log.info("Creating train/val/test datasets with params:")
@@ -24,9 +56,7 @@ def create_dataset(params):
     # prepare datasets
     mpp_datas = {"train": [], "val": [], "test": []}
     for data_dir in p["data_dirs"]:
-        mpp_data = MPPData.from_data_dir(
-            data_dir, seed=p["seed"], data_config=p["data_config"]
-        )
+        mpp_data = MPPData.from_data_dir(data_dir, seed=p["seed"], data_config=p["data_config"])
         train, val, test = mpp_data.train_val_test_split(**p["split_kwargs"])
         # subsample train data now
         if p["subsample"]:
@@ -45,9 +75,7 @@ def create_dataset(params):
     val = MPPData.concat(mpp_datas["val"])
     test = MPPData.concat(mpp_datas["test"])
     # prepare (channels, normalise, condition, subset)
-    train.prepare(
-        params
-    )  # this has side-effects on params, st val + test use correct params
+    train.prepare(params)  # this has side-effects on params, st val + test use correct params
     val.prepare(params)
     test.prepare(params)
     # save test and val imgs
@@ -103,23 +131,13 @@ class NNDataset:
 
         # data
         self.data = {
-            "train": MPPData.from_data_dir(
-                os.path.join(self.dataset_folder, "train"), base_dir=""
-            ),
-            "val": MPPData.from_data_dir(
-                os.path.join(self.dataset_folder, "val"), base_dir=""
-            ),
-            "test": MPPData.from_data_dir(
-                os.path.join(self.dataset_folder, "test"), base_dir=""
-            ),
+            "train": MPPData.from_data_dir(os.path.join(self.dataset_folder, "train"), base_dir=""),
+            "val": MPPData.from_data_dir(os.path.join(self.dataset_folder, "val"), base_dir=""),
+            "test": MPPData.from_data_dir(os.path.join(self.dataset_folder, "test"), base_dir=""),
         }
         self.imgs = {
-            "val": MPPData.from_data_dir(
-                os.path.join(self.dataset_folder, "val_imgs"), base_dir=""
-            ),
-            "test": MPPData.from_data_dir(
-                os.path.join(self.dataset_folder, "test_imgs"), base_dir=""
-            ),
+            "val": MPPData.from_data_dir(os.path.join(self.dataset_folder, "val_imgs"), base_dir=""),
+            "test": MPPData.from_data_dir(os.path.join(self.dataset_folder, "test_imgs"), base_dir=""),
         }
         self.channels = self.data["train"].channels.reset_index().set_index("name")
         self.params = json.load(open(os.path.join(self.dataset_folder, "params.json")))
@@ -172,9 +190,7 @@ class NNDataset:
         if is_conditional:
             num = x[0].shape[0]
             output_types.append((tf.float32, tf.float32))
-            output_shapes.append(
-                (tf.TensorShape(x[0].shape[1:]), tf.TensorShape(x[1].shape[1:]))
-            )
+            output_shapes.append((tf.TensorShape(x[0].shape[1:]), tf.TensorShape(x[1].shape[1:])))
         else:
             num = x.shape[0]
             output_types.append(tf.float32)
@@ -221,7 +237,5 @@ class NNDataset:
                     el_y = y[i]
                 yield (el_x, el_y)
 
-        dataset = tf.data.Dataset.from_generator(
-            gen, tuple(output_types), tuple(output_shapes)
-        )
+        dataset = tf.data.Dataset.from_generator(gen, tuple(output_types), tuple(output_shapes))
         return dataset

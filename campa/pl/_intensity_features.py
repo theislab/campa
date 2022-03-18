@@ -1,14 +1,14 @@
 import warnings
 
-import anndata as ad
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import scanpy as sc
-import scipy
-import statsmodels.api as sm
 from scipy.stats import zscore
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
+import numpy as np
+import scipy
+import pandas as pd
+import scanpy as sc
+import anndata as ad
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
 
 # TODO: remove, not needed anymore, use scipy zscoring now
 # def zscore(adata, key_added='zscored', limit_to_groups={}):
@@ -125,9 +125,7 @@ def plot_mean_intensity(
     # plot
     if dendrogram:
         sc.tl.dendrogram(adata, groupby=groupby)
-    title = "mean intensity in " + ", ".join(
-        [f"{key}: {val}" for key, val in limit_to_groups.items()]
-    )
+    title = "mean intensity in " + ", ".join([f"{key}: {val}" for key, val in limit_to_groups.items()])
     if limit_to_groups == {}:
         title = "mean intensity"
     if ax is None:
@@ -254,9 +252,7 @@ def mixed_model(ref_expr, g_expr, ref_well_name, g_well_name):
             # sns.distplot(df[df['group']==0]['mean_expr'])
             # sns.distplot(df[df['group']==1]['mean_expr'])
 
-            model = sm.MixedLM.from_formula(
-                "mean_expr ~ group", re_formula="~1", groups="well", data=df
-            )
+            model = sm.MixedLM.from_formula("mean_expr ~ group", re_formula="~1", groups="well", data=df)
             result = model.fit()
             pvals.append(result.summary().tables[1].loc["group"]["P>|z|"])
             res_data["df"].append(df)
@@ -326,9 +322,7 @@ def get_intensity_change(
     adata = adata[:, marker_list].copy()
 
     # calculate values to show
-    color_values = pd.DataFrame(
-        index=adata.var.index
-    )  # intensity values shown as colors
+    color_values = pd.DataFrame(index=adata.var.index)  # intensity values shown as colors
     p_values = pd.DataFrame(index=adata.var.index)  # pvalues (impacting dot sizes)
     size_values = pd.DataFrame(index=adata.var.index)  # dot sizes
     group_size = {}  # mean group sizes (for barplot)
@@ -364,12 +358,8 @@ def get_intensity_change(
         cur_ref_expr = adata_cur_ref.X
         if norm_by_group is not None:
             assert reference is not None, "Need a reference for norm by group"
-            assert (
-                reference_group != groupby
-            ), "Can only norm by group if reference_group is different to groupby"
-            cur_ref_expr = (
-                cur_ref_expr / adata_ref[adata_ref.obs[groupby] == norm_by_group].X
-            )
+            assert reference_group != groupby, "Can only norm by group if reference_group is different to groupby"
+            cur_ref_expr = cur_ref_expr / adata_ref[adata_ref.obs[groupby] == norm_by_group].X
         cur_ref_size = adata_cur_ref.obs["size"]
 
         # group expression
@@ -381,9 +371,7 @@ def get_intensity_change(
         # mean group expression
         mean_g = (g_expr * g_size[:, np.newaxis]).sum(axis=0) / g_size.sum()
         # mean reference expression
-        mean_ref = (cur_ref_expr * cur_ref_size[:, np.newaxis]).sum(
-            axis=0
-        ) / cur_ref_size.sum()
+        mean_ref = (cur_ref_expr * cur_ref_size[:, np.newaxis]).sum(axis=0) / cur_ref_size.sum()
         # mean group size
         if group_sizes_barplot == "mean":
             group_size[g] = g_size.mean()
@@ -437,9 +425,7 @@ def get_intensity_change(
             raise NotImplementedError(color)
 
     # get title for plot
-    lmt_str = ", ".join(
-        [f'{key}: {",".join(val)}' for key, val in limit_to_groups.items()]
-    )
+    lmt_str = ", ".join([f'{key}: {",".join(val)}' for key, val in limit_to_groups.items()])
     if limit_to_groups == {}:
         lmt_str = "all"
     title = f'{color} of {lmt_str} wrt {reference_group}: {",".join([str(r) for r in reference])}'
@@ -576,9 +562,7 @@ def plot_size_change(
     """
     if limit_to_groups is None:
         limit_to_groups = {}
-    assert (reference_col is None) ^ (
-        reference_row is None
-    ), "either reference_row or reference_col must be defined"
+    assert (reference_col is None) ^ (reference_row is None), "either reference_row or reference_col must be defined"
     _ensure_categorical(adata, groupby_row)
     _ensure_categorical(adata, groupby_col)
     kwargs["vmin"] = kwargs.get("vmin", -1)
@@ -640,9 +624,7 @@ def plot_size_change(
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
 
-    lmt_str = ", ".join(
-        [f'{key}: {",".join(val)}' for key, val in limit_to_groups.items()]
-    )
+    lmt_str = ", ".join([f'{key}: {",".join(val)}' for key, val in limit_to_groups.items()])
     if limit_to_groups == {}:
         lmt_str = "all"
     title = f"size logfoldchange of {lmt_str} wrt "

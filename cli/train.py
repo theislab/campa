@@ -1,9 +1,10 @@
-import argparse
+from typing import Iterable
 import os
+import argparse
 
-from campa.constants import EXPERIMENT_DIR
-from campa.tl import Cluster, Estimator, Experiment, ModelComparator, Predictor
+from campa.tl import Cluster, Estimator, Predictor, Experiment, ModelComparator
 from campa.utils import init_logging
+from campa.constants import EXPERIMENT_DIR
 
 
 def prepare_exp_split(exp):
@@ -39,7 +40,26 @@ def prepare_exp_split(exp):
         )
 
 
-def run_experiments(mode, exps):
+def run_experiments(exps: Iterable[Experiment], mode: str = "all"):
+    """
+    Execute experiments
+
+    Runs all given experiments in the given mode.
+    The following modes are available:
+    - "train": train experiments (if trainable)
+    - "evaluate": predict experiments on val set and cluster results
+    - "trainval": both train and evaluate
+    - "compare": generate comparative plots of experiments
+    - "all": trainval and compare
+
+    Parameters
+    ----------
+    exps
+        experiments to run
+    mode
+        mode, one of "train", "evaluate", "trainval", "compare", "all"
+    """
+    assert mode in ["train", "evaluate", "trainval", "compare", "all"], f"unknown mode {mode}"
     exp_names = [exp.name for exp in exps]
     print(f"Running experiment for {exp_names} with mode {mode}")
     for exp_name, exp in zip(exp_names, exps):
@@ -74,19 +94,13 @@ def run_experiments(mode, exps):
             save_prefix="decoder_loss_",
         )
         comp.plot_per_channel_mse()
-        comp.plot_predicted_images(
-            img_ids=[0, 1, 2, 3, 4], img_size=exps[0].data_params["test_img_size"]
-        )
-        comp.plot_cluster_images(
-            img_ids=[0, 1, 2, 3, 4], img_size=exps[0].data_params["test_img_size"]
-        )
+        comp.plot_predicted_images(img_ids=[0, 1, 2, 3, 4], img_size=exps[0].data_params["test_img_size"])
+        comp.plot_cluster_images(img_ids=[0, 1, 2, 3, 4], img_size=exps[0].data_params["test_img_size"])
         comp.plot_umap()
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description=("Train and evaluate models defined by experiment config")
-    )
+    parser = argparse.ArgumentParser(description=("Train and evaluate models defined by experiment config"))
     parser.add_argument(
         "mode",
         default="all",

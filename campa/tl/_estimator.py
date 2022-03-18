@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from campa.tl import Experiment
 
-import logging
 import os
+import logging
 
 import pandas as pd
 import tensorflow as tf
 
-from campa.data import NNDataset
 from campa.tl import LossEnum, ModelEnum
+from campa.data import NNDataset
 from campa.tl._layers import UpdateSparsityLevel
 
 
@@ -31,19 +31,11 @@ class LossWarmup(tf.keras.callbacks.Callback):
             if to_epoch == 0 or to_epoch <= epoch:
                 tf.keras.backend.set_value(self.weight_vars[key], to_weight)
             else:
-                tf.keras.backend.set_value(
-                    self.weight_vars[key], to_weight / to_epoch * epoch
-                )
-            print(
-                f"set {key} loss weight to {tf.keras.backend.get_value(self.weight_vars[key])}"
-            )
+                tf.keras.backend.set_value(self.weight_vars[key], to_weight / to_epoch * epoch)
+            print(f"set {key} loss weight to {tf.keras.backend.get_value(self.weight_vars[key])}")
 
         if "latent" in self.weight_vars.keys():
-            print(
-                "set latent loss weight to {}".format(
-                    tf.keras.backend.get_value(self.weight_vars["latent"])
-                )
-            )
+            print("set latent loss weight to {}".format(tf.keras.backend.get_value(self.weight_vars["latent"])))
 
 
 class AnnealTemperature(tf.keras.callbacks.Callback):
@@ -61,10 +53,7 @@ class AnnealTemperature(tf.keras.callbacks.Callback):
         else:
             tf.keras.backend.set_value(
                 self.temperature,
-                self.initial_temperature
-                + (self.final_temperature - self.initial_temperature)
-                / self.to_epoch
-                * epoch,
+                self.initial_temperature + (self.final_temperature - self.initial_temperature) / self.to_epoch * epoch,
             )
         print(f"set temperature to {tf.keras.backend.get_value(self.temperature)}")
 
@@ -77,12 +66,10 @@ class Estimator:
         self.config = exp.estimator_config
 
         self.config["training"]["loss"] = {
-            key: LossEnum(val).get_fn()
-            for key, val in self.config["training"]["loss"].items()
+            key: LossEnum(val).get_fn() for key, val in self.config["training"]["loss"].items()
         }
         self.config["training"]["metrics"] = {
-            key: LossEnum(val).get_fn()
-            for key, val in self.config["training"]["metrics"].items()
+            key: LossEnum(val).get_fn() for key, val in self.config["training"]["metrics"].items()
         }
         self.callbacks: list[object] = []
 
@@ -109,9 +96,7 @@ class Estimator:
         self._train_dataset, self._val_dataset, self._test_dataset = None, None, None
 
         # set up model weights and history paths for saving/loading later
-        self.weights_name = os.path.join(
-            self.exp.full_path, "weights_epoch{:03d}"  # noqa: P103
-        )
+        self.weights_name = os.path.join(self.exp.full_path, "weights_epoch{:03d}")  # noqa: P103
         self.history_name = os.path.join(self.exp.full_path, "history.csv")
 
     @property
@@ -153,9 +138,7 @@ class Estimator:
             self._compile_model()
             self.log.info(f"Initializing model with weights from {weights_path}")
             w1 = self.model.model.layers[5].get_weights()
-            self.model.model.load_weights(
-                weights_path
-            ).assert_nontrivial_match().assert_existing_objects_matched()
+            self.model.model.load_weights(weights_path).assert_nontrivial_match().assert_existing_objects_matched()
             w2 = self.model.model.layers[5].get_weights()
             assert (w1[0] != w2[0]).any()
             assert (w1[1] != w2[1]).any()
@@ -165,10 +148,7 @@ class Estimator:
     def _compile_model(self):
         config = self.config["training"]
         # set loss weights
-        self.loss_weights = {
-            key: tf.keras.backend.variable(val)
-            for key, val in config["loss_weights"].items()
-        }
+        self.loss_weights = {key: tf.keras.backend.variable(val) for key, val in config["loss_weights"].items()}
         # callback to update weights before each epoch
         self.callbacks.append(
             LossWarmup(
@@ -189,9 +169,7 @@ class Estimator:
             )
         # create optimizer
         if self.optimizer is None:
-            self.optimizer = tf.keras.optimizers.Adam(
-                learning_rate=config["learning_rate"]
-            )
+            self.optimizer = tf.keras.optimizers.Adam(learning_rate=config["learning_rate"])
         self.model.model.compile(
             optimizer=self.optimizer,
             loss=config["loss"],
@@ -253,9 +231,7 @@ class Estimator:
         if dataset is None:
             dataset = self.val_dataset
         self.model.model.reset_metrics()
-        scores = self.model.model.evaluate(
-            dataset.batch(self.config["training"]["batch_size"])
-        )
+        scores = self.model.model.evaluate(dataset.batch(self.config["training"]["batch_size"]))
         return scores
 
 

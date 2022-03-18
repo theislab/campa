@@ -1,10 +1,10 @@
 # TODO go through functions and comment
-import json
-import logging
 from copy import deepcopy
 from enum import Enum
-from functools import partial
 from typing import Any, Dict
+from functools import partial
+import json
+import logging
 
 import tensorflow as tf
 
@@ -149,13 +149,10 @@ class BaseAEModel:
             self.config["num_input_channels"] = self.config["num_channels"]
         if isinstance(self.config["encoder_conv_kernel_size"], int):
             self.config["encoder_conv_kernel_size"] = [
-                self.config["encoder_conv_kernel_size"]
-                for _ in self.config["encoder_conv_layers"]
+                self.config["encoder_conv_kernel_size"] for _ in self.config["encoder_conv_layers"]
             ]
         self.log.info("Creating model")
-        self.log.debug(
-            f"Creating model with config: {json.dumps(self.config, indent=4)}"
-        )
+        self.log.debug(f"Creating model with config: {json.dumps(self.config, indent=4)}")
 
         # set up model
         # input layers for encoder and decoder
@@ -204,9 +201,7 @@ class BaseAEModel:
         # create model
         if self.is_conditional:
             # self.model_output = self.decoder([self.encoder.output, self.encoder.input[1]])
-            self.model_output = self.decoder(
-                [self.encoder(self.encoder_input), self.encoder_input[1]]
-            )
+            self.model_output = self.decoder([self.encoder(self.encoder_input), self.encoder_input[1]])
         else:
             self.model_output = self.decoder([self.encoder(self.encoder_input)])
         if self.latent is not None:
@@ -214,17 +209,13 @@ class BaseAEModel:
             self.model_output = [self.model_output, self.latent]
         if self.is_adversarial:
             if isinstance(self.model_output, list):
-                self.model_output = self.model_output + [
-                    self.adv_head(self.encoder(self.encoder_input))
-                ]
+                self.model_output = self.model_output + [self.adv_head(self.encoder(self.encoder_input))]
             else:
                 self.model_output = [
                     self.model_output,
                     self.adv_head(self.encoder(self.encoder_input)),
                 ]
-        model = tf.keras.Model(
-            self.encoder_input, self.model_output, name=self.config["name"]
-        )
+        model = tf.keras.Model(self.encoder_input, self.model_output, name=self.config["name"])
         return model
 
     @property
@@ -298,9 +289,7 @@ class BaseAEModel:
         """
         X = self._create_base_encoder()
         # linear layer to latent
-        X = tf.keras.layers.Dense(
-            self.config["latent_dim"], activation=None, name="latent"
-        )(X)
+        X = tf.keras.layers.Dense(self.config["latent_dim"], activation=None, name="latent")(X)
 
         # define encoder model
         encoder = tf.keras.Model(self.encoder_input, X, name="encoder")
@@ -335,9 +324,7 @@ class BaseAEModel:
             tf.keras.regularizers.l1(self.config["decoder_regularizer_weight"])
         else:
             tf.keras.regularizers.l2(self.config["decoder_regularizer_weight"])
-        decoder_output = tf.keras.layers.Dense(
-            self.config["num_output_channels"], activation=None
-        )(X)
+        decoder_output = tf.keras.layers.Dense(self.config["num_output_channels"], activation=None)(X)
 
         # define decoder model
         decoder = tf.keras.Model(self.decoder_input, decoder_output, name="decoder")
@@ -356,9 +343,7 @@ class BaseAEModel:
         for layer in self.config["adversarial_layers"]:
             X = tf.keras.layers.Dense(layer, activation=tf.nn.relu)(X)
         # linear layer to num_conditions
-        adv_head_output = tf.keras.layers.Dense(
-            self.config["num_conditions"], activation=None
-        )(X)
+        adv_head_output = tf.keras.layers.Dense(self.config["num_conditions"], activation=None)(X)
 
         # define adv_head model
         adv_head = tf.keras.Model(inpt, adv_head_output, name="adv_head")
@@ -392,9 +377,7 @@ class VAEModel(BaseAEModel):
         """
         X = self._create_base_encoder()
         # linear layer to latent
-        latent = tf.keras.layers.Dense(
-            self.config["latent_dim"] * 2, activation=None, name="latent"
-        )(X)
+        latent = tf.keras.layers.Dense(self.config["latent_dim"] * 2, activation=None, name="latent")(X)
         # reparameterise
         reparam_latent = reparameterize_gaussian(latent)
         # define encoder
@@ -420,9 +403,7 @@ class CatVAEModel(BaseAEModel):
 
     def __init__(self, **kwargs):
         self.temperature = tf.Variable(
-            initial_value=kwargs.get(
-                "initial_temperature", self.default_config["initial_temperature"]
-            ),
+            initial_value=kwargs.get("initial_temperature", self.default_config["initial_temperature"]),
             trainable=False,
             dtype=tf.float32,
         )
@@ -436,9 +417,7 @@ class CatVAEModel(BaseAEModel):
         """
         X = self._create_base_encoder()
         # linear layer to latent
-        latent = tf.keras.layers.Dense(
-            self.config["latent_dim"], activation=None, name="latent"
-        )(X)
+        latent = tf.keras.layers.Dense(self.config["latent_dim"], activation=None, name="latent")(X)
         # reparameterise
         reparam_latent = reparameterize_gumbel_softmax(latent, self.temperature)
         # define encoder
@@ -467,9 +446,7 @@ class CondCatVAEModel(CatVAEModel):
             self.config["num_output_channels"] * self.config["encode_condition"],
             activation=None,
         )(X)
-        X = tf.keras.layers.Reshape(
-            (self.config["num_output_channels"], self.config["encode_condition"])
-        )(X)
+        X = tf.keras.layers.Reshape((self.config["num_output_channels"], self.config["encode_condition"]))(X)
 
         C = self.encode_condition(C)
         # multiply X by conditions
@@ -553,9 +530,7 @@ class GMMVAEModel(BaseAEModel):
         for layer in self.config["y_fc_layers"]:
             X = tf.keras.layers.Dense(layer, activation=tf.nn.relu)(X)
         # linear layer to latent
-        Y = tf.keras.layers.Dense(
-            self.config["k"], activation="softmax", name="latent_y"
-        )(X)
+        Y = tf.keras.layers.Dense(self.config["k"], activation="softmax", name="latent_y")(X)
         return Y
 
     def qz_graph(self, X_input_shape):
@@ -568,9 +543,7 @@ class GMMVAEModel(BaseAEModel):
         # concatenate Y with X
         fn = partial(expand_and_broadcast, s=self.config["num_neighbors"])
         Y = tf.keras.layers.Lambda(fn)(Y_input)
-        X = tf.keras.layers.concatenate(
-            [X_input, Y], axis=-1
-        )  # this is now the input for the normal encoder
+        X = tf.keras.layers.concatenate([X_input, Y], axis=-1)  # this is now the input for the normal encoder
 
         # conv layers
         for i, l in enumerate(self.config["encoder_conv_layers"]):
@@ -660,9 +633,7 @@ class GMMVAEModel(BaseAEModel):
         fn = partial(expand_and_broadcast_qY, s=self.config["latent_dim"] * 2)
         qY = tf.keras.layers.Lambda(fn)(latent_y)
         # stack pZ, qZ, qY to one output
-        latent_zy = tf.keras.layers.Lambda(
-            lambda x: tf.stack(x, axis=1), name="latent_zy"
-        )([pZ, qZ, qY])
+        latent_zy = tf.keras.layers.Lambda(lambda x: tf.stack(x, axis=1), name="latent_zy")([pZ, qZ, qY])
 
         return encoder, latent_y, latent_zy
 
@@ -676,20 +647,14 @@ class GMMVAEModel(BaseAEModel):
         self.decoder = self.create_decoder()
 
         # add encoder_y model
-        self.encoder_y = tf.keras.Model(
-            self.encoder_input, self.latent_y, name="encoder_y"
-        )
+        self.encoder_y = tf.keras.Model(self.encoder_input, self.latent_y, name="encoder_y")
 
         # create model
         if self.is_conditional:
-            self.model_output = self.decoder(
-                [self.encoder(self.encoder_input), self.encoder_input[1]]
-            )
+            self.model_output = self.decoder([self.encoder(self.encoder_input), self.encoder_input[1]])
         else:
             self.model_output = self.decoder([self.encoder(self.encoder_input)])
         # model should return both output + latent_y (for cat loss) + latent_zy (for KL loss)
         self.model_output = [self.model_output, self.latent_y, self.latent_zy]
-        model = tf.keras.Model(
-            self.encoder_input, self.model_output, name=self.config["name"]
-        )
+        model = tf.keras.Model(self.encoder_input, self.model_output, name=self.config["name"])
         return model

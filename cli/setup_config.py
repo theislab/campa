@@ -1,9 +1,9 @@
 #!python
-import argparse
+from pathlib import Path
+from configparser import ConfigParser
 import os
 import shutil
-from configparser import ConfigParser
-from pathlib import Path
+import argparse
 
 
 def prepare_config(args):
@@ -24,9 +24,7 @@ def prepare_config(args):
         return p
 
     def change_path(config, name, section="DEFAULT"):
-        print(
-            f"The current {name} is {config.get(section, name)}. Would you like to change it? (y/n)"
-        )
+        print(f"The current {name} is {config.get(section, name)}. Would you like to change it? (y/n)")
         if not get_yn_input():
             print(f"Leaving {name} unchanged.")
         else:
@@ -38,10 +36,7 @@ def prepare_config(args):
 
     config_path = Path.home() / ".config" / "campa" / "campa.ini"
     # read config file from scripts_dir (parent dir of dir that this file is in)
-    example_config_path = (
-        Path(__file__).resolve().parent.parent / "campa" / "campa.ini.example"
-    )
-    print(example_config_path)
+    example_config_path = Path(__file__).resolve().parent.parent / "campa" / "campa.ini.example"
     # check if custom config exists
     if not config_path.is_file() or args.force:
         print(f"No campa.ini found in {config_path}. Creating default config file.")
@@ -61,12 +56,7 @@ def prepare_config(args):
         config.set(
             "data",
             "TestData",
-            str(
-                Path(__file__).resolve().parent.parent
-                / "notebooks"
-                / "params"
-                / "TestData_constants.py"
-            ),
+            str(Path(__file__).resolve().parent.parent / "notebooks" / "params" / "TestData_constants.py"),
         )
         with open(config_path, "w") as configfile:
             config.write(configfile)

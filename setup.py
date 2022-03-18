@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from setuptools import find_packages, setup
+from setuptools import setup, find_packages
 
 setup(
     name="campa",
@@ -19,14 +19,14 @@ setup(
             "nbconvert",
             "ipykernel",
         ],
-        # docs=[
-        # l.strip()
-        # for l in (Path("docs") / "requirements.txt").read_text("utf-8").splitlines()
-        # if not l.startswith("-r")
-        # ],
+        docs=[
+            l.strip()
+            for l in (Path("docs") / "requirements.txt").read_text("utf-8").splitlines()
+            if not l.startswith("-r")
+        ],
     ),
-    install_requires=[
-        line.strip()
-        for line in Path("requirements.txt").read_text("utf-8").splitlines()
-    ],
+    install_requires=[line.strip() for line in Path("requirements.txt").read_text("utf-8").splitlines()],
+    entry_points={
+        "console_scripts": ["campa=campa.cli.main:CAMPA"],
+    },
 )

@@ -12,9 +12,7 @@ def gen_vstr_recarray(m, n, dtype=None):
     letters = np.array(list(ascii_letters))
     gen_word = lambda l: "".join(np.random.choice(letters, l))  # noqa: E731
     arr = np.array([gen_word(len) for len in lengths]).reshape(m, n)
-    return pd.DataFrame(arr, columns=[gen_word(5) for i in range(n)]).to_records(
-        index=False, column_dtypes=dtype
-    )
+    return pd.DataFrame(arr, columns=[gen_word(5) for i in range(n)]).to_records(index=False, column_dtypes=dtype)
 
 
 def gen_metadata_df(n, obj_ids, possible_cell_cycles=None, ensure_None=True):
@@ -63,13 +61,9 @@ def gen_obj(shape, bounding_box, num_channels, mpp_dtype):
         x = x[:num_values]
         y = y[:num_values]
     if np.issubdtype(mpp_dtype, np.floating):
-        values = np.array(
-            [np.random.random(num_values) for ch in range(num_channels)]
-        ).T
+        values = np.array([np.random.random(num_values) for ch in range(num_channels)]).T
     else:
-        values = np.array(
-            [np.random.randint(100, 5000, num_values) for ch in range(num_channels)]
-        ).T
+        values = np.array([np.random.randint(100, 5000, num_values) for ch in range(num_channels)]).T
     return x, y, values
 
 
@@ -101,7 +95,7 @@ def gen_mppdata(
     possible_cell_cycles: list = None,
     channels: list = None,
     data_config: str = "TestData",
-    **kwargs
+    **kwargs,
 ) -> MPPData:
     """\
     generate several obj ids, for each - generate X, Y, MPP withing bounding box:
@@ -129,9 +123,7 @@ def gen_mppdata(
         num_channels = len(channels)
         channels_df = pd.DataFrame(np.array(channels), columns=["name"])
     else:
-        channels_df = pd.DataFrame(
-            np.array([gen_word(len) for len in lengths]), columns=["name"]
-        )
+        channels_df = pd.DataFrame(np.array([gen_word(len) for len in lengths]), columns=["name"])
 
     channels_df.index.name = "channel_id"
     # .reset_index().set_index('name').loc[channels]['channel_id']

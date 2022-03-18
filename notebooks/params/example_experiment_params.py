@@ -1,4 +1,4 @@
-from campa.tl import LossEnum
+from campa.tl import LossEnum, ModelEnum
 
 base_config = {
     "experiment": {
@@ -7,7 +7,7 @@ base_config = {
         "save_config": True,
     },
     "data": {
-        "data_config": "NascentRNA",
+        "data_config": "TestData",
         "dataset_name": "184A1_test_dataset",
         "output_channels": None,
     },
@@ -31,7 +31,7 @@ base_config = {
     },
     "training": {
         "learning_rate": 0.001,
-        "epochs": 10,
+        "epochs": 5,
         "batch_size": 128,
         "loss": {"decoder": LossEnum.SIGMA_MSE, "latent": LossEnum.KL},
         "metrics": {"decoder": LossEnum.MSE_metric, "latent": LossEnum.KL},
@@ -40,10 +40,10 @@ base_config = {
         "save_history": True,
         "overwrite_history": True,
     },
-    "evaluation": {  # TODO change this to fit to aggregation params
+    "evaluation": {
         "split": "val",
         "predict_reps": ["latent", "decoder"],
-        "img_ids": 5,
+        "img_ids": 2,
         "predict_imgs": True,
         "predict_cluster_imgs": True,
     },
@@ -61,23 +61,23 @@ base_config = {
 
 variable_config = [
     # unconditional model
-    # {
-    #    'experiment': {'name': 'VAE'},
-    #    'model': {
-    #        'model_cls': ModelEnum.VAEModel,
-    #    },
-    # },
-    # conditional model
-    # {
-    #    'experiment': {'name': 'CondVAE_pert-CC'},
-    #    'model': {
-    #        'model_cls': ModelEnum.VAEModel,
-    #        'model_kwargs': {
-    #            'num_conditions': 14,
-    #            'encode_condition': [10,10],
-    #        },
-    #    },
-    # },
+    {
+        "experiment": {"name": "VAE"},
+        "model": {
+            "model_cls": ModelEnum.VAEModel,
+        },
+    },
+    # conditional VAE model
+    {
+        "experiment": {"name": "CondVAE_pert-CC"},
+        "model": {
+            "model_cls": ModelEnum.VAEModel,
+            "model_kwargs": {
+                "num_conditions": 14,
+                "encode_condition": [10, 10],
+            },
+        },
+    },
     # MPPleiden model (non-trainable)
     {
         "experiment": {"name": "MPPleiden"},
@@ -85,5 +85,5 @@ variable_config = [
         "training": None,
         "evaluation": {"predict_reps": [], "predict_imgs": False},
         "cluster": {"cluster_rep": "mpp", "leiden_resolution": 2},
-    }
+    },
 ]

@@ -1,8 +1,8 @@
 from pathlib import Path
 
-import nbformat
-import pytest
 from nbconvert.preprocessors import ExecutePreprocessor
+import pytest
+import nbformat
 
 ROOT = Path(__file__).parent.parent
 

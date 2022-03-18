@@ -1,9 +1,9 @@
 """Keras implementation of the k-sparse autoencoder.
 Based on https://gist.github.com/harryscholes/ed3539ab21ad34dc24b63adc715a97e0
 """
+from tensorflow import keras
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 
 
 class KSparse(keras.layers.Layer):
@@ -15,19 +15,13 @@ class KSparse(keras.layers.Layer):
 
     def __init__(self, sparsity_levels, **kwargs):
         self.sparsity_levels = sparsity_levels
-        self.k = tf.Variable(
-            initial_value=self.sparsity_levels[0], trainable=False, dtype=tf.int32
-        )
+        self.k = tf.Variable(initial_value=self.sparsity_levels[0], trainable=False, dtype=tf.int32)
         super().__init__(**kwargs)
 
     def call(self, inputs, mask=None):
-        kth_largest = tf.expand_dims(
-            tf.sort(inputs, direction="DESCENDING")[..., self.k - 1], -1
-        )
+        kth_largest = tf.expand_dims(tf.sort(inputs, direction="DESCENDING")[..., self.k - 1], -1)
         # mask inputs
-        sparse_inputs = inputs * tf.cast(
-            tf.math.greater_equal(inputs, kth_largest), keras.backend.floatx()
-        )
+        sparse_inputs = inputs * tf.cast(tf.math.greater_equal(inputs, kth_largest), keras.backend.floatx())
         return sparse_inputs
 
     def get_config(self):

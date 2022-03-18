@@ -52,8 +52,8 @@ data_params = {
     "condition_kwargs": {"cond_params": {}},
     # train/val/test split
     "split_kwargs": {
-        "train_frac": 0.9,
-        "val_frac": 0.05,
+        "train_frac": 0.7,
+        "val_frac": 0.2,
     },
     "test_img_size": 225,
     # subset to objects with certain metadata.

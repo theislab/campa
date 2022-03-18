@@ -23,6 +23,12 @@ since it will help you to pass the linting step
 but are unable in deciphering some flags, you can
 still commit using the ``--no-verify``.
 
+To build documentation for ipython notebooks, you will also have to install
+`pandoc <https://pandoc.org/installing.html>`_. This is possible for example using conda::
+
+    conda install -c conda-forge pandoc
+
+
 Code style guide
 ----------------
 We rely on ``black`` and ``isort`` to do the most of the formatting
@@ -53,4 +59,14 @@ Writing documentation
 ---------------------
 We use ``numpy``-style docstrings for the documentation.
 
-TODO build documentation with tox
+In order to build the documentation, run::
+
+    tox -e docs
+
+To validate the links inside the documentation, run::
+
+    tox -e check-docs
+
+If you need to clean the artifacts from previous documentation builds, run::
+
+    tox -e clean-docs

@@ -18,9 +18,7 @@ def get_combined_one_hot(arrs):
     n1 = arrs[0].shape[1]
     n2 = arrs[1].shape[1]
     targets = np.zeros(len(arrs[0]), dtype=np.uint8)
-    targets[mask] = np.argmax(arrs[0][mask], axis=1) + n1 * np.argmax(
-        arrs[1][mask], axis=1
-    )
+    targets[mask] = np.argmax(arrs[0][mask], axis=1) + n1 * np.argmax(arrs[1][mask], axis=1)
     res = get_one_hot(targets, n1 * n2)
     res[~mask] = np.nan
     return res
@@ -39,12 +37,8 @@ def convert_condition(arr, desc, one_hot=False, data_config=None):
             log.info(f"Converting condition {desc} to numbers")
             conv_arr = np.zeros(arr.shape, dtype=np.uint8)
             if "UNKNOWN" in cur_conditions:
-                cur_conditions.append(
-                    cur_conditions.pop(cur_conditions.index("UNKNOWN"))
-                )
-                conv_arr[~np.in1d(arr, cur_conditions)] = cur_conditions.index(
-                    "UNKNOWN"
-                )
+                cur_conditions.append(cur_conditions.pop(cur_conditions.index("UNKNOWN")))
+                conv_arr[~np.in1d(arr, cur_conditions)] = cur_conditions.index("UNKNOWN")
             for i, c in enumerate(cur_conditions):
                 conv_arr[arr == c] = i
             if one_hot:

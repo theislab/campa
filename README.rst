@@ -1,7 +1,7 @@
 CAMPA
 ~~~~~
 
-Conditional Autoencoder for Muliplexed Pixel Analysis
+Conditional Autoencoder for Multiplexed Pixel Analysis
 
 Installation
 ------------
@@ -57,7 +57,7 @@ There is an example config file in ``campa/campa.ini.example``.
 Create ``campa.ini`` with system-specific paths to experiment and
 data folders by running::
 
-    python cli/setup.py
+    python cli/setup_config.py
 
 This creates a default config in ``$HOME/.config/campa/campa.ini``.
 To add new ``[data]`` fields, directly edit ``campa.ini``
