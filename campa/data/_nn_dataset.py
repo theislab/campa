@@ -1,4 +1,4 @@
-from typing import Any, List, Mapping
+from typing import Any, List, Mapping, Optional
 import os
 import json
 import logging
@@ -12,10 +12,10 @@ from campa.data._data import MPPData
 
 def create_dataset(params: Mapping[str, Any]):
     """
-    Create a NNDataset
+    Create a :class:`NNDataset.`
 
     Params determine how the data should be selected and processed.
-     The following keys in params are expected:
+    The following keys in params are expected:
 
     - ``dataset_name``: name of the resulting dataset that is defined by these params
       (relative to ``DATA_DIR/datasets``)
@@ -23,9 +23,9 @@ def create_dataset(params: Mapping[str, Any]):
     - ``data_dirs``: where to read data from (relative to ``DATA_DIR`` defined in data config)
     - ``channels``: list of channel names to include in this dataset
     - ``condition``: list of conditions. Should be defined in data config.
-      The suffix `_one_hot` will convert the condition in a one-hot encoded vector.
-      Conditions are concatenated, except when they are defined as a list of lists.
-      In this case the condition is defined as a pairwise combination of the conditions.
+        The suffix `_one_hot` will convert the condition in a one-hot encoded vector.
+        Conditions are concatenated, except when they are defined as a list of lists.
+        In this case the condition is defined as a pairwise combination of the conditions.
     - ``condition_kwargs``: kwargs to :meth:`MPPData.add_conditions`
     - ``split_kwargs``: kwargs to :meth:`MPPData.train_val_test_split`
     - ``test_img_size``: standard size of images in test set. Imaged are padded/truncated to this size
@@ -115,10 +115,18 @@ class NNDataset:
     """
     Dataset for training and evaluation of neural networks.
 
-    A NNDataset is stored train/val/test/val_img/test_img folders that contain MPPData.
+    A ``NNDataset`` is stored within ``DATA_DIR/dataset_name``. 
+    This folder contains `train`/`val`/`test`/`val_img`/`test_img` folders with :class:`MPPData` objects.
+
+    Parameters
+    ----------
+    dataset_name:
+        name of the dataset, relative to ``DATA_DIR``
+    data_config:
+        name of the data config to use, should be registered in ``campa.ini``
     """
 
-    def __init__(self, dataset_name, data_config=None):
+    def __init__(self, dataset_name: str, data_config: Optional[str] = None):
         self.log = logging.getLogger(self.__class__.__name__)
         if data_config is None:
             self.data_config_name = "NascentRNA"

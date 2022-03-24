@@ -28,7 +28,7 @@ it = nt.int64
 
 def extract_features(params: Mapping[str, Any]):
     """
-    Extract features from clustered dataset.
+    Extract features from clustered dataset using :class:`FeaturesExtractor`.
 
     Creates features :class:`anndata.AnnData` object.
 
@@ -67,7 +67,7 @@ def extract_features(params: Mapping[str, Any]):
     Parameters
     ----------
     params
-        parameter dict
+        parameter dictionary
     """
     # set up FeatureExtractor
     log = logging.getLogger("extract_features")
