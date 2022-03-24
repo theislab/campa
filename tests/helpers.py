@@ -11,7 +11,7 @@ def gen_vstr_recarray(m, n, dtype=None):
     lengths = np.random.randint(3, 5, size)
     letters = np.array(list(ascii_letters))
     gen_word = lambda l: "".join(np.random.choice(letters, l))  # noqa: E731
-    arr = np.array([gen_word(len) for len in lengths]).reshape(m, n)
+    arr = np.array([gen_word(gen_len) for gen_len in lengths]).reshape(m, n)
     return pd.DataFrame(arr, columns=[gen_word(5) for i in range(n)]).to_records(index=False, column_dtypes=dtype)
 
 
@@ -22,7 +22,7 @@ def gen_metadata_df(n, obj_ids, possible_cell_cycles=None, ensure_None=True):
     letters = np.array(list(ascii_letters))
     gen_word = lambda l: "".join(np.random.choice(letters, l))  # noqa: E731
     if possible_cell_cycles is None:
-        possible_cell_cycles = [gen_word(len) for len in lengths]
+        possible_cell_cycles = [gen_word(gen_len) for gen_len in lengths]
 
     if ensure_None:
         cell_cycle = np.array([None for i in range(n)])
@@ -36,14 +36,14 @@ def gen_metadata_df(n, obj_ids, possible_cell_cycles=None, ensure_None=True):
     if n > len(letters):
         letters = letters[: n // 2]  # Make sure categories are repeated
 
-    metadata_dict = dict(
-        mapobject_id=obj_ids,
-        cell_cycle=cell_cycle,
-        cat=pd.Categorical(np.random.choice(letters, n)),
-        int64=np.random.randint(-50, 50, n),
-        float64=np.random.random(n),
-        uint16=np.random.randint(255, size=n, dtype="uint8"),
-    )
+    metadata_dict = {
+        "mapobject_id": obj_ids,
+        "cell_cycle": cell_cycle,
+        "cat": pd.Categorical(np.random.choice(letters, n)),
+        "int64": np.random.randint(-50, 50, n),
+        "float64": np.random.random(n),
+        "uint16": np.random.randint(255, size=n, dtype="uint8"),
+    }
 
     return pd.DataFrame(metadata_dict)
 
@@ -74,7 +74,7 @@ def gen_objs(shape, bounding_box, num_channels, obj_ids, mpp_dtype):
         np.empty((0, num_channels), dtype=np.uint8),
     )
     obj_ids_all = np.empty((0), dtype=obj_ids.dtype)
-    for i, obj_id in enumerate(obj_ids):
+    for obj_id in obj_ids:
         x, y, values = gen_obj(shape, bounding_box, num_channels, mpp_dtype)
         obj_ids_all = np.append(obj_ids_all, [obj_id] * len(x))
         x_all = np.append(x_all, x)
@@ -107,7 +107,7 @@ def gen_mppdata(
         - generate df with cell cycle:
              - generate 5 diff cell cycles, then assign random cols to that
              - generate  TR: float64, from 100 to 1000
-        -
+
     Params
     ------
 
@@ -123,7 +123,7 @@ def gen_mppdata(
         num_channels = len(channels)
         channels_df = pd.DataFrame(np.array(channels), columns=["name"])
     else:
-        channels_df = pd.DataFrame(np.array([gen_word(len) for len in lengths]), columns=["name"])
+        channels_df = pd.DataFrame(np.array([gen_word(gen_len) for gen_len in lengths]), columns=["name"])
 
     channels_df.index.name = "channel_id"
     # .reset_index().set_index('name').loc[channels]['channel_id']
