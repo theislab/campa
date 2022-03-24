@@ -325,7 +325,7 @@ def run_experiments(exps: Iterable[Experiment], mode: str = "all"):
     # compare models
     if mode in ("all", "compare"):
         # assumes that all experiments have the same experiment_dir
-        comp = ModelComparator(exps, save_dir=os.path.join(EXPERIMENT_DIR, exps[0].dir))
+        comp = ModelComparator(exps, save_dir=os.path.join(EXPERIMENT_DIR, list(exps)[0].dir))
         comp.plot_history(values=["val_loss", "val_decoder_loss"])
         comp.plot_final_score(
             score="val_decoder_loss",
@@ -333,8 +333,8 @@ def run_experiments(exps: Iterable[Experiment], mode: str = "all"):
             save_prefix="decoder_loss_",
         )
         comp.plot_per_channel_mse()
-        comp.plot_predicted_images(img_ids=[0, 1, 2, 3, 4], img_size=exps[0].data_params["test_img_size"])
-        comp.plot_cluster_images(img_ids=[0, 1, 2, 3, 4], img_size=exps[0].data_params["test_img_size"])
+        comp.plot_predicted_images(img_ids=[0, 1, 2, 3, 4], img_size=list(exps)[0].data_params["test_img_size"])
+        comp.plot_cluster_images(img_ids=[0, 1, 2, 3, 4], img_size=list(exps)[0].data_params["test_img_size"])
         comp.plot_umap()
 
 

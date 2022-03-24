@@ -1,7 +1,7 @@
 Tutorials
 ---------
 
-This section contains several detailled tutorials 
+This section contains several detailled tutorials
 showcasing different aspects of CAMPA
 
 .. toctree::

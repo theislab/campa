@@ -46,4 +46,3 @@ Plotting
     pl.plot_co_occurrence
     pl.plot_co_occurrence_grid
     pl.annotate_img
-

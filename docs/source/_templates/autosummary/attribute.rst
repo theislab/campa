@@ -7,4 +7,3 @@
 .. autoattribute:: {{ fullname }}
 
 .. _sphx_glr_backref_{{fullname}}:
-

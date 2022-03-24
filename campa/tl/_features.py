@@ -6,16 +6,24 @@ import time
 import logging
 import multiprocessing
 
+from numba import jit
 from skimage.measure import label, regionprops
 import numpy as np
 import pandas as pd
 import anndata as ad
 import squidpy as sq
+import numba.types as nt
 
-from campa.tl import Experiment
 from campa.data import MPPData
 from campa.constants import CoOccAlgo, get_data_config, CO_OCC_CHUNK_SIZE
 from campa.tl._cluster import annotate_clustering
+from campa.tl._experiment import Experiment
+
+ft = nt.float32
+it = nt.int64
+
+ft = nt.float32
+it = nt.int64
 
 
 def extract_features(params: Mapping[str, Any]):
@@ -614,16 +622,6 @@ class FeatureExtractor:
                     masks.append((self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1))
             obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
             return obj_ids
-
-
-from numba import jit
-import numba.types as nt
-
-ft = nt.float32
-it = nt.int64
-
-ft = nt.float32
-it = nt.int64
 
 
 @jit(ft[:, :](it[:], it[:], it), fastmath=True)

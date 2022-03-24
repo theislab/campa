@@ -1,4 +1,4 @@
-from typing import Any, Mapping
+from typing import Any, List, Mapping
 import os
 import json
 import logging
@@ -7,8 +7,7 @@ import numpy as np
 import tensorflow as tf
 
 from campa.constants import get_data_config
-
-from ._data import MPPData
+from campa.data._data import MPPData
 
 
 def create_dataset(params: Mapping[str, Any]):
@@ -24,9 +23,9 @@ def create_dataset(params: Mapping[str, Any]):
     - ``data_dirs``: where to read data from (relative to ``DATA_DIR`` defined in data config)
     - ``channels``: list of channel names to include in this dataset
     - ``condition``: list of conditions. Should be defined in data config.
-     The suffix `_one_hot` will convert the condition in a one-hot encoded vector.
-     Conditions are concatenated, except when they are defined as a list of lists.
-     In this case the condition is defined as a pairwise combination of the conditions.
+      The suffix `_one_hot` will convert the condition in a one-hot encoded vector.
+      Conditions are concatenated, except when they are defined as a list of lists.
+      In this case the condition is defined as a pairwise combination of the conditions.
     - ``condition_kwargs``: kwargs to :meth:`MPPData.add_conditions`
     - ``split_kwargs``: kwargs to :meth:`MPPData.train_val_test_split`
     - ``test_img_size``: standard size of images in test set. Imaged are padded/truncated to this size
@@ -54,7 +53,7 @@ def create_dataset(params: Mapping[str, Any]):
     outdir = os.path.join(data_config.DATASET_DIR, p["dataset_name"])
     os.makedirs(outdir, exist_ok=True)
     # prepare datasets
-    mpp_datas = {"train": [], "val": [], "test": []}
+    mpp_datas: Mapping[str, List[MPPData]] = {"train": [], "val": [], "test": []}
     for data_dir in p["data_dirs"]:
         mpp_data = MPPData.from_data_dir(data_dir, seed=p["seed"], data_config=p["data_config"])
         train, val, test = mpp_data.train_val_test_split(**p["split_kwargs"])

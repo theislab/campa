@@ -79,4 +79,3 @@ def prepare_config(args):
         if key not in ["experiment_dir", "data_dir"]:
             print(f"\t{key}: {val}")
     print(f"To change or add data configs, please edit {config_path} directly.")
-

@@ -7,7 +7,8 @@ import scanpy as sc
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from campa.tl import Estimator, Experiment
+from campa.tl._estimator import Estimator
+from campa.tl._experiment import Experiment
 from campa.data._conditions import process_condition_desc
 
 
@@ -434,6 +435,7 @@ class ModelComparator:
                 vmax="p99",
                 show=False,
             )
+            plt.suptitle(exp_name)
             if self.save_dir is not None:
                 plt.savefig(
                     os.path.join(self.save_dir, f"{save_prefix}umap_{exp_name}.png"),

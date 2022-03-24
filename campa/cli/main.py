@@ -1,16 +1,16 @@
-import argparse
 import sys
+import argparse
+
+from campa.utils import load_config, init_logging, merged_config
 from campa.cli.prepare_config import prepare_config
 import campa
 import campa.tl
 
-from campa.utils import load_config, init_logging, merged_config
 
-class CAMPA(object):
-
+class CAMPA:
     def __init__(self):
         parser = argparse.ArgumentParser(
-            description='CAMPA - conditional autoencoder for multiplexed image analysis',
+            description="CAMPA - conditional autoencoder for multiplexed image analysis",
             usage="""campa <command> [<args>]
 
 Available subcommands are:
@@ -19,13 +19,14 @@ Available subcommands are:
     train               Train and evaluate models defined by experiment config
     cluster             Cluster data and project clustering
     extract_features    Extract features from clustered dataset
-""")
-        parser.add_argument('command', help='Subcommand to run')
+""",
+        )
+        parser.add_argument("command", help="Subcommand to run")
         # parse_args defaults to [1:] for args, but you need to
         # exclude the rest of the args too, or validation will fail
         args = parser.parse_args(sys.argv[1:2])
         if not hasattr(self, args.command):
-            print('Unrecognized command')
+            print("Unrecognized command")
             parser.print_help()
             exit(1)
         # use dispatch pattern to invoke method with same name
@@ -35,14 +36,13 @@ Available subcommands are:
     def setup(self):
         parser = argparse.ArgumentParser(description="Create configuration file campa.ini")
         parser.add_argument(
-        "--force",
-        action="store_true",
-        help="force recreation of campa.ini even if exists",
+            "--force",
+            action="store_true",
+            help="force recreation of campa.ini even if exists",
         )
         args = parser.parse_args(sys.argv[2:])
         # create and populate campa.ini
         prepare_config(args)
-
 
     def create_dataset(self):
         parser = argparse.ArgumentParser(description=("Create NNDataset using parameter file"))
@@ -98,7 +98,12 @@ Available subcommands are:
         )
         create.add_argument(
             "--save-dir",
-            help="directory to save subsampled cluster data, relative to experiment dir. Default is aggregated/sub-FRAC",
+            help="directory to save subsampled cluster data, relative to experiment dir. Default is aggregated/sub-FRAC",  # noqa: E501
+        )
+        create.add_argument(
+            "--cluster",
+            help="use cluster params in Experiment config to cluster the subsetted data.",
+            action="store_true",
         )
         create.set_defaults(func=campa.tl.create_cluster_data)
         # prepare-full
@@ -147,8 +152,10 @@ Available subcommands are:
             print(cur_params)
             campa.tl.extract_features(cur_params)
 
+
 def main():
     CAMPA()
-    
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     CAMPA()

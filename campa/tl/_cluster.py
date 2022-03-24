@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, Iterable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from campa.tl import Experiment
@@ -18,10 +18,10 @@ import pandas as pd
 import scanpy as sc
 import matplotlib.pyplot as plt
 
-from campa.tl import Predictor
 from campa.data import MPPData
 from campa.utils import merged_config
 from campa.constants import EXPERIMENT_DIR, get_data_config
+from campa.tl._evaluate import Predictor
 
 
 # annotation fns
@@ -606,6 +606,8 @@ def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_d
     save_dir
         directory to save prepared full data to, relative to experiment dir.
     """
+    from campa.tl import Experiment
+
     log = logging.getLogger("prepare full dataset")
     exp = Experiment.from_dir(experiment_dir)
     # iterate over all data dirs
@@ -639,7 +641,9 @@ def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_d
             )
 
 
-def create_cluster_data(experiment_dir, subsample: bool = False, frac: float = 0.005, save_dir=None):
+def create_cluster_data(
+    experiment_dir, subsample: bool = False, frac: float = 0.005, save_dir: str | None = None, cluster: bool = False
+):
     """
     Create (subsampled) data for clustering.
 
@@ -656,7 +660,11 @@ def create_cluster_data(experiment_dir, subsample: bool = False, frac: float = 0
     save_dir
         directory to save subsampled cluster data, relative to experiment dir.
         default is aggregated/sub-FRAC
+    cluster
+        use cluster params in Experiment config to cluster the subsetted data.
     """
+    from campa.tl import Experiment
+
     exp = Experiment.from_dir(experiment_dir)
     cluster_config = {
         "subsample": subsample,
@@ -668,8 +676,12 @@ def create_cluster_data(experiment_dir, subsample: bool = False, frac: float = 0
     cl.create_cluster_mpp()
     # predict rep
     cl.predict_cluster_rep(exp)
-    # get umap
-    cl.add_umap()
+    if cluster:
+        # cluster (also gets umap)
+        cl.create_clustering()
+    else:
+        # get umap
+        cl.add_umap()
 
 
 def project_cluster_data(
@@ -696,18 +708,20 @@ def project_cluster_data(
         data_dir to project. If not specified, project all data_dirs in save_dir.
         Relative to save_dir
     """
+    from campa.tl import Experiment
+
     exp = Experiment.from_dir(experiment_dir)
     # set up cluster data
     cl = Cluster.from_cluster_data_dir(os.path.join(exp.dir, exp.name, cluster_data_dir))
     cl.set_cluster_name(cluster_name)
     assert cl.cluster_mpp.data(cluster_name) is not None, f"cluster data needs to contain clustering {cluster_name}"
     # iterate over all data dirs
-    data_dirs = exp.data_params["data_dirs"] if data_dir is None else [data_dir]
-    for data_dir in data_dirs:
+    data_dirs: Iterable[str] = exp.data_params["data_dirs"] if data_dir is None else [data_dir]
+    for cur_data_dir in data_dirs:
         # load mpp_data with cluster_rep
         mpp_data = MPPData.from_data_dir(
-            data_dir,
+            cur_data_dir,
             base_dir=os.path.join(exp.full_path, save_dir),
             keys=["x", "y", "obj_ids", cl.config["cluster_rep"]],
         )
-        cl.project_clustering(mpp_data, save_dir=os.path.join(exp.full_path, save_dir, data_dir))
+        cl.project_clustering(mpp_data, save_dir=os.path.join(exp.full_path, save_dir, cur_data_dir))

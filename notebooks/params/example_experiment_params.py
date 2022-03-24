@@ -31,7 +31,7 @@ base_config = {
     },
     "training": {
         "learning_rate": 0.001,
-        "epochs": 5,
+        "epochs": 10,
         "batch_size": 128,
         "loss": {"decoder": LossEnum.SIGMA_MSE, "latent": LossEnum.KL},
         "metrics": {"decoder": LossEnum.MSE_metric, "latent": LossEnum.KL},
@@ -51,7 +51,7 @@ base_config = {
         "cluster_name": "clustering",
         "cluster_rep": "latent",
         "cluster_method": "leiden",  # leiden or kmeans
-        "leiden_resolution": 0.8,
+        "leiden_resolution": 0.2,
         "subsample": None,  # 'subsample' or 'som'
         "subsample_kwargs": {},
         "som_kwargs": {},

@@ -17,5 +17,3 @@ Classes representing data, experiment, and evaluation objects.
     tl.ModelComparator
     tl.Cluster
     tl.FeatureExtractor
- 
- 
