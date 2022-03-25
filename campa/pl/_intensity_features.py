@@ -1,5 +1,6 @@
 from typing import Iterable, Mapping, Optional, Union
 import warnings
+import matplotlib
 
 from scipy.stats import zscore
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
@@ -463,7 +464,7 @@ def plot_intensity_change(
     plot_data,
     alpha,
     adjust_height: bool =True,
-    ax: Optional[plt.axes.Axes]=None,
+    ax: Optional[matplotlib.axes.Axes]=None,
     figsize: Iterable[int]=(10, 3),
     save: Optional[str]=None,
     **kwargs,
