@@ -1132,7 +1132,7 @@ def _get_keys(keys, optional_keys, base_mpp_data=None):
         # loading of mpp_data
         # check which of required keys are already loaded, and move them to optional
         res_keys = ["x", "y", "obj_ids"]
-        res_optional_keys = copy(optional_keys)
+        res_optional_keys = list(copy(optional_keys))
         for k in list(set(keys).difference(res_keys)):
             if base_mpp_data.data(k) is not None:
                 res_optional_keys.append(k)
