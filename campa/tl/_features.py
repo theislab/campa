@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Union, Mapping
+from typing import Any, Iterable, Optional, Union, Mapping
 from functools import partial
 import os
 import time
@@ -35,39 +35,39 @@ def extract_features(params: Mapping[str, Any]):
     Params determine what features are extracted from a given clustering.
     The following keys in params are expected:
 
-    - ``experiment_dir``: path to experiment directory relative to EXPERIMENT_DIR
-    - ``cluster_name``: name of clustering to use
+    - ``experiment_dir``: path to experiment directory relative to EXPERIMENT_DIR.
+    - ``cluster_name``: name of clustering to use.
     - ``cluster_dir``: dir of subsampled clustering to load annotation.
       Relative to experiment_dir.
-      Default is taking first of ``experiment_dir/aggregated/sub-*``
-    - ``cluster_col``: cluster annotation to use. Defaults to cluster_name
+      Default is taking first of ``experiment_dir/aggregated/sub-*``.
+    - ``cluster_col``: cluster annotation to use. Defaults to ``cluster_name``.
     - ``data_dirs``: data dirs to be processed.
       Relative to ``experiment_dir/aggregated/full_data``.
-      If None, all available data_dirs will be processed
+      If None, all available data_dirs will be processed.
     - ``save_name``: filename to use for saving extracted features.
-    - ``force``: force calculation even when adata exists
-    - ``features``: type of features to extract. One or more of `intensity`, `co-occurrence`, `object-stats`
+    - ``force``: force calculation even when adata exists.
+    - ``features``: type of features to extract. One or more of `intensity`, `co-occurrence`, `object-stats`.
 
         - Intensity: per-cluster mean and size features. Needs to be calculated first to set up the adata.
         - Co-occurrence: spatial co-occurrence between pairs of clusters at different distances.
-        - Object stats: number and area of connected components per cluster
+        - Object stats: number and area of connected components per cluster.
 
-    - ``co_occurrence_params``: parameters for co-occurrence calculation
+    - ``co_occurrence_params``: parameters for co-occurrence calculation.
 
-        - ``min``, ``max``, ``nsteps``: size of distances interval
-        - ``logspace``: use log spacing of co-occurrence intervals
-        - ``num_processes``:  number of processes to use to compute co-occurrence scores
+        - ``min``, ``max``, ``nsteps``: size of distances interval.
+        - ``logspace``: use log spacing of co-occurrence intervals.
+        - ``num_processes``:  number of processes to use to compute co-occurrence scores.
 
-    - ``object_stats_params``: parameter dict for object-stats calculation
+    - ``object_stats_params``: parameter dict for object-stats calculation.
 
         - ``features``: features to extract in mode object-stats.
-          Possible features: `area`, `circularity`, `elongation`, `extent`
-        - ``channels``: intensity channels to extract mean per cluster from
+          Possible features: `area`, `circularity`, `elongation`, `extent`.
+        - ``channels``: intensity channels to extract mean per cluster from.
 
     Parameters
     ----------
     params
-        parameter dictionary
+        Parameter dictionary.
     """
     # set up FeatureExtractor
     log = logging.getLogger("extract_features")
@@ -118,16 +118,33 @@ def extract_features(params: Mapping[str, Any]):
 class FeatureExtractor:
     """
     Extract features from clustering.
+
+    Parameters
+    ----------
+    exp
+        Experiment to extract features from.
+    data_dir
+        Name of data to cluster. Relative to ``{exp.full_path}/aggregated/full_data``.
+    cluster_name
+        Name of clustering to use.
+    cluster_dir
+        Dir of subsampled clustering to load annotation.
+        Relative to ``exp.full_path```.
+        Default is taking first of ``{exp.full_path}/aggregated/sub-*``.
+    cluster_col
+        Cluster annotation to use. Defaults to ``cluster_name``.
+    adata
+        If existing, the features adata object containing extracted features.
     """
 
     def __init__(
         self,
-        exp,
-        data_dir,
-        cluster_name,
-        cluster_dir=None,
-        cluster_col=None,
-        adata=None,
+        exp: Experiment,
+        data_dir: str,
+        cluster_name: str,
+        cluster_dir: Optional[str] =None,
+        cluster_col: Optional[str]=None,
+        adata: Optional[ad.AnnData]=None,
     ):
         self.log = logging.getLogger(self.__class__.__name__)
         self.exp = exp
@@ -148,13 +165,36 @@ class FeatureExtractor:
 
         self._mpp_data = None
 
+
+    @classmethod
+    def from_adata(cls, fname: str):
+        """
+        Initialise from existing features :class:`ad.AnnData` object.
+
+        Parameters
+        ----------
+        fname
+            Full path to adata object.
+        """
+        adata = ad.read(fname)
+        params = deepcopy(adata.uns["params"])
+        exp = Experiment.from_dir(params.pop("exp_name"))
+        self = cls(exp, adata=adata, **params)
+        self.fname = fname
+        return self
+
+
     @property
     def mpp_data(self):
+        """
+        :class:`MPPData` object containing pixel-wise clustered data from ``data_dir``.
+        """
         if self._mpp_data is None:
             self._mpp_data = MPPData.from_data_dir(
                 self.params["data_dir"],
                 base_dir=os.path.join(self.exp.full_path, "aggregated/full_data"),
                 keys=["x", "y", "mpp", "obj_ids", self.params["cluster_name"]],
+                data_config=self.exp.data_config_name,
             )
             # ensure that cluster data is string
             self._mpp_data._data[self.params["cluster_name"]] = self._mpp_data._data[
@@ -165,29 +205,19 @@ class FeatureExtractor:
             self._mpp_data.prepare(data_params)
         return self._mpp_data
 
-    @classmethod
-    def from_adata(cls, fname):
+
+    def extract_intensity_size(self, force:bool=False, fname:str="features.h5ad"):
         """
-        Initialise from existing adata
+        Calculate per cluster mean intensity and size for each object.
 
-        Args;
-            fname: full path to adata object
-        """
-        adata = ad.read(fname)
-        params = deepcopy(adata.uns["params"])
-        exp = Experiment.from_dir(params.pop("exp_name"))
-        self = cls(exp, adata=adata, **params)
-        self.fname = fname
-        return self
+        Saves adata in ``{exp.full_path}/aggregated/full_data/data_dir/{fname}``
 
-    def extract_intensity_size(self, force=False, fname="features.h5ad"):
-        """
-        calculate per cluster mean intensity and size for each object.
-
-        Saves adata in exp.full_path/aggregated/full_data/data_dir/features.h5ad
-
-        Args:
-            force: overwrite existing adata
+        Parameters
+        ----------
+        force
+            Overwrite existing adata.
+        fname
+            Name of the saved adata.
         """
         if self.adata is not None and not force:
             self.log.info("extract_intensity_size: adata is not None. Specify force=True to overwrite. Exiting.")
@@ -257,28 +287,35 @@ class FeatureExtractor:
 
     def extract_object_stats(
         self,
-        features=("area", "circularity", "elongation", "extent"),
-        intensity_channels=(),
+        features: Iterable[str] =("area", "circularity", "elongation", "extent"),
+        intensity_channels: Iterable[str]=(),
     ):
         """
         Extract features from connected components per cluster for each cell.
 
-        Implemented features area: area, circlularity, elongation, and extent of connected components
+        Implemented features are: `area`, `circlularity`, `elongation`, and `extent` of connected components
         per cluster for each cell.
         In addition, the mean intensity per component/region of channels specified in intensity_channels is calculated.
-        This is stored in columns "mean_{channel_name}"
-        Per component/region features are calculated and stored in uns['object_stats']
+        Per component/region features are calculated and stored in ``uns['object_stats']``,
         together with OBJ_ID and cluster that this region belongs to.
-        To aggregate these computed stats in a mean/median values per OBJ_ID, use extr.get_object_stats()
+        To aggregate these computed stats in a mean/median values per OBJ_ID, use :meth:`FeatureExtractor.get_object_stats`.
 
-        Adds uns entry: object_stats and object_stats_params
+        $circularity = (4 * pi * Area) / Perimeter^2$
 
-        circularity = (4 * pi * Area) / Perimeter^2,
-        elongation = (major_axis - minor_axis) / major_axis
+        $elongation = (major_axis - minor_axis) / major_axis$
 
-        Args:
-            features: list of features to be calculated
-            intensity_channels: list of channels for which the mean intensity should be extracted
+        Parameters
+        ----------
+        features
+            List of features to be calculated.
+        intensity_channels
+            List of channels for which the mean intensity should be extracted.
+
+        Returns
+        -------
+        Nothing, modifies ``adata``:
+        - Adds ``uns`` entry: ``object_stats`` and ``object_stats_params``
+        - Adds ``obs`` entries: ``mean_{channel_name}``
         """
         if self.adata is None:
             self.log.info(
@@ -367,24 +404,32 @@ class FeatureExtractor:
 
     def extract_co_occurrence(
         self,
-        interval,
+        interval: Iterable[float],
         algorithm: Union[str, CoOccAlgo] = CoOccAlgo.OPT,
-        num_processes=None,
+        num_processes: Optional[int]=None,
     ):
         """
         Extract co_occurrence for each cell invididually.
 
-        Adds obsm co_occurrence_CLUSTER1_CLUSTER2 to adata and saves to self.fname
+        Parameters
+        ----------
+        interval
+            Distance intervals for which to calculate co-occurrence score.
+        algorithm
+            Co-occurrence function to use:
+            - `squidpy`: use :func:`sq.gr.co_occurrence`.
+            -  `opt`: use custom implementation which is optimised for a large number of pixels.
+                This implementation avoids recalculation of distances, using the fact that coordinates
+                in given images lie on a regular grid.
+                Use opt for very large inputs.
 
-        Args:
-            interval: distance intervals for which to calculate co-occurrence score
-            algorithm: co-occurrence function to use.
-                squidpy: use sq.gr.co_occurrence
-                opt: use custom implementation which is optimised for a large number of pixels.
-                    This implementation avoids recalculation of distances, using the fact that coordinates
-                    in given images lie on a regular grid.
-                Use opt for very large inputs
-            num_processes: only for algorithm='opt'. Number if processes to use to compute scores.
+        num_processes
+            only for ``algorithm='opt'``. Number if processes to use to compute scores.
+
+        Returns
+        -------
+        Nothing, modifies ``adata``
+        - Adds ``obsm`` entries: ``co_occurrence_{cluster1}_{cluster2}``
         """
         if self.adata is None:
             self.log.info(
@@ -512,7 +557,9 @@ class FeatureExtractor:
 
     def get_intensity_adata(self):
         """
-        adata object with intensity per cluster combined in X. Needed for intensity and dotplots.
+        Adata object with intensity per cluster combined in X. 
+        
+        Needed for intensity and dotplots.
         """
         adata = self.adata
         adatas = {}
@@ -527,16 +574,26 @@ class FeatureExtractor:
         comb_adata = ad.concat(adatas, uns_merge="same", index_unique="-", label="cluster")
         return comb_adata
 
-    def get_object_stats(self, area_threshold=10, agg=("median",), save=False):
+    def get_object_stats(self, area_threshold:int=10, agg: Union[Iterable[str], Mapping[str, str]]=("median",), save:bool=False):
         """
-        aggregate object stats per obj_id
-        Returns obj_id x (clustering, feature) dataframe and stores result in self.adata.obsm['object_stats_agg']
+        Aggregate object stats per obj_id.
 
-        Args:
-            area_threshold: all components smaller than this threshold are discarded
-            agg: list of aggregation function or dict with {feature: function}. Passed to pd.GroupBy.agg
-            save: save adata object with object_stats_agg
+        Parameters
+        ----------
+        area_threshold
+            All components smaller than this threshold are discarded.
+        agg
+            List of aggregation function or dict with ``{feature: function}``. 
+            Passed to :func:`pd.GroupBy.agg`
+        save
+            Save adata object with `object_stats_agg` entry in ``obsm``.
 
+        Returns
+        -------
+        pd.DataFrame
+            obj_id x (clustering, feature) dataframe 
+            
+        Additionally stores result in ``self.adata.obsm['object_stats_agg']``
         """
         assert (
             "object_stats" in self.adata.uns.keys()
@@ -579,12 +636,16 @@ class FeatureExtractor:
             self.adata.write(self.fname)
         return agg_stats
 
-    def extract_intensity_csv(self, obs=None):
+    def extract_intensity_csv(self, obs: Optional[Iterable[str]]=None):
         """
-        extract csv file containing obj_id, mean cluster intensity and size for each channel.
+        Extract csv file containing obj_id, mean cluster intensity and size for each channel.
 
-        saves csv as fname.csv
-        obs: column names from metadata.csv that should be additionally stored.
+        Saves csv as ``{self.fname}.csv``.
+
+        Parameters
+        ----------
+        obs
+            column names from `metadata.csv` that should be additionally stored.
         """
         if self.adata is None:
             self.log.warn(
@@ -607,7 +668,7 @@ class FeatureExtractor:
 
     def _missing_co_occ_obj_ids(self):
         """
-        Return those obj_ids that do not yet have co-occurence scores calculated
+        Return those obj_ids that do not yet have co-occurence scores calculated.
         """
         n = f"co_occurrence_{self.clusters[0]}_{self.clusters[0]}"
         if n not in self.adata.obsm.keys():
@@ -678,7 +739,7 @@ def _co_occ_opt(
     Calculate co-occurrence scores for several intervals.
 
     For decreased memory usage coords1 x coords2 pairs are chunked in CO_OCC_CHUNK_SIZE chunks and processed.
-    If num_processes is specified, uses multiprocessing to calculate co-occurrence scores
+    If num_processes is specified, uses multiprocessing to calculate co-occurrence scores.
 
     Args:
         coords1: first list of coordiantes
@@ -752,7 +813,7 @@ def _co_occ_opt(
 
 def _prepare_co_occ(interval):
     """
-    return lists of coordinates to consider for each interval. Coordinates are relative to [0,0].
+    Return lists of coordinates to consider for each interval. Coordinates are relative to [0,0].
     """
     arr = np.zeros((int(interval[-1]) * 2 + 1, int(interval[-1]) * 2 + 1))
     # calc distances for interval range (assuming c as center px)

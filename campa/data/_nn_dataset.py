@@ -1,7 +1,7 @@
-from typing import Any, List, Mapping, Optional
-import os
+from typing import Any, List, Mapping, Optional, Iterable
 import json
 import logging
+import os
 
 import numpy as np
 import tensorflow as tf
@@ -12,7 +12,7 @@ from campa.data._data import MPPData
 
 def create_dataset(params: Mapping[str, Any]):
     """
-    Create a :class:`NNDataset.`
+    Create a :class:`NNDataset`.
 
     Params determine how the data should be selected and processed.
     The following keys in params are expected:
@@ -155,14 +155,35 @@ class NNDataset:
         s += f" test: {len(self.data['test'].mpp)}"
         return s
 
-    def x(self, split, is_conditional=False):
+    def x(self, split:str, is_conditional:bool=False):
+        """
+        Inputs to neural network.
+        
+        Parameters
+        ----------
+        split
+            One of `train`, `val`, `test`.
+        is_conditional 
+            Whether to add condition information to x
+        """
         x = self.data[split].mpp.astype(np.float32)
         if is_conditional:
             c = self.data[split].conditions.astype(np.float32)
             x = (x, c)
         return x
 
-    def y(self, split, output_channels=None):
+    def y(self, split:str, output_channels:Optional[Iterable[str]]=None):
+        """
+        Groundtruth outputs of neural network.
+        
+        Parameters
+        ----------
+        split
+            One of `train`, `val`, `test`.
+        output_channels
+            Channels that should be predicted by the neural network.
+            Defaults to all input channels.
+        """
         y = self.data[split].center_mpp
         if output_channels is not None:
             channel_ids = self.data[split].get_channel_ids(output_channels)
@@ -171,22 +192,38 @@ class NNDataset:
 
     def get_tf_dataset(
         self,
-        split="train",
-        output_channels=None,
-        is_conditional=False,
-        repeat_y=False,
-        add_c_to_y=False,
-        shuffled=False,
-    ):
-        """returns tf.data.Dataset of the desired split.
+        split: str ="train",
+        output_channels: Optional[Iterable[str]]=None,
+        is_conditional: bool=False,
+        repeat_y: bool =False,
+        add_c_to_y: bool=False,
+        shuffled: bool =False,
+    ) -> tf.data.Dataset:
+        """
+        :class:`tf.data.Dataset` of the desired split.
 
-        shuffled: for generator dataset, shuffle indices before generating data.
-        will produce same order every time
-
-        repeat_y: match output len to number of losses
-        (otherwise keras will not work, even if its losses that do not need y)
-
-        add_c_to_y: append condition to y. Needed for adversarial loss
+        Parameters
+        ----------
+        split
+            One of `train`, `val`, `test`.
+        output_channels
+            Channels that should be predicted by the neural network.
+            Defaults to all input channels.
+        is_conditional 
+            Whether to add condition information to x
+        repeat_y:
+            Match output length to number of losses
+            (otherwise keras will not work, even if its losses that do not need y).
+        add_c_to_y
+            Append condition to y. Needed for adversarial loss.
+        shuffled
+            Shuffle indices before generating data. 
+            Will produce same order every time.
+      
+        Returns
+        -------
+        :class:`tf.data.Dataset`
+            the dataset.
         """
 
         output_types = []

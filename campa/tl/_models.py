@@ -10,8 +10,18 @@ import tensorflow as tf
 
 
 class ModelEnum(str, Enum):
+    """
+    Available models for training.
+    """
     BaseAEModel = "BaseAEModel"
+    """
+    :class:`BaseAEModel`, "BaseAEModel"
+    """
+
     VAEModel = "VAEModel"
+    """
+    :class:`VAEModel`, "VAEModel"
+    """
     CatVAEModel = "CatVAEModel"
     GMMVAEModel = "GMMVAEModel"
     CondCatVAEModel = "CondCatVAEModel"

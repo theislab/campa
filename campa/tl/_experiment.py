@@ -16,6 +16,44 @@ from campa.constants import EXPERIMENT_DIR, get_data_config
 
 
 class Experiment:
+    """
+    Experiment stored on disk with neural network.
+
+    Initialised with config dictionary with keys:
+
+    - `experiment`: where to save experiment
+
+        - `dir`: experiment folder
+        - `name`: name of the experiment
+        - `save_config`: (bool), whether to save this config in the folder
+
+    - `data`: which dataset to use for training
+
+        - `data_config`: name of the data config to use, should be registered in ``campa.ini``
+        - `dataset_name`: name of the dataset, relative to ``DATA_DIR``
+        - `output_channels`: Channels that should be predicted by the neural network.
+            Defaults to all input channels.
+
+    - `model`: model definition
+
+        - `model_cls`: instance or value of :class:`ModelEnum`
+        - `model_kwargs`: keyword arguments passed to the model class
+        - `init_with_weights`: if true, looks for saved weights in experiment_dir.
+            if a path, loads these weights
+
+    - `training`: training hyperparameters
+
+        - 
+    - evaluation (evaluation on val/test split)
+    - cluster (clustering on val/test split)
+
+
+    Parameters
+    ----------
+    config
+        config dictionary detailling 
+    """
+
     # base experiment config
     config: Dict[str, Any] = {
         "experiment": {
@@ -68,7 +106,12 @@ class Experiment:
     }
 
     def __init__(self, config):
+
         self.config = merged_config(self.config, config)
+        """Config.
+
+        :meta private:
+        """
         self.log = logging.getLogger(self.__class__.__name__)
         self.log.info(f"Setting up experiment {self.dir}/{self.name}")
         data_config = get_data_config(self.config["data"]["data_config"])
@@ -279,22 +322,23 @@ class Experiment:
 
 def run_experiments(exps: Iterable[Experiment], mode: str = "all"):
     """
-    Execute experiments
+    Execute experiments.
 
     Runs all given experiments in the given mode.
     The following modes are available:
-    - "train": train experiments (if trainable)
-    - "evaluate": predict experiments on val set and cluster results (on val set)
-    - "trainval": both train and evaluate
-    - "compare": generate comparative plots of experiments
-    - "all": trainval and compare
+
+    - `train`: train experiments (if trainable)
+    - `evaluate`: predict experiments on val set and cluster results (on val set)
+    - `trainval`: both train and evaluate
+    - `compare`: generate comparative plots of experiments
+    - `all`: trainval and compare
 
     Parameters
     ----------
     exps
-        experiments to run
+        Experiments to run.
     mode
-        mode, one of "train", "evaluate", "trainval", "compare", "all"
+        mode, one of "train", "evaluate", "trainval", "compare", "all".
     """
     from campa.tl import Cluster, Estimator, Predictor, ModelComparator
 
@@ -340,7 +384,9 @@ def run_experiments(exps: Iterable[Experiment], mode: str = "all"):
 
 def _prepare_exp_split(exp):
     """
-    set up exp split data for non trainable model. Mimicks results folders created with predictor
+    Set up exp split data for non trainable model. 
+    
+    Mimicks results folders created with predictor.
     """
     import numpy as np
 

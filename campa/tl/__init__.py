@@ -1,5 +1,5 @@
 from ._losses import LossEnum
-from ._models import ModelEnum
+from ._models import ModelEnum, BaseAEModel, VAEModel
 from ._cluster import (
     Cluster,
     create_cluster_data,

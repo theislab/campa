@@ -1,3 +1,4 @@
+from typing import Iterable, Mapping, Optional, Union
 import warnings
 
 from scipy.stats import zscore
@@ -10,31 +11,11 @@ import anndata as ad
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
-# TODO: remove, not needed anymore, use scipy zscoring now
-# def zscore(adata, key_added='zscored', limit_to_groups={}):
-#    """
-#    scale adata based on values in cluster "all".
-#    can subset adata to perturbation before calculating mean intensities (i.e. reference perturbation)
-#    adds
-#        adata.layers[key_added]
-#        adata.var['mean_intensity'], adata.var['std_intensity']
-#    """
-#    cur_adata = adata[adata.obs['cluster']=='all']
-#    for key, val in limit_to_groups.items():
-#        cur_adata = cur_adata[cur_adata.obs[key]==val]
-#    # mean intensity per channel
-#    mean_intensity = (cur_adata.X * cur_adata.obs['size'][:, np.newaxis]).sum(axis=0) / cur_adata.obs['size'].sum()
-#    # std per channel
-#    std = np.sqrt(((cur_adata.X - mean_intensity)**2).mean(axis=0))
-#    # scale values
-#    adata.layers[key_added] = (adata.X - mean_intensity) / std
-#    adata.var['mean_intensity'] = mean_intensity
-#    adata.var['std_intensity'] = std
-
 
 def _adjust_plotheight(scplot):
     """
-    fig large gap between title and plot for scanpy plots
+    Fix large gap between title and plot for scanpy plots.
+
     (rather hacky, might not work in all cases)
     """
     # modified code from sc.pl.MatrixPlot.make_figure
@@ -69,7 +50,6 @@ def plot_mean_intensity(
     save=None,
     dendrogram=False,
     limit_to_groups=None,
-    layer=None,
     type="matrixplot",  # noqa: A002
     cmap="viridis",
     adjust_height=True,
@@ -78,14 +58,17 @@ def plot_mean_intensity(
     **kwargs,
 ):
     """
-    show per cluster intensity of each channel.
-    intensity is either shown as mean or z-scored intensity
+    Show per cluster intensity of each channel.
+
+    Intensity is either shown as mean or z-scored intensity, depending on the ``standard_scale`` kwarg.
+
+    Parameters
+    ----------
+    TODO
+
     """
     if limit_to_groups is None:
         limit_to_groups = {}
-    if layer == "zscored" and "zscored" not in adata.layers.keys():
-        print("Compute adata.layers[zscored] first!")
-        return
     _ensure_categorical(adata, groupby)
 
     # subset data
@@ -104,14 +87,8 @@ def plot_mean_intensity(
     # calculate values to show
     color_values = pd.DataFrame(index=adata.var.index)
     for g in adata.obs[groupby].cat.categories:
-        if layer is None:
-            color = "mean intensity"
-            g_expr = adata[adata.obs[groupby] == g].X
-        elif layer == "zscored":
-            color = "mean zscore"
-            g_expr = adata[adata.obs[groupby] == g].layers["zscored"]
-        else:
-            raise NotImplementedError(layer)
+        color = "mean intensity"
+        g_expr = adata[adata.obs[groupby] == g].X
         g_size = adata[adata.obs[groupby] == g].obs["size"]
         color_values[g] = (g_expr * g_size[:, np.newaxis]).sum(axis=0) / g_size.sum()
     color_values = color_values.loc[marker_list]
@@ -138,7 +115,6 @@ def plot_mean_intensity(
             groupby=groupby,  # standard_scale='var',
             ax=ax,
             dendrogram=dendrogram,
-            layer=layer,
             return_fig=True,
             title=title,
             **kwargs,
@@ -147,7 +123,6 @@ def plot_mean_intensity(
         scplot = sc.pl.matrixplot(
             adata,
             var_names=marker_dict,
-            layer=layer,
             groupby=groupby,
             cmap=cmap,
             colorbar_title=color,
@@ -186,7 +161,11 @@ def plot_mean_size(
     **kwargs,
 ):
     """
-    plot mean cluster sizes per cell, grouped by different columns in obs
+    Plot mean cluster sizes per cell, grouped by different columns in obs.
+
+    Parameters
+    ----------
+    TODO
     """
     _ensure_categorical(adata, groupby_row)
     _ensure_categorical(adata, groupby_col)
@@ -260,48 +239,65 @@ def mixed_model(ref_expr, g_expr, ref_well_name, g_well_name):
 
 
 def get_intensity_change(
-    adata,
-    groupby,
-    marker_dict=None,
-    limit_to_groups=None,
-    reference=None,
-    reference_group=None,
-    color="logfoldchange",
-    size="mean_reference",
-    figsize=(10, 3),
-    return_data=False,
-    group_sizes_barplot=None,
-    pval="ttest",
-    alpha=0.05,
+    adata: ad.AnnData,
+    groupby: str,
+    marker_dict: Optional[Union[Mapping[str, Iterable[str]], Iterable[str]]]=None,
+    limit_to_groups: Optional[Mapping[str, Iterable[str]]]=None,
+    reference: Optional[str] =None,
+    reference_group: Optional[str]=None,
+    color: str ="logfoldchange",
+    size: str ="mean_reference",
+    group_sizes_barplot: Optional[str]=None,
+    pval: str ="ttest",
+    alpha: float =0.05,
     norm_by_group=None,
 ):
     """
-    get data needed to call plot_intensity_change.
+    Get data for plotting intensity comparison with :func:`plot_intensity_change`.
 
     Calculate mean intensity differences between perturbations or clusters.
-    if no reference is given, use all other groups (except the current one) as reference
-    colors show log2fc / mean intensity changes / zscore changes
-    dot size shows mean intensity of reference group that is compared to, or indicates the pvalue
+    If no reference is given, use all other groups (except the current one) as reference.
+    Colors show log2fc / mean intensity changes / zscore changes, depending on the ``color`` argument.
+    Dot size shows mean intensity of reference group that is compared to, or indicates the pvalue,
+    depending on the ``size`` argument.
 
-    Args:
-        adata: adata containing aggregated information by clusters
-        marker_dict: limit/group vars that are shown, either by passing list or dict (adds annotations to plot)
-        limit_to_groups: dict with obs as keys and groups from obs as values, to subset adata before plotting
-        reference: reference cluster/perturbation to compare to
-        reference_group: obs entry that contains reference grouping (if None, groupby is used)
-        color: color of dots, either 'logfoldchange' or 'meanchange'
-        size: sizes of dots, either 'mean_reference' or 'pval' (distinguish significant and non-significant dots)
-        group_sizes_barplot: mean size of groups shown as a bar plot to the right.
-            Either None (do not show), 'mean' (mean size of groups),
-            'meanchange' (mean difference of group size from reference), 'foldchange'
-        pval: type of test done to determine pvalues. Either 'ttest' or 'mixed_model'.
-            'mixed_model' calculates a mixed model using wells as random effects.
-        alpha: pvalue threshold above which dots are not shown
-        norm_by_group: divide all mean values by the mean values of this group.
-            This is done separately for the reference and the values to compare to.
+    Parameters
+    ----------
+    adata
+        Adata containing aggregated information by clusters. 
+        E.g. result of :meth:`FeatureExtractor.get_intensity_adata`.
+    groupby
+        column in ``adata.obs`` containing the groups to compare.
+    marker_dict
+        Limit/group vars that are shown, either by passing list or dict (adds annotations to plot).
+    limit_to_groups
+        Dict with obs as keys and groups from obs as values, to subset adata before plotting.
+    reference
+        Reference cluster/perturbation to compare to.
+        If not defined, will compare each value in groupby against the rest.
+    reference_group
+        Obs entry that contains reference grouping (by default, ``groupby`` is used).
+    color
+        Color of dots, either `logfoldchange` or `meanchange`.
+    size
+        sizes of dots, either `mean_reference` or `pval` (distinguish significant and non-significant dots).
+    group_sizes_barplot
+        Mean size of groups shown as a bar plot to the right.
+        Either None (do not show), `mean` (mean size of groups),
+        `meanchange` (mean difference of group size from reference), `foldchange`.
+    pval 
+        Type of test done to determine pvalues. Either `ttest` or `mixed_model`.
+        `mixed_model` calculates a mixed model using wells as random effects and should be preferred.
+    alpha
+        ``pval`` threshold above which dots are not shown
+    norm_by_group
+        Divide all mean values by the mean values of this group.
+        This is done separately for the reference and the values to compare to.
 
-    Returns:
-        dict with keys
+    Returns
+    -------
+        Mapping[str, Any]:
+            data to input to :func:`plot_intensity_change`.
     """
     _ensure_categorical(adata, groupby)
     if limit_to_groups is None:
@@ -338,6 +334,7 @@ def get_intensity_change(
         adata_ref = adata[adata.obs[reference_group].isin(reference)]
         # subset adata to not reference
         adata = adata[~adata.obs[reference_group].isin(reference)]
+        assert len(adata) > 0, f"no obs in adata that are not one of {reference} in {reference_group}"
 
     for g in adata.obs[groupby].cat.categories:
         # reference expression
@@ -465,23 +462,31 @@ def plot_intensity_change(
     groupby,
     plot_data,
     alpha,
-    adjust_height=True,
-    ax=None,
-    figsize=(10, 3),
-    save=None,
+    adjust_height: bool =True,
+    ax: Optional[plt.axes.Axes]=None,
+    figsize: Iterable[int]=(10, 3),
+    save: Optional[str]=None,
     **kwargs,
 ):
     """
-    plot mean intensity differences between perturbations or clusters.
-    Takes returns of get_intensity_change as input.
+    Plot mean intensity differences between perturbations or clusters.
 
-    Args:
-        ... results of get_intensity_change
-        adjust_height: option to make plots a bit more streamlined
-        ax: axis to plot in
-        figsize: size of figure
-        save: path to save figure to
-        kwargs: keyword arguments for sc.pl.dotplot
+    Takes returns of :func:`get_intensity_change` as input: 
+    ``plot_intensity_change(**get_intensity_change(...))``
+
+    Parameters
+    ----------
+        ... results of :func:`get_intensity_change`.
+        adjust_height
+            Option to make plots a bit more streamlined.
+        ax
+            Axis to plot in.
+        figsize
+            Size of figure.
+        save
+            Path to save figure to.
+        kwargs 
+            Keyword arguments for :func:`sc.pl.dotplot`.
     """
     kwargs["vmin"] = kwargs.get("vmin", -1)
     kwargs["vmax"] = kwargs.get("vmax", 1)
@@ -557,8 +562,41 @@ def plot_size_change(
     **kwargs,
 ):
     """
-    size: sizes of dots, either 'mean_size' or 'pval' (distinguish significant and non-significant dots)
+    Plot mean intensity differences between perturbations and clusters.
 
+    TODO type annotations
+
+    Parameters
+    ----------
+    adata
+        Adata containing aggregated information by clusters. 
+        E.g. result of :meth:`FeatureExtractor.get_intensity_adata`.
+    groupby_row
+        Column in ``adata.obs`` containing the row-wise grouping.
+    groupby_col
+        Column in ``adata.obs`` containing the column-wise grouping.
+    reference_row
+        Reference cluster/perturbation to compare to row-wise.
+        If not defined, will compare each value in groupby_row against the rest.
+    reference_col
+        Reference cluster/perturbation to compare to col-wise.
+        If not defined, will compare each value in groupby_col against the rest.
+    figsize
+        Size of figure.
+    adjust_height
+        Option to make plots a bit more streamlined.
+    ax
+        Axis to plot in.
+    pval
+        ``pval`` threshold above which dots are not shown.
+    save
+        Path to save figure to.
+    size
+        Sizes of dots, either `mean_size` or `pval` (distinguish significant and non-significant dots).
+    limit_to_groups
+        Dict with obs as keys and groups from obs as values, to subset adata before plotting.
+    kwargs 
+        Keyword arguments for :func:`sc.pl.dotplot`.
     """
     if limit_to_groups is None:
         limit_to_groups = {}
