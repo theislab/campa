@@ -13,7 +13,7 @@ feature_params = {
     # data dirs to be processed. 
     # Relative to experiment_dir/aggregated/full_data. 
     # If None, all available data_dirs will be processed
-    'data_dirs': ["184A1_unperturbed/I09"],
+    'data_dirs': ["184A1_unperturbed/I09", "184A1_unperturbed/I11", "184A1_meayamycin/I12", "184A1_meayamycin/I20"],
     #'data_dirs': [
     #    "184A1_unperturbed/I09", "184A1_unperturbed/I11", "184A1_unperturbed/J10", "184A1_unperturbed/J12", 
     #    "184A1_DMSO/I14", "184A1_DMSO/J16", "184A1_AZD4573/I13", "184A1_AZD4573/I17", "184A1_AZD4573/J14",

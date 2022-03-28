@@ -194,7 +194,7 @@ class FeatureExtractor:
                 self.params["data_dir"],
                 base_dir=os.path.join(self.exp.full_path, "aggregated/full_data"),
                 keys=["x", "y", "mpp", "obj_ids", self.params["cluster_name"]],
-                data_config=self.exp.data_config_name,
+                data_config=self.exp.config["data"]["data_config"],
             )
             # ensure that cluster data is string
             self._mpp_data._data[self.params["cluster_name"]] = self._mpp_data._data[

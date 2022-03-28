@@ -613,7 +613,7 @@ def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_d
     # iterate over all data dirs
     for data_dir in exp.data_params["data_dirs"]:
         log.info(f"Processing data_dir {data_dir}")
-        mpp_data = MPPData.from_data_dir(data_dir, data_config=exp.data_config_name,)
+        mpp_data = MPPData.from_data_dir(data_dir, data_config=exp.config["data"]["data_config"],)
         # params for partial saving of mpp_data
         mpp_params = {"base_data_dir": data_dir, "subset": True}
         # prepare mpp_data
@@ -723,6 +723,6 @@ def project_cluster_data(
             cur_data_dir,
             base_dir=os.path.join(exp.full_path, save_dir),
             keys=["x", "y", "obj_ids", cl.config["cluster_rep"]],
-            data_config=exp.data_config_name,
+            data_config=exp.config["data"]["data_config"],
         )
         cl.project_clustering(mpp_data, save_dir=os.path.join(exp.full_path, save_dir, cur_data_dir))
