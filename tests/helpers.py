@@ -1,7 +1,13 @@
 from string import ascii_letters
+from pathlib import Path
+import os
+import shutil
+import tempfile
 
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
+import requests
 
 from campa.data import MPPData
 
@@ -11,7 +17,7 @@ def gen_vstr_recarray(m, n, dtype=None):
     lengths = np.random.randint(3, 5, size)
     letters = np.array(list(ascii_letters))
     gen_word = lambda l: "".join(np.random.choice(letters, l))  # noqa: E731
-    arr = np.array([gen_word(len) for len in lengths]).reshape(m, n)
+    arr = np.array([gen_word(gen_len) for gen_len in lengths]).reshape(m, n)
     return pd.DataFrame(arr, columns=[gen_word(5) for i in range(n)]).to_records(index=False, column_dtypes=dtype)
 
 
@@ -22,7 +28,7 @@ def gen_metadata_df(n, obj_ids, possible_cell_cycles=None, ensure_None=True):
     letters = np.array(list(ascii_letters))
     gen_word = lambda l: "".join(np.random.choice(letters, l))  # noqa: E731
     if possible_cell_cycles is None:
-        possible_cell_cycles = [gen_word(len) for len in lengths]
+        possible_cell_cycles = [gen_word(gen_len) for gen_len in lengths]
 
     if ensure_None:
         cell_cycle = np.array([None for i in range(n)])
@@ -36,14 +42,14 @@ def gen_metadata_df(n, obj_ids, possible_cell_cycles=None, ensure_None=True):
     if n > len(letters):
         letters = letters[: n // 2]  # Make sure categories are repeated
 
-    metadata_dict = dict(
-        mapobject_id=obj_ids,
-        cell_cycle=cell_cycle,
-        cat=pd.Categorical(np.random.choice(letters, n)),
-        int64=np.random.randint(-50, 50, n),
-        float64=np.random.random(n),
-        uint16=np.random.randint(255, size=n, dtype="uint8"),
-    )
+    metadata_dict = {
+        "mapobject_id": obj_ids,
+        "cell_cycle": cell_cycle,
+        "cat": pd.Categorical(np.random.choice(letters, n)),
+        "int64": np.random.randint(-50, 50, n),
+        "float64": np.random.random(n),
+        "uint16": np.random.randint(255, size=n, dtype="uint8"),
+    }
 
     return pd.DataFrame(metadata_dict)
 
@@ -74,7 +80,7 @@ def gen_objs(shape, bounding_box, num_channels, obj_ids, mpp_dtype):
         np.empty((0, num_channels), dtype=np.uint8),
     )
     obj_ids_all = np.empty((0), dtype=obj_ids.dtype)
-    for i, obj_id in enumerate(obj_ids):
+    for obj_id in obj_ids:
         x, y, values = gen_obj(shape, bounding_box, num_channels, mpp_dtype)
         obj_ids_all = np.append(obj_ids_all, [obj_id] * len(x))
         x_all = np.append(x_all, x)
@@ -107,7 +113,7 @@ def gen_mppdata(
         - generate df with cell cycle:
              - generate 5 diff cell cycles, then assign random cols to that
              - generate  TR: float64, from 100 to 1000
-        -
+
     Params
     ------
 
@@ -123,7 +129,7 @@ def gen_mppdata(
         num_channels = len(channels)
         channels_df = pd.DataFrame(np.array(channels), columns=["name"])
     else:
-        channels_df = pd.DataFrame(np.array([gen_word(len) for len in lengths]), columns=["name"])
+        channels_df = pd.DataFrame(np.array([gen_word(gen_len) for gen_len in lengths]), columns=["name"])
 
     channels_df.index.name = "channel_id"
     # .reset_index().set_index('name').loc[channels]['channel_id']
@@ -142,13 +148,152 @@ def gen_mppdata(
     return mppdata
 
 
+class test_dataset:
+    def __init__(self):
+        return
+
+    @staticmethod
+    def load_test_dataset(datasetdir=None):
+        """
+        loads test dataset into a datasetdir
+        Args:
+            datasetdir (default tests/test_dataset)
+
+        Returns:
+            path to a folder where dataset is stored
+        """
+        from pathlib import Path
+        import os
+
+        fname = "test_dataset"
+        if datasetdir is None:
+            datasetdir = os.path.join(str(Path(__file__).parent))
+
+        folder_dir = test_dataset.load_dataset(
+            dataset_path=datasetdir,
+            fname=fname,
+            backup_url="https://figshare.com/ndownloader/files/34507349?private_link=f004270cd1eeeffdb340",
+        )
+        return folder_dir
+
+    @staticmethod
+    def load_dataset(dataset_path, fname, backup_url):
+        """
+        Generic function to load dataset
+        In dataset_path, creates ierarhy of folders "raw", "archive".
+        If unpacked files are already stored in "raw" doesn't do anything.
+        Otherwise checks for archive file in "archive" folder and unpacks it into "raw" folder.
+        If no files are present there, attempts to load the dataset from URL
+         into "archive" folder and then unpacks it into "raw" folder.
+
+        Args:
+            dataset_path: path where folder for the dataset will be created.
+            fname: desired name of the dataset
+            backup_url: link from which dataset will be loaded
+
+        Returns:
+            path to a folder where unpacked dataset is stored
+
+        """
+        uncpacked_dir = Path(os.path.join(dataset_path, fname, "raw"))
+        archive_path = Path(os.path.join(dataset_path, fname, "archive", f"{fname}.zip"))
+
+        os.makedirs(uncpacked_dir, exist_ok=True)
+        foldercontent = os.listdir(str(uncpacked_dir))
+        if "channels_metadata.csv" in foldercontent:
+            return uncpacked_dir
+
+        elif archive_path.exists():
+            shutil.unpack_archive(archive_path, uncpacked_dir)
+            return uncpacked_dir
+
+        elif not archive_path.exists():
+            if backup_url is None:
+                raise Exception(
+                    f"File or directory {archive_path} does not exist and no backup_url was provided.\n"
+                    f"Please provide a backup_url or check whether path is spelled correctly."
+                )
+
+            print("Path or dataset does not yet exist. Attempting to download...")
+
+            test_dataset.download(
+                backup_url,
+                output_path=archive_path,
+            )
+
+            shutil.unpack_archive(archive_path, uncpacked_dir)
+
+        return uncpacked_dir
+
+    @staticmethod
+    def getFilename_fromCd(cd):
+        """
+        Get filename from content-disposition or url request
+        """
+
+        import re
+
+        if not cd:
+            return None
+        fname = re.findall("filename=(.+)", cd)
+        if len(fname) == 0:
+            return None
+        fname = fname[0]
+        if '"' in fname:
+            fname = fname.replace('"', "")
+        return fname
+
+    @staticmethod
+    def download(
+        url: str,
+        output_path=None,
+        block_size: int = 1024,
+        overwrite: bool = False,
+    ) -> None:
+        """Downloads a dataset irrespective of the format.
+
+        Args:
+            url: URL to download
+            output_path: Path to download/extract the files to
+            block_size: Block size for downloads in bytes (default: 1024)
+            overwrite: Whether to overwrite existing files (default: False)
+        """
+
+        if output_path is None:
+            output_path = tempfile.gettempdir()
+
+        response = requests.get(url, stream=True)
+        filename = test_dataset.getFilename_fromCd(response.headers.get("content-disposition"))
+
+        # currently supports zip, tar, gztar, bztar, xztar
+        download_to_folder = output_path.parent
+        os.makedirs(download_to_folder, exist_ok=True)
+
+        archive_formats, _ = zip(*shutil.get_archive_formats())
+        is_archived = str(Path(filename).suffix)[1:] in archive_formats
+        assert is_archived
+
+        download_to_path = os.path.join(download_to_folder, filename)
+
+        if Path(download_to_path).exists():
+            warning = f"File {download_to_path} already exists!"
+            if not overwrite:
+                print(warning)
+                return
+            else:
+                print(f"{warning} Overwriting...")
+
+        total = int(response.headers.get("content-length", 0))
+
+        print(f"Downloading... {total}")
+        with open(download_to_path, "wb") as file:
+            for data in tqdm(response.iter_content(block_size)):
+                file.write(data)
+
+        os.replace(download_to_path, str(output_path))
+
+
 if __name__ == "__main__":
     # tmp1=gen_mppdata()
-
-    mpp_data = gen_mppdata(num_obj_ids=5)
-    mpp_data_sub = mpp_data.subsample(frac=-1)
-
-    assert len(mpp_data_sub.unique_obj_ids) == 0
-    assert len(mpp_data_sub.x) == 0
-    assert len(mpp_data_sub.y) == 0
-    assert len(mpp_data_sub.mpp) == 0
+    folder_dir = test_dataset.load_test_dataset()
+    print(folder_dir)

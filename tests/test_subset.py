@@ -71,7 +71,7 @@ class TestSubset:
     def test_frac_trueCopy_flag(self):
         mpp_data = gen_mppdata(num_obj_ids=10)
         mpp_data_orig = mpp_data.copy()
-        mpp_data_sub = mpp_data.subset(frac=0.5, copy=True)
+        _ = mpp_data.subset(frac=0.5, copy=True)
         isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
         assert isequal
         assert isequal_dict["channels"]
@@ -83,7 +83,7 @@ class TestSubset:
         num_objects_orig = len(mpp_data_orig.unique_obj_ids)
         mpp_data.subset(frac=0.5, copy=False)
         isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
-        assert isequal == False
+        assert not isequal
         assert num_objects_orig_intended == num_objects_orig == len(mpp_data_orig.unique_obj_ids)
         assert num_objects_orig != len(mpp_data.unique_obj_ids)
 
@@ -128,14 +128,14 @@ class TestSubset:
         cell_cycle = list(mpp_data.metadata.cell_cycle.unique())[:num_keys]
         mpp_data_subset = mpp_data.subset(cell_cycle=cell_cycle, copy=True)
         isequal, isequal_dict = mpp_data.compare(mpp_data_subset)
-        assert isequal == False
+        assert not isequal
         assert np.array_equal(mpp_data_subset.metadata.cell_cycle.unique(), cell_cycle)
 
     def test_subset_by_metadataKey_unknownKey(self):
         mpp_data = gen_mppdata()
         new_key = "new_key"
         with pytest.raises(AssertionError) as exc:
-            mpp_data_copy = mpp_data.subset(new_key=["1", "2"], copy=True)
+            _ = mpp_data.subset(new_key=["1", "2"], copy=True)
         assert f"provided column {new_key} was not found in the metadata table!" in str(exc.value)
 
     def test_subset_by_metadataKey_NO_NAN_woNone(self):
@@ -153,7 +153,7 @@ class TestSubset:
 
         mpp_data_subset = mpp_data.subset(cell_cycle="NO_NAN", copy=True)
         isequal, isequal_dict = mpp_data.compare(mpp_data_subset)
-        assert isequal == False
+        assert not isequal
         assert not mpp_data_subset.metadata.cell_cycle.isnull().values.any()
         assert None not in mpp_data_subset.metadata.cell_cycle.unique()
 
@@ -165,7 +165,7 @@ class TestSubsetChannels:
         channels = str(len(channels) + 1)
         with pytest.raises(AssertionError) as exc:
             mpp_data.subset_channels(channels)
-        assert f"mpp object does not contain provided channels!" in str(exc.value)
+        assert "mpp object does not contain provided channels!" in str(exc.value)
 
     def test_filterNoChannels(self):
         channels = [str(i) for i in range(5)]
@@ -185,7 +185,7 @@ class TestSubsetChannels:
         channels_to_subset = np.random.choice(channels, num_channels, replace=False)
         mpp_data.subset_channels(channels_to_subset)
         isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
-        assert isequal == False
+        assert not isequal
         assert np.array_equal(np.sort(mpp_data.channels["name"].values), np.sort(channels_to_subset))
         assert mpp_data.mpp.shape[-1] == len(channels_to_subset)
 
@@ -198,7 +198,7 @@ class TestSubsetChannels:
 
         mpp_data.subset_channels(channels_to_subset)
         isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
-        assert isequal == False
+        assert not isequal
         assert np.array_equal(np.sort(mpp_data.channels["name"].values), ["3", "4"])
         assert mpp_data.mpp.shape[-1] == len(overlap_channels)
 

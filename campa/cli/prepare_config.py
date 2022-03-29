@@ -56,7 +56,7 @@ def prepare_config(args):
         config.set(
             "data",
             "TestData",
-            str(Path(__file__).resolve().parent.parent / "notebooks" / "params" / "TestData_constants.py"),
+            str(Path(__file__).resolve().parent.parent.parent / "notebooks" / "params" / "TestData_constants.py"),
         )
         with open(config_path, "w") as configfile:
             config.write(configfile)
