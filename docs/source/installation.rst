@@ -51,7 +51,7 @@ There is an example config file in ``campa/campa.ini.example``.
 Create ``campa.ini`` with system-specific paths to experiment and
 data folders in by running::
 
-    python cli/setup_config.py
+    campa setup
 
 This creates a default config in ``$HOME/.config/campa/campa.ini``.
 To add new ``[data]`` fields, directly edit ``campa.ini``

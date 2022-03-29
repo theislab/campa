@@ -3,7 +3,7 @@ import os
 
 # --- dataset specific constants ---
 # Use fixed data_dir for TestData, for other datasets can use BASE_DATA_DIR defined in config.ini/campa.constants
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "example_data")
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "example_data/raw")
 DATASET_DIR = os.path.join(DATA_DIR, "datasets")
 # name of column in metadata.csv that contains a unique object identifier
 OBJ_ID = "mapobject_id"

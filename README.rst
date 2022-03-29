@@ -29,8 +29,7 @@ This file contains the following sections:
       results are stored.
       This is going to be loaded in ``campa.constants.EXPERIMENT_DIR``
     - ``data_dir``: default path of the directory where all data is stored.
-      For more information on the data format, see the `MPPData notebook`_  and
-      the `example_data <notebooks/example_data>`_ folder.
+      For more information on the data format, see the `MPPData notebook`_.
       Note that any given data config for specific data may overwrite
       ``data_dir``, and all functions will use ``data_config.DATA_DIR``
       to determine the path to the data.
@@ -40,7 +39,7 @@ This file contains the following sections:
     - ``DataName=<path>``. Each constant here contains a path to a python file,
       where parameters that are specific to the required data load are stored.
       Please refer to the `MPPData notebook`_ and
-      the `TestData_constants.py <notebooks/TestData_constants.py>`_
+      the `TestData_constants.py <https://github.com/theislab/campa/blob/main/notebooks/params/TestData_constants.py>`_
       to see an example.
 
 .. _MPPData notebook: notebooks/mpp_data.ipynb
@@ -57,7 +56,7 @@ There is an example config file in ``campa/campa.ini.example``.
 Create ``campa.ini`` with system-specific paths to experiment and
 data folders by running::
 
-    python campa/cli/main.py setup
+    campa setup
 
 This creates a default config in ``$HOME/.config/campa/campa.ini``.
 To add new ``[data]`` fields, directly edit ``campa.ini``
@@ -67,9 +66,6 @@ TODO
 ----
 
 - add test + cluster + eval notebooks to test
-- write feature notebook
 - write notebook explaining how to export things
 - create a list of tests that still need to be done
-- incorporate readthedocs in tox
-- add black + import checking to precommit + set up precommit
-- make scripts installable
+
