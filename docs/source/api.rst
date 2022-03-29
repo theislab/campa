@@ -13,6 +13,7 @@ Data
     :toctree: api
 
     data.create_dataset
+    data.load_example_data
 
 Tools
 ~~~~~

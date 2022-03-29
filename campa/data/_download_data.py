@@ -15,15 +15,16 @@ from campa.data import MPPData
 
 def load_example_data(data_dir: str =None) -> Union[os.PathLike, str]:
     """
-    Donwload example data to data_dir.
+    Download example data to ``data_dir``.
 
     Parameters
     ----------
-    data_dir (defaults to notebooks/example_data)
+    data_dir 
+        Defaults to ``notebooks/example_data``
 
     Returns
     -------
-        path to folder where dataset is stored
+        Path to folder where dataset is stored
     """
     from pathlib import Path
     import os
