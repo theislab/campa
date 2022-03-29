@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Union, Mapping, Iterable, Optional
 import os
 import logging
 
@@ -7,6 +8,7 @@ import scanpy as sc
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+from campa.data import MPPData
 from campa.tl._estimator import Estimator
 from campa.tl._experiment import Experiment
 from campa.data._conditions import process_condition_desc
@@ -14,10 +16,18 @@ from campa.data._conditions import process_condition_desc
 
 class Predictor:
     """
-    predict MPPData with trained model.
+    Predict results from trained model.
+
+    Parameters
+    ----------
+    exp
+        Trained Experiment.
+    batch_size
+        Batch size to use for prediction.
+        If None, training batch size is used.
     """
 
-    def __init__(self, exp, batch_size=None):
+    def __init__(self, exp: Experiment, batch_size: Optional[int] = None):
         self.log = logging.getLogger(self.__class__.__name__)
         self.exp = exp.set_to_evaluate()
         self.log.info(f"Creating Predictor for {self.exp.dir}/{self.exp.name}")
@@ -31,9 +41,9 @@ class Predictor:
 
     def evaluate_model(self):
         """
-        predict val/test split and imgs.
+        Predict val/test split and images.
 
-        Uses exp.evaluate_config for settings
+        Uses :meth:`Experiment.evaluate_config` for settings.
         """
         config = self.exp.evaluate_config
         # predict split
@@ -46,25 +56,40 @@ class Predictor:
             )
 
     # TODO might not need?
-    def calculate_mse(self, mpp_data):
-        """
-        Calculate mean squared error from mpp_data. If mpp_data does not have decoder representation, predict it
-        """
-        if mpp_data.data("decoder") is None:
-            self.predict(mpp_data, reps=["decoder"])
-        return np.mean((mpp_data.center_mpp - mpp_data.data("decoder")) ** 2, axis=0)
+    # def calculate_mse(self, mpp_data):
+    #    """
+    #    Calculate mean squared error from mpp_data. If mpp_data does not have decoder representation, predict it
+    #    """
+    #    if mpp_data.data("decoder") is None:
+    #        self.predict(mpp_data, reps=["decoder"])
+    #    return np.mean((mpp_data.center_mpp - mpp_data.data("decoder")) ** 2, axis=0)
 
-    def predict(self, mpp_data, save_dir=None, reps=("latent",), mpp_params=None):
+    def predict(
+        self,
+        mpp_data: MPPData,
+        save_dir: Optional[str] = None,
+        reps: Iterable[str] = ("latent",),
+        mpp_params: Optional[Mapping[str, Any]] = None,
+    ) -> MPPData:
         """
-        Predict reps from mpp_data,
+        Predict representations from ``mpp_data``.
 
-        Args:
-        save_dir: save predicted reps to this dir (absolute path)
-        reps: which representations to predict
-        mpp_params: base_data_dir and subset information to save alongside of predicted mpp_data. See MPPData.write()
+        Parameters
+        ----------
+        mpp_data
+            Data to predict.
+        save_dir
+            Save predicted representations to this dir (absolute path).
+        reps
+            Which representations to predict. See :meth:`Predictor.get_representation`.
+        mpp_params
+            Base data dir and subset information to save alongside of predicted MPPData.
+            See :meth:`MPPData.write`.
 
-        Returns:
-            MPPData with keys reps.
+        Returns
+        -------
+        :class:`MPPData`
+            Data with representations stored in :meth:`MPPData.data`.
         """
         self.log.info(f"Predicting representation {reps} for mpp_data")
         for rep in reps:
@@ -73,15 +98,26 @@ class Predictor:
             mpp_data.write(save_dir, save_keys=reps, mpp_params=mpp_params)
         return mpp_data
 
-    def predict_split(self, split, img_ids=None, reps=("latent", "decoder"), **kwargs):
+    def predict_split(
+        self,
+        split: str,
+        img_ids: Optional[Union[np.ndarray, List[int], int]] = None,
+        reps: Iterable[str] = ("latent", "decoder"),
+        **kwargs: Any,
+    ) -> None:
         """
         Predict data from train/val/test split of dataset that the model was trained with.
-        Saves in experiment_dir/exp_name/split.
 
-        Args:
-            split (str or list of str): train, val, test, val_imgs, test_imgs
-            img_ids: obj_ids or number of objects that should be predicted (only for val_imgs and test_imgs)
-            reps: which representations should be predicted?
+        Saves results in ``experiment_dir/exp_name/split``.
+
+        Parameters
+        ----------
+        split
+            Data split to predict. One of `train`, `val`, `test`, `val_imgs`, `test_imgs`.
+        img_ids
+            obj_ids or number of objects that should be predicted (only for val_imgs and test_imgs).
+        reps
+            Representations to predict. See :meth:`Predictor.get_representation`.
         """
         self.log.info(f"Predicting split {split} for {self.exp.dir}/{self.exp.name}")
         if "_imgs" in split:
@@ -94,7 +130,7 @@ class Predictor:
                 rng = np.random.default_rng(seed=42)
                 img_ids = rng.choice(mpp_data.unique_obj_ids, img_ids, replace=False)
             # subset mpp_data to these img_ids
-            mpp_data.subset(obj_ids=img_ids)
+            mpp_data.subset(obj_ids=img_ids)  # type: ignore[arg-type]
             # add neighborhood to mpp_data (other processing is already done)
             if self.est.ds.params["neighborhood"]:
                 mpp_data.add_neighborhood(size=self.est.ds.params["neighborhood_size"])
@@ -112,27 +148,34 @@ class Predictor:
             mpp_params={"base_data_dir": base_data_dir, "subset": True},
         )
 
-    def get_representation(self, mpp_data, rep="latent"):
+    def get_representation(self, mpp_data: MPPData, rep: str = "latent") -> Any:
         """
-        Return desired representation from given mpp_data inputs.
+        Return representation from given mpp_data inputs.
 
-        TODO might remove entangled, latent_y in the future (not needed currently)
+        Representation `input` returns ``mpp_data.mpp``.
+        For representations `latent` and `decoder`, predict the model.
 
-        Args:
-            rep: Representation, one of: 'input', 'latent', 'entangled'
-            (for cVAE models which have and entangled layer in the decoder),
-                'decoder', 'latent_y' (encoder_y)
-        Returns:
-            representation
+        Parameters
+        ----------
+        mpp_data
+            Data to get representation from.
+        rep
+            Representation, one of: `input`, `latent`, `decoder`.
+
+        Returns
+        -------
+        Iterable
+            Representation.
         """
+        #  TODO might remove entangled, latent_y in the future (not needed currently)
         if rep == "input":
             # return mpp
             return mpp_data.center_mpp
         # need to prepare input to model
         if self.est.model.is_conditional:
-            data = [mpp_data.mpp, mpp_data.conditions]
+            data: List[np.ndarray] = [mpp_data.mpp, mpp_data.conditions]  # type: ignore[list-item]
         else:
-            data = mpp_data.mpp
+            data: np.ndarray = mpp_data.mpp  # type: ignore[no-redef]
         # get representations
         if rep == "latent":
             return self.est.model.encoder.predict(data, batch_size=self.batch_size)
@@ -159,17 +202,35 @@ class Predictor:
 
 
 class ModelComparator:
-    def __init__(self, exps, save_dir=None):
-        """
-        Compare experiments
-        """
+    """
+    Compare experiments.
+
+    Creates and saves comparison plots.
+
+    Parameters
+    ----------
+    exps
+        Experiments to compare.
+    save_dir
+        Absolute path to directory in which the plots should be saved.
+    """
+
+    def __init__(self, exps: Iterable[Experiment], save_dir: Optional[str] = None):
+
         self.exps = {exp.name: exp for exp in exps}
         self.exp_names = list(self.exps.keys())
         self.save_dir = save_dir
 
         # default channels and mpp data
-        self.mpps = {exp_name: self.exps[exp_name].get_split_mpp_data() for exp_name in self.exp_names}
-        self.img_mpps = {exp_name: self.exps[exp_name].get_split_imgs_mpp_data() for exp_name in self.exp_names}
+        self.mpps: Dict[str, MPPData] = {}
+        self.img_mpps: Dict[str, MPPData] = {}
+        for exp_name in self.exp_names:
+            mpp = self.exps[exp_name].get_split_mpp_data()
+            assert mpp is not None
+            self.mpps[exp_name] = mpp
+            img_mpp = self.exps[exp_name].get_split_imgs_mpp_data()
+            assert img_mpp is not None
+            self.img_mpps[exp_name] = img_mpp
         channels = {
             exp_name: self.exps[exp_name].config["data"].get("output_channels", None) for exp_name in self.exp_names
         }
@@ -180,23 +241,29 @@ class ModelComparator:
     @classmethod
     def from_dir(cls, exp_names, exp_dir):
         """
-        Initialise from experiments in experiment dir
+        Initialise from experiments in experiment dir.
         """
         exps = [Experiment.from_dir(os.path.join(exp_dir, exp_name)) for exp_name in exp_names]
         return cls(exps, save_dir=exp_dir)
 
     def _filter_trainable_exps(self, exp_names):
         """
-        return exp_names that are trainable.
-        Needed for some plotting fns that only make sense for trainable exps
+        Return exp_names that are trainable.
+
+        Needed for some plotting fns that only make sense for trainable exps.
         """
         return [exp_name for exp_name in exp_names if self.exps[exp_name].is_trainable]
 
     def plot_history(self, values=("loss",), exp_names=None, save_prefix=""):
-        """line plot of values against epochs for different experiments
-        Args:
-            values: key in history dict to be plotted
-            exp_names (optional): compare only a subset of experiments
+        """
+        Line plot of values against epochs for different experiments.
+
+        Parameters
+        ----------
+        values
+            Key in history dict to be plotted.
+        exp_names (optional)
+            Compare only a subset of experiments.
         """
         if exp_names is None:
             exp_names = self.exp_names
@@ -213,6 +280,7 @@ class ModelComparator:
             for i, exp_name in enumerate(exp_names):
                 cm.viridis(i)
                 hist = self.exps[exp_name].get_history()
+                assert hist is not None, "no history available"
                 if val in hist.keys():
                     ax.plot(hist.index, hist[val], label=exp_name, color=cmap(cnorm(i)))
             ax.legend()
@@ -231,6 +299,7 @@ class ModelComparator:
         scores = []
         for exp_name in exp_names:
             hist = self.exps[exp_name].get_history()
+            assert hist is not None, "no history available"
             scores.append(list(hist.get(score, hist[fallback_score]))[-1])
         fig, ax = plt.subplots(1, 1)
         ax.bar(x=range(len(scores)), height=scores)
@@ -283,6 +352,7 @@ class ModelComparator:
         """
         if exp_names is None:
             exp_names = self.exp_names
+
         exp_names = self._filter_trainable_exps(exp_names)
         if channels is None:
             channels = self.channels[exp_names[0]]

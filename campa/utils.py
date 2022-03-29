@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any, Mapping, MutableMapping
 import os
 import logging
 import collections.abc
@@ -33,12 +33,14 @@ def load_config(config_file):
 
     loader = importlib.machinery.SourceFileLoader(os.path.basename(config_file), config_file)
     spec = importlib.util.spec_from_loader(loader.name, loader)
-    config = importlib.util.module_from_spec(spec)
-    loader.exec_module(config)
-    return config
+    if spec is not None:
+        config = importlib.util.module_from_spec(spec)
+        loader.exec_module(config)
+        return config
+    return None
 
 
-def merged_config(config1, config2) -> Dict[str, Any]:
+def merged_config(config1: MutableMapping[str, Any], config2: Mapping[str, Any]) -> MutableMapping[str, Any]:
     """update config1 with config2. Should work arbitary nested levels"""
     res_config = deepcopy(config1)
     for k, v in config2.items():

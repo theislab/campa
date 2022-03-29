@@ -135,6 +135,8 @@ campa.ini
 notebooks/example_data
 docs/source/api
 docs/source/classes
+docs/source/models
 
 # data
 tests/test_dataset
+

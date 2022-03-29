@@ -55,7 +55,7 @@ def calculate_sparsity_levels(initial_sparsity, final_sparsity, n_epochs):
     """
     return np.hstack(
         (
-            np.linspace(initial_sparsity, final_sparsity, n_epochs // 2, dtype=np.int),
+            np.linspace(initial_sparsity, final_sparsity, n_epochs // 2, dtype=np.uint),
             np.repeat(final_sparsity, (n_epochs // 2) + 1),
         )
     )[:n_epochs]

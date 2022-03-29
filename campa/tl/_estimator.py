@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from campa.tl import Experiment
+    import numpy as np
 
 import os
 import logging
@@ -60,6 +61,17 @@ class AnnealTemperature(tf.keras.callbacks.Callback):
 
 # --- Estimator class ---
 class Estimator:
+    """
+    Neural network estimator.
+
+    Handles training and evaluation of models.
+
+    Parameters
+    ----------
+    exp
+        Experiment with model config.
+    """
+
     def __init__(self, exp: Experiment):
         self.log = logging.getLogger(self.__class__.__name__)
         self.exp = exp
@@ -100,34 +112,48 @@ class Estimator:
         self.history_name = os.path.join(self.exp.full_path, "history.csv")
 
     @property
-    def train_dataset(self):
+    def train_dataset(self) -> tf.data.Dataset:
+        """
+        Shuffled :class:`tf.data.Dataset` of train split.
+        """
         if self._train_dataset is None:
             self._train_dataset = self._get_dataset("train", shuffled=True)
         return self._train_dataset
 
     @property
-    def val_dataset(self):
+    def val_dataset(self) -> tf.data.Dataset:
+        """
+        :class:`tf.data.Dataset` of val split.
+        """
         if self._val_dataset is None:
             self._val_dataset = self._get_dataset("val")
         return self._val_dataset
 
     @property
-    def test_dataset(self):
+    def test_dataset(self) -> tf.data.Dataset:
+        """
+        :class:`tf.data.Dataset` of test split.
+        """
         if self._test_dataset is None:
             self._test_dataset = self._get_dataset("test")
         return self._test_dataset
 
-    def _get_dataset(self, split, shuffled=False):
+    def _get_dataset(self, split: str, shuffled: bool = False) -> tf.data.Dataset:
         return self.ds.get_tf_dataset(
             split=split,
             output_channels=self.output_channels,
             is_conditional=self.model.is_conditional,
-            repeat_y=self.repeat_y,
+            repeat_y=bool(self.repeat_y),
             add_c_to_y=self.add_c_to_y,
             shuffled=shuffled,
         )
 
     def create_model(self):
+        """
+        Initialise neural network model.
+
+        Adds ``self.model``.
+        """
         ModelClass = ModelEnum(self.config["model"]["model_cls"]).get_cls()
         self.model = ModelClass(**self.config["model"]["model_kwargs"])
         weights_path = self.config["model"]["init_with_weights"]
@@ -179,6 +205,11 @@ class Estimator:
         self.compiled_model = True
 
     def train_model(self):
+        """
+        Train neural network model.
+
+        Needs an initialised model in ``self.model``.
+        """
         config = self.config["training"]
         if not self.compiled_model:
             self._compile_model()
@@ -207,10 +238,21 @@ class Estimator:
             history.to_csv(self.history_name)
         return history
 
-    def predict_model(self, data, batch_size=None):
-        """predict all elements in data
-        args:
-            data: numpy array with first dimension the number of elements
+    def predict_model(self, data: tf.data.Dataset | np.ndarray, batch_size: int | None = None) -> Any:
+        """
+        Predict all elements in ``data``.
+
+        Parameters
+        ----------
+        data
+            Data to predict, with first dimension the number of elements.
+        batch_size
+            Batch size. If None, the training batch size is used.
+
+        Returns
+        -------
+        Iterable
+            prediction
         """
         if isinstance(data, tf.data.Dataset):
             data = data.batch(self.config["training"]["batch_size"])
@@ -224,8 +266,21 @@ class Estimator:
             pred = pred[0]
         return pred
 
-    def evaluate_model(self, dataset=None):
-        """evaluate model using tf dataset"""
+    def evaluate_model(self, dataset: tf.data.Dataset | None = None) -> Any:
+        """
+        Evaluate model using :class:`tf.data.Dataset`.
+
+        Parameters
+        ----------
+        dataset
+            Dataset to evaluate.
+            If None, :meth:`Estimator.val_dataset` is used.
+
+        Returns
+        -------
+        Iterable[float]
+            Scores.
+        """
         if not self.compiled_model:
             self._compile_model()
         if dataset is None:

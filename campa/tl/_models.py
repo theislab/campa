@@ -10,6 +10,15 @@ import tensorflow as tf
 
 
 class ModelEnum(str, Enum):
+    """
+    Neural network models.
+
+    Possible values are:
+
+    - ``ModelEnum.BaseAEModel``: "BaseAEModel" (:class:`BaseAEModel`)
+    - ``ModelEnum.VAEModel``: "VAEModel" (:class:`VAEModel`)
+    """
+
     BaseAEModel = "BaseAEModel"
     VAEModel = "VAEModel"
     CatVAEModel = "CatVAEModel"
@@ -114,28 +123,82 @@ BASE_MODEL_CONFIG: Dict[str, Any] = {
 
 class BaseAEModel:
     """
-    Base class for AE and VAE models. Can have neighbors, conditions (concatenated to input + decoder), and
+    Base class for AE and VAE models.
+
+    This model can have neighbors, conditions (concatenated to input + decoder), and
     and adversarial head.
+    The class defines init functions for setting up AE with encoder and decoder.
+    In addition, encoder and decoder input layers are defined (can be overwritten in subclassed functions).
 
-    Defines init functions for setting up AE with encoder and decoder
-    Defines encoder and decoder input layers (can be overwritten in subclassed functions)
-    Subclassed models can define
-        self.default_config (as class variable)
-        self.create_encoder() function, returning encoder model and latent (for KL loss)
-        self.create_decoder() function, returning decoder model
-        self.create_model() function, creating overall model (put encoder and decoder together)
+    Subclassed models can define:
 
-    Default architecture:
-    Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim
-    Decoder: fc_layers - linear (regularized) layer to num_output_channels
+    - :attr:`BaseAEModel.default_config` (as class variable).
+    - :meth:`BaseAEModel.create_encoder` function, returning encoder model and latent (for KL loss).
+    - :meth:`BaseAEModel.create_decoder` function, returning decoder model.
+    - :meth:`BaseAEModel.create_model` function, creating overall model (put encoder and decoder together).
 
-    Conditional models additionally output "latent", the latent space (for KL loss computation).
+    Default architecture of this model:
 
-    Adversarial models additionally output "adv_head", the output of the adversarial head (for adv loss computation)
-    (adv_latent - reverse_gradients - adversarial_layers - linear layer to num_conditions)
+    - Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim
+    - Decoder: fc_layers - linear (regularized) layer to num_output_channels
+
+    Conditional models additionally output `latent`, the latent space (for KL loss computation).
+
+    Adversarial models additionally output `adv_head`, the output of the adversarial head (for adv loss computation).
+    (adv_latent - reverse_gradients - adversarial_layers - linear layer to num_conditions).
+
+    TODO adversarial models are not tested in this version of the code.
+
+    Parameters
+    ----------
+    name: Optional[str]
+        Model name.
+    num_neighbors: str
+        Number of neighbors used in input data.
+    num_channels: int
+        Number of channels for input and output.
+        Can be split up in ``num_input_channels`` and ``num_output_channels``.
+    num_output_channels: Optional[int]
+        Number of output channels
+    num_input_channels: Optional[int]
+        Number of input channels
+    num_conditions: int
+        Number of conditions. If > 0, the model is conditional and an additional input w/ conditions is assumed.
+        Conditions are appended to the input and the latent representation. They are assumed to be 1d.
+    encode_condition: Optional[Union[int, Iterable[int]]
+        If number or list, the condition is encoded using dense layers with this number of nodes.
+    condition_injection_layers: Iterable[int]
+        Which layers of encoder and decoder to apply condition to.
+        Give index of layer in encoder and decoder.
+    input_noise: Optional[str]
+        One of `gaussian`, `dropout`, adds noise to encoder input.
+    noise_scale: int
+        Scale of gaussian noise.
+    encoder_conv_layers: Iterable[int]
+        Size of conv layers for encoder.
+    encoder_conv_kernel_size: Iterable[int]
+        Kernel size for each encoder conv layer.
+    encoder_fc_layers: Iterable[int]
+        Size of fc encoder layers.
+        From last encoder layer, a linear fcl to latent_dim is applied.
+    latent_dim: int
+        Number of nodes in latent space (for some models == number of classes).
+    decoder_fc_layers: Iterable[int]
+        Decoder architecture.
+        From last decoder later, a linear fcl to ``num_output_channels`` is applied.
+    decoder_regularizer: Optional[str]
+        Regularizer for decoder, `l1` or `l2`.
+    decoder_regularizer_weight: float
+        Weight of regularizer.
+    adversarial_layers
+        For adversarial models, add adversarial layers.
+        Only works with categorical conditions.
     """
 
-    default_config = {"name": "BaseAEModel"}
+    default_config: Dict[str, Any] = {"name": "BaseAEModel"}
+    """
+    Default config used in every model.
+    """
 
     def __init__(self, **kwargs):
         # set up log and config
@@ -189,8 +252,15 @@ class BaseAEModel:
 
     def create_model(self):
         """
-        creates keras model using create_encoder and create_decoder functions.
-        sets self.encoder, self.latent, self.decoder, self.model_output attributes
+        Create :class:`tf.keras.Model`.
+
+        Use :meth:`BaseAEModel.create_encoder` and :meth:`BaseAEModel.create_decoder` functions to
+        set ``self.encoder``, ``self.latent``, ``self.decoder``, ``self.model_output`` attributes.
+
+        Returns
+        -------
+        :class:`tf.keras.Model`
+            Neural network model.
         """
         # encoder and decoder
         self.encoder, self.latent = self.create_encoder()
@@ -220,14 +290,26 @@ class BaseAEModel:
 
     @property
     def is_conditional(self):
+        """Flag set based on num_conditions."""
         return self.config["num_conditions"] > 0
 
     @property
     def is_adversarial(self):
-        # needs to have adv layers defined, and be conditional
+        """Model is adversarial if is is conditional and adv layers are defined."""
         return self.config["adversarial_layers"] is not None and self.is_conditional
 
     def encode_condition(self, C):
+        """
+        Apply condition encoder to C.
+
+        Parameters
+        ----------
+        C
+            condition (maybe one-hot encoded)
+        Returns
+        -------
+        Encoded condition.
+        """
         if self.config["encode_condition"] is None:
             return C
         if not hasattr(self, "condition_encoder"):
@@ -283,9 +365,15 @@ class BaseAEModel:
 
     def create_encoder(self):
         """
-        returns encoder and latent (or none)
-        Encoder outputs reparameterized latent
-        Latent is potentially returned by overall model for loss calculation, e.g. for VAE
+        Create encoder.
+
+        Encoder outputs reparameterized latent.
+        Latent is potentially returned by overall model for loss calculation, e.g. for VAE.
+
+        Returns
+        -------
+        tf.keras.model, tf.Tensor
+            Encoder and latent (None for BaseAEModel).
         """
         X = self._create_base_encoder()
         # linear layer to latent
@@ -297,7 +385,12 @@ class BaseAEModel:
 
     def create_decoder(self):
         """
-        returns decoder
+        Create decoder.
+
+        Returns
+        -------
+        tf.keras.Model
+            Decoder.
         """
         X = self.decoder_input
         if self.is_conditional:
@@ -332,7 +425,12 @@ class BaseAEModel:
 
     def create_adversarial_head(self):
         """
-        returns adversarial head (reverse_gradient - adversarial_layers - num_conditions)
+        Create adversarial head: (reverse_gradient - adversarial_layers - num_conditions).
+
+        Returns
+        -------
+        tf.keras.Model
+            adversarial head.
         """
         assert self.is_conditional
         assert self.is_adversarial
@@ -350,6 +448,18 @@ class BaseAEModel:
         return adv_head
 
     def add_noise(self, X):
+        """
+        Add noise to X.
+
+        Parameters
+        ----------
+        X
+            inputs.
+
+        Returns
+        -------
+        X with noise applied.
+        """
         if self.config["input_noise"] == "dropout":
             X = tf.keras.layers.Dropout(self.config["noise_scale"])(X)
         elif self.config["input_noise"] == "gaussian":
@@ -361,20 +471,19 @@ class BaseAEModel:
 
 class VAEModel(BaseAEModel):
     """
-    VAE with simple gaussian prior (trainable with KL loss)
-    Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim * 2
-    Latent: split latent_dim in half, resample using gaussian prior
-    Decoder: fc_layers - linear (regularized) layer to num_output_channels
+    VAE with simple gaussian prior (trainable with KL loss).
+
+    Inherits from :class:`BaseAEModel`.
+
+    Model architecture:
+    - Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim * 2
+    - Latent: split latent_dim in half, resample using gaussian prior
+    - Decoder: fc_layers - linear (regularized) layer to num_output_channels
     """
 
     default_config = {"name": "VAEModel"}
 
     def create_encoder(self):
-        """
-        returns encoder and latent (or none)
-        Encoder outputs reparameterized latent
-        Latent is returned by overall model for loss calculation
-        """
         X = self._create_base_encoder()
         # linear layer to latent
         latent = tf.keras.layers.Dense(self.config["latent_dim"] * 2, activation=None, name="latent")(X)

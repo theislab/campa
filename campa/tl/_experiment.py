@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Dict, Iterable
+from typing import Any, List, Mapping, Iterable, Optional, MutableMapping
 import os
 import re
 import glob
@@ -16,8 +16,69 @@ from campa.constants import EXPERIMENT_DIR, get_data_config
 
 
 class Experiment:
+    """
+    Experiment stored on disk with neural network.
+
+    Initialised with config dictionary with keys:
+
+    - `experiment`: where to save experiment
+
+        - `dir`: experiment folder
+        - `name`: name of the experiment
+        - `save_config`: (bool), whether to save this config in the folder
+
+    - `data`: which dataset to use for training
+
+        - `data_config`: name of the data config to use, should be registered in ``campa.ini``
+        - `dataset_name`: name of the dataset, relative to ``DATA_DIR``
+        - `output_channels`: Channels that should be predicted by the neural network.
+          Defaults to all input channels.
+
+    - `model`: model definition
+
+        - `model_cls`: instance or value of :class:`ModelEnum`
+        - `model_kwargs`: keyword arguments passed to the model class
+        - `init_with_weights`: if true, looks for saved weights in experiment_dir.
+          if a path, loads these weights
+
+    - `training`: training hyperparameters
+
+        - `learning_rate`: learning rate to use
+        - `epochs`: number of epochs to train
+        - `batch_size`: number of samples per batch
+        - `loss`: mapping of model output names to values of :class:`LossEnum`.
+          Possible names are `decoder` and `latent`.
+        - `metrics`: mapping of model output names to values of :class:`LossEnum`.
+        - `save_model_weights`: (bool) whether or not to save the model.
+        - `save_history`: (bool) save csv with losses and metrics at each epoch.
+        - `overwrite_history`: overwrite existing history csv file. Otherwise concatenate to it.
+
+    - `evaluation`: evaluation on val/test split
+        - `split`: `train`, `val`, or `test`
+        - `predict_reps`: (list) model output that should be predicted.
+          Possible values: `decoder`, `latent`.
+        - `img_ids`: number of images to predict, or list of image ids.
+        - `predict_imgs`: (bool) whether to predict reconstructed images.
+        - `predict_cluster_imgs`: (bool) whether to predict clustered images.
+
+    - `cluster`: clustering on val/test split
+
+        - `cluster_name`: name of the clustering, used to save npy file.
+        - `cluster_rep`: model output name to use for clustering, or "mpp".
+        - `cluster_method`: leiden or kmeans.
+        - `leiden_resolution`: resolution parameter for leiden clustering.
+        - `subsample`: None or "subsample", whether or not to subsample data before clustering.
+        - `subsample_kwargs`: passed to :meth:`MPPData.subsample` for creating the subsample data for clustering.
+        - `umap`: (bool) predict UMAP of cluster_rep.
+
+    Parameters
+    ----------
+    config
+        Experiment config.
+    """
+
     # base experiment config
-    config: Dict[str, Any] = {
+    config: MutableMapping[str, Any] = {
         "experiment": {
             "dir": None,
             "name": "experiment",
@@ -67,8 +128,12 @@ class Experiment:
         },
     }
 
-    def __init__(self, config):
+    def __init__(self, config: Mapping[str, Any]):
+
         self.config = merged_config(self.config, config)
+        """
+        Experiment config, see :class:`Experiment`.
+        """
         self.log = logging.getLogger(self.__class__.__name__)
         self.log.info(f"Setting up experiment {self.dir}/{self.name}")
         data_config = get_data_config(self.config["data"]["data_config"])
@@ -96,10 +161,11 @@ class Experiment:
             self.log.info("exp_dir is None, did not save config")
 
     @classmethod
-    def from_dir(cls, exp_path: str):
+    def from_dir(cls, exp_path: str) -> "Experiment":
         """
-        init experiment from trained experiment in exp_path.
-        Changes init_with_weights to True and save_config to False
+        Init experiment from trained experiment in exp_path.
+
+        Changes ``init_with_weights`` to True and ``save_config`` to False
 
         Parameters
         ----------
@@ -116,29 +182,48 @@ class Experiment:
         self.log.info(f"Initialised from existing experiment in {self.dir}/{self.name}")
         return self
 
-    def set_to_evaluate(self):
-        # changes init_with_weights to True to load correct weights in Estimator
+    def set_to_evaluate(self) -> "Experiment":
+        """
+        Prepare Experiment for evaluation.
+
+        Changes ``init_with_weights`` to True to load correct weights in :class:`Estimator`.
+        """
         self.config["model"]["init_with_weights"] = True
         return self
 
     @property
-    def is_trainable(self):
+    def is_trainable(self) -> bool:
+        """
+        False, if this is not a traineable experiment (e.g. raw pixel clustering).
+        """
         return self.config["model"] is not None and self.config["training"] is not None
 
     @property
-    def name(self):
-        return self.config["experiment"]["name"]
+    def name(self) -> str:
+        """
+        Experiment name.
+        """
+        return str(self.config["experiment"]["name"])
 
     @property
-    def dir(self):  # noqa: A003
-        return self.config["experiment"]["dir"]
+    def dir(self) -> str:  # noqa: A003
+        """
+        Experiment directory.
+        """
+        return str(self.config["experiment"]["dir"])
 
     @property
-    def full_path(self):
+    def full_path(self) -> str:
+        """
+        Full path to Experiment.
+        """
         return os.path.join(EXPERIMENT_DIR, self.dir, self.name)
 
     @property
-    def estimator_config(self):
+    def estimator_config(self) -> Mapping[str, Any]:
+        """
+        Config dictionary to initialise :class:`campa.tl.Estimator`.
+        """
         estimator_config = {
             key: val for key, val in self.config.items() if key in ["experiment", "data", "model", "training"]
         }
@@ -146,11 +231,22 @@ class Experiment:
         return deepcopy(estimator_config)
 
     @property
-    def evaluate_config(self):
+    def evaluate_config(self) -> Mapping[str, Any]:
+        """
+        Config dictionary to initialise :class:`campa.tl.Predictor`.
+        """
         evaluate_config = self.config["evaluation"]
         return deepcopy(evaluate_config)
 
-    def get_history(self):
+    def get_history(self) -> Optional[pd.DataFrame]:
+        """
+        Training history.
+
+        Returns
+        -------
+        pd.DataFrame:
+            training history
+        """
         history_path = os.path.join(self.full_path, "history.csv")
         if os.path.isfile(history_path):
             return pd.read_csv(history_path, index_col=0)
@@ -158,9 +254,9 @@ class Experiment:
             return None
 
     @property
-    def epoch(self):
+    def epoch(self) -> int:
         """
-        last epoch for which there is a trained model
+        Last epoch for which there is a trained model.
         """
         weights_path = tf.train.latest_checkpoint(self.full_path)
         if weights_path is None:
@@ -172,9 +268,11 @@ class Experiment:
         else:
             return int(res[0])
 
-    def get_split_mpp_data(self):
+    def get_split_mpp_data(self) -> Optional[MPPData]:
         """
-        val / test from results_epochXXX
+        Val or test :class:`MPPData` read from ``results_epoch{self.epoch}``.
+
+        Whether val or test is returned depends on evaluation split defined in config.
         """
         split = self.config["evaluation"]["split"]
         data_dir = os.path.join(self.full_path, f"results_epoch{self.epoch:03d}", split)
@@ -196,9 +294,11 @@ class Experiment:
             )
         return None
 
-    def get_split_imgs_mpp_data(self):
+    def get_split_imgs_mpp_data(self) -> Optional[MPPData]:
         """
-        val_imgs / test_imgs from results_epochXXX
+        Val_imgs / test_imgs :class:`MPPData` read from ``results_epoch{self.epoch}```.
+
+        Whether val or test is returned depends on evaluation split defined in config.
         """
         split = self.config["evaluation"]["split"]
         data_dir = os.path.join(self.full_path, f"results_epoch{self.epoch:03d}", split + "_imgs")
@@ -220,14 +320,21 @@ class Experiment:
             )
         return None
 
-    def get_sub_mpp_data(self):
+    def get_split_cluster_annotation(self, cluster_name: str = "clustering") -> pd.DataFrame:
         """
-        subsampled mpp data from aggregated/sub
-        """
+        Read cluster_annotation file for evaluation split from disk.
 
-    def get_split_cluster_annotation(self, cluster_name="clustering"):
-        """
-        Reads cluster_annotation file from disk for evaluation split
+        Looks for file ``{cluster_name}_annotation.csv`` in ``results_epoch{self.epoch}``.
+
+        Parameters
+        ----------
+        cluster_name
+            Name of clustering.
+
+        Returns
+        -------
+        pd.DataFrame
+            The cluster annotation file.
         """
         fname = os.path.join(
             self.full_path,
@@ -238,10 +345,26 @@ class Experiment:
         # TODO this reading is duplicated in Cluster (where annotation is first created)
         return pd.read_csv(fname, index_col=0, dtype=str, keep_default_na=False)
 
-    def get_cluster_annotation(self, cluster_name="clustering", cluster_dir=None):
+    def get_cluster_annotation(
+        self, cluster_name: str = "clustering", cluster_dir: Optional[str] = None
+    ) -> pd.DataFrame:
         """
-        Read cluster_annotation for full data from disk
-        If cluster_dir is none, is inferred from filesystem
+        Read cluster_annotation file for full data from disk.
+
+        Looks for file ``{cluster_name}_annotation.csv`` in ``cluster_dir``.
+        If ``cluster_dir`` is None, is is set to the first dir of ``aggregated/sub-*``.
+
+        Parameters
+        ----------
+        cluster_name
+            Name of clustering.
+        cluster_dir
+            Directory in which to find the clustering.
+
+        Returns
+        -------
+        pd.DataFrame
+            The cluster annotation file.
         """
         # TODO need to somehow figure out sub dir!
         if cluster_dir is None:
@@ -249,13 +372,25 @@ class Experiment:
                 cluster_dir = "aggregated/" + os.path.basename(f)
                 self.log.info(f"Cluster annotation: using cluster data in {cluster_dir}")
                 break
-        fname = os.path.join(self.full_path, cluster_dir, f"{cluster_name}_annotation.csv")
+        fname = os.path.join(self.full_path, cluster_dir, f"{cluster_name}_annotation.csv")  # type: ignore[arg-type]
         return pd.read_csv(fname, index_col=0, dtype=str, keep_default_na=False)
 
     @staticmethod
-    def get_experiments_from_config(config_fname, exp_names=None):
+    def get_experiments_from_config(config_fname: str, exp_names: Optional[Iterable[str]] = None) -> List["Experiment"]:
         """
-        init and return experiments from configs in config.py file
+        Init and return experiments from configs in config file.
+
+        Parameters
+        ----------
+        config_fname
+            full path to config file containing experiment definitions.
+        exp_names
+            List of experiment names to load. If None, all are loaded.
+
+        Returns
+        -------
+        `typing.Iterable[Experiment]`
+            Initialised experiments.
         """
         config = load_config(config_fname)
         exps = []
@@ -266,7 +401,26 @@ class Experiment:
         return exps
 
     @staticmethod
-    def get_experiments_from_dir(exp_dir, exp_names=None, only_trainable=False):
+    def get_experiments_from_dir(
+        exp_dir: str, exp_names: Optional[Iterable[str]] = None, only_trainable: bool = False
+    ) -> List["Experiment"]:
+        """
+        Init and return experiments from experiment directory.
+
+        Parameters
+        ----------
+        exp_dir
+            Experiment directory, relative to EXPERIMENT_DIR.
+        exp_names
+            List of experiment names to load. If None, all are loaded.
+        only_trainable
+            Only return trainable experiments.
+
+        Returns
+        -------
+        Iterable[Experiment]
+            Initialised experiments.
+        """
         exps = []
         for exp_name in next(os.walk(os.path.join(EXPERIMENT_DIR, exp_dir)))[1]:
             config_fname = os.path.join(EXPERIMENT_DIR, exp_dir, exp_name, "config.json")
@@ -277,24 +431,25 @@ class Experiment:
         return exps
 
 
-def run_experiments(exps: Iterable[Experiment], mode: str = "all"):
+def run_experiments(exps: Iterable[Experiment], mode: str = "all") -> None:
     """
-    Execute experiments
+    Execute experiments.
 
     Runs all given experiments in the given mode.
     The following modes are available:
-    - "train": train experiments (if trainable)
-    - "evaluate": predict experiments on val set and cluster results (on val set)
-    - "trainval": both train and evaluate
-    - "compare": generate comparative plots of experiments
-    - "all": trainval and compare
+
+    - `train`: train experiments (if trainable)
+    - `evaluate`: predict experiments on val set and cluster results (on val set)
+    - `trainval`: both train and evaluate
+    - `compare`: generate comparative plots of experiments
+    - `all`: trainval and compare
 
     Parameters
     ----------
     exps
-        experiments to run
+        Experiments to run.
     mode
-        mode, one of "train", "evaluate", "trainval", "compare", "all"
+        mode, one of "train", "evaluate", "trainval", "compare", "all".
     """
     from campa.tl import Cluster, Estimator, Predictor, ModelComparator
 
@@ -338,9 +493,11 @@ def run_experiments(exps: Iterable[Experiment], mode: str = "all"):
         comp.plot_umap()
 
 
-def _prepare_exp_split(exp):
+def _prepare_exp_split(exp: Experiment) -> None:
     """
-    set up exp split data for non trainable model. Mimicks results folders created with predictor
+    Set up exp split data for non trainable model.
+
+    Mimicks results folders created with predictor.
     """
     import numpy as np
 

@@ -39,6 +39,7 @@ Plotting
     :toctree: api
 
     pl.plot_mean_intensity
+    pl.get_intensity_change
     pl.plot_intensity_change
     pl.plot_mean_size
     pl.plot_size_change
@@ -46,3 +47,19 @@ Plotting
     pl.plot_co_occurrence
     pl.plot_co_occurrence_grid
     pl.annotate_img
+
+Other
+~~~~~
+
+.. module:: campa
+.. currentmodule:: campa
+.. autosummary::
+    :toctree: api
+
+    utils.load_config
+    utils.merged_config
+    utils.init_logging
+    constants.get_data_config
+    constants.EXPERIMENT_DIR
+    constants.BASE_DATA_DIR
+    constants.CO_OCC_CHUNK_SIZE

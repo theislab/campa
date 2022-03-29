@@ -1,11 +1,22 @@
 from copy import copy
-from typing import Dict
+from typing import (
+    Any,
+    Dict,
+    List,
+    Tuple,
+    Union,
+    Mapping,
+    Iterable,
+    Optional,
+    MutableMapping,
+)
 from logging import getLogger
 import os
 import json
 
 import numpy as np
 import pandas as pd
+import anndata as ad
 
 from campa.pl import annotate_img
 from campa.constants import get_data_config
@@ -48,7 +59,7 @@ class MPPData:
         metadata: pd.DataFrame,
         channels: pd.DataFrame,
         data: Dict[str, np.ndarray],
-        **kwargs,
+        **kwargs: Any,
     ):
         """
         data: dictionary containing MPPData, at least containing required_keys: x, y, obj_ids.
@@ -70,6 +81,9 @@ class MPPData:
         self.data_config = get_data_config(self.data_config_name)
         self.channels = channels
         self._data = data
+        # data dir and base dir
+        self.data_dir: Union[str, None] = None
+        self.base_dir: Union[str, None] = None
 
         for required_key in ["x", "y", "obj_ids"]:
             assert required_key in data.keys(), f"required key {required_key} missing from data"
@@ -81,20 +95,20 @@ class MPPData:
         self.log.info(f"Created new: {self.__str__()}")
 
     @classmethod
-    def from_image_data(self, image_data: ImageData):
+    def from_image_data(self, image_data: ImageData) -> "MPPData":
         # TODO convert ImageData to MPPData
         pass
 
     @classmethod
     def from_data_dir(
         cls,
-        data_dir,
-        mode="r",
-        base_dir=None,
-        keys=("x", "y", "obj_ids"),
-        optional_keys=("mpp", "labels", "latent", "conditions"),
-        **kwargs,
-    ):
+        data_dir: str,
+        mode: str = "r",
+        base_dir: Optional[str] = None,
+        keys: Iterable[str] = ("x", "y", "obj_ids"),
+        optional_keys: Iterable[str] = ("mpp", "labels", "latent", "conditions"),
+        **kwargs: Any,
+    ) -> "MPPData":
         """
         Read MPPData from directory.
 
@@ -161,13 +175,13 @@ class MPPData:
     @classmethod
     def _from_data_dir(
         cls,
-        data_dir,
-        mode="r",
-        base_dir=None,
-        keys=("x", "y", "obj_ids"),
-        optional_keys=("mpp", "labels", "latent", "conditions"),
-        **kwargs,
-    ):
+        data_dir: str,
+        mode: str = "r",
+        base_dir: Optional[str] = None,
+        keys: Iterable[str] = ("x", "y", "obj_ids"),
+        optional_keys: Iterable[str] = ("mpp", "labels", "latent", "conditions"),
+        **kwargs: Any,
+    ) -> "MPPData":
         """
         Helper function to read MPPData from directory. Ignores mpp_params.json
         """
@@ -202,7 +216,7 @@ class MPPData:
         return self
 
     @classmethod
-    def concat(cls, objs):
+    def concat(cls, objs: List["MPPData"]) -> "MPPData":
         """concatenate the mpp_data objects by concatenating all arrays and return a new one"""
         # channels, data_config, and _data.keys() need to be the same
         for mpp_data in objs:
@@ -230,29 +244,29 @@ class MPPData:
 
     # --- Properties ---
     @property
-    def mpp(self):
+    def mpp(self) -> np.ndarray:
         if "mpp" not in self._data.keys():
             self.log.info("Setting mpp to empty array")
             self._data["mpp"] = np.zeros((len(self.x), 1, 1, len(self.channels)))
         return self._data["mpp"]
 
     @property
-    def obj_ids(self):
+    def obj_ids(self) -> np.ndarray:
         return self._data["obj_ids"]
 
     @property
-    def x(self):
+    def x(self) -> np.ndarray:
         return self._data["x"]
 
     @property
-    def y(self):
+    def y(self) -> np.ndarray:
         return self._data["y"]
 
     @property
-    def latent(self):
+    def latent(self) -> Union[np.ndarray, None]:
         return self.data("latent")
 
-    def data(self, key):
+    def data(self, key: str) -> Union[np.ndarray, None]:
         """
         Information contained in MPPData.
 
@@ -271,30 +285,30 @@ class MPPData:
         return None
 
     @property
-    def conditions(self):
+    def conditions(self) -> Union[np.ndarray, None]:
         return self.data("conditions")
 
     @property
-    def has_neighbor_data(self):
+    def has_neighbor_data(self) -> bool:
         return (self.mpp.shape[1] != 1) and (self.mpp.shape[2] != 1)
 
     @property
-    def center_mpp(self):
-        c = self.mpp.shape[1] // 2
-        return self.mpp[:, c, c, :]
+    def center_mpp(self) -> np.ndarray:
+        c = int(self.mpp.shape[1] // 2)
+        return self.mpp[:, c, c, :]  # type: ignore[no-any-return]
 
     @property
-    def unique_obj_ids(self):
-        return np.unique(self.obj_ids)
+    def unique_obj_ids(self) -> np.ndarray:
+        return np.unique(self.obj_ids)  # type: ignore[no-any-return]
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = f"MPPData for {self.data_config_name} ({self.mpp.shape[0]} mpps with shape {self.mpp.shape[1:]}"
         s += f" from {len(self.metadata)} objects)."
         s += f" Data keys: {list(self._data.keys())}."
         return s
 
     # --- Saving ---
-    def write(self, save_dir, save_keys=None, mpp_params=None):
+    def write(self, save_dir: str, save_keys: Iterable[str] = None, mpp_params: Mapping[str, Any] = None) -> None:
         """
         Write MPPData to disk.
 
@@ -335,7 +349,7 @@ class MPPData:
         self.channels.to_csv(os.path.join(save_dir, "channels.csv"), header=None)
         self.metadata.to_csv(os.path.join(save_dir, "metadata.csv"))
 
-    def copy(self):
+    def copy(self) -> "MPPData":
         import copy
 
         copy.deepcopy(self._data)
@@ -354,7 +368,14 @@ class MPPData:
 
     # TODO Nastassya: ensure that each function logs what its doing with log.info
     # --- Modify / Add data ---
-    def add_data_from_dir(self, data_dir, keys=(), optional_keys=(), subset=False, **kwargs):
+    def add_data_from_dir(
+        self,
+        data_dir: str,
+        keys: Iterable[str] = (),
+        optional_keys: Iterable[str] = (),
+        subset: bool = False,
+        **kwargs: Any,
+    ) -> None:
         """
         Add data to MPPData from data_dir.
 
@@ -393,21 +414,21 @@ class MPPData:
         # finally, add keys
         added_mpp = False
         for key in keys:
-            self._data[key] = mpp_to_add.data(key)
+            self._data[key] = mpp_to_add._data[key]
             added_mpp = added_mpp if key != "mpp" else True
         for key in optional_keys:
             if mpp_to_add.data(key) is not None:
                 # check if mpp is not only zeros
-                if key == "mpp" and (mpp_to_add.data("mpp") == np.zeros_like(mpp_to_add.data("mpp"))).all():
+                if key == "mpp" and (mpp_to_add.data("mpp") == np.zeros_like(mpp_to_add.mpp)).all():
                     continue
-                self._data[key] = mpp_to_add.data(key)
+                self._data[key] = mpp_to_add._data[key]
                 added_mpp = added_mpp if key != "mpp" else True
         # update channels if added mpp
         if added_mpp:
             self.channels = mpp_to_add.channels
         self.log.info(f"Updated data to keys {list(self._data.keys())}")
 
-    def train_val_test_split(self, train_frac=0.8, val_frac=0.1):
+    def train_val_test_split(self, train_frac: float = 0.8, val_frac: float = 0.1) -> List["MPPData"]:
         """split along obj_ids for train/val/test split"""
         # TODO (maybe) adapt and ensure that have even val/test fractions from each well
         ids = self.unique_obj_ids.copy()
@@ -424,7 +445,7 @@ class MPPData:
             splits.append(self.apply_mask(ind, copy=True))
         return splits
 
-    def prepare(self, params):
+    def prepare(self, params: Mapping[str, Any]) -> None:
         """prepare MPP data according to given params.
 
         Ignores data_dirs, split, subsampling, and neighborhood.
@@ -446,7 +467,7 @@ class MPPData:
 
     # --- Detailed fns used in prepare() ---
     # TODO: Nastassya write tests for this
-    def add_conditions(self, cond_desc, cond_params=None):
+    def add_conditions(self, cond_desc: str, cond_params: MutableMapping[str, Any] = None) -> None:
         """
         Add conditions informations by aggregating over channels (per cell) or reading data from cell cycle file.
 
@@ -479,7 +500,7 @@ class MPPData:
                 - one_hot: same as when only ***columnName*** is provided as a condition description,
                   but additionally one-hot encodes the class values.
 
-        cond_params: Dictionary with parameters needed for some conditions, e.g. for classyfying values into bins.
+        cond_params: Dictionary with parameters needed for some conditions, e.g. for classifying values into bins.
             If empty, these values are calculated and stored into this dict (where appropriate).
 
         NOTE: Operation is performed inplace.
@@ -494,13 +515,13 @@ class MPPData:
     # TODO: Nastassya: write tests for this
     def subset(
         self,
-        frac=None,
-        num=None,
-        obj_ids=None,
-        nona_condition=False,
-        copy=False,
-        **kwargs,
-    ):
+        frac: Optional[float] = None,
+        num: Optional[int] = None,
+        obj_ids: Optional[Union[np.ndarray, List[int]]] = None,
+        nona_condition: bool = False,
+        copy: bool = False,
+        **kwargs: Any,
+    ) -> "MPPData":
         """
         Restrict objects to those with specified value(s) for key in the metadata table
 
@@ -566,7 +587,7 @@ class MPPData:
         return self.apply_mask(mpp_mask, copy=copy)
 
     # TODO Nastassya: write tests for this
-    def subset_channels(self, channels):
+    def subset_channels(self, channels: Iterable[str]) -> None:
         """
         Restrict self.mpp to defined channels. Channels are given as string values.
         Updates self.mpp and self.channels
@@ -593,13 +614,13 @@ class MPPData:
     # TODO Nastassya: write tests for this
     def subsample(
         self,
-        frac=None,
-        frac_per_obj=None,
-        num=None,
-        num_per_obj=None,
-        add_neighborhood=False,
-        neighborhood_size=3,
-    ):
+        frac: Optional[float] = None,
+        frac_per_obj: Optional[float] = None,
+        num: Optional[int] = None,
+        num_per_obj: Optional[int] = None,
+        add_neighborhood: bool = False,
+        neighborhood_size: int = 3,
+    ) -> "MPPData":
         """
         Performs MPP-level subsampling by selecting mpps (could be thought of as pixels)
         All other information is updated accordingly (to save RAM/HDD-memory).
@@ -647,10 +668,10 @@ class MPPData:
             # select other information accordingly
             mpp_data = self.apply_mask(selected, copy=True)
 
-        else:
+        else:  # frac_per_obj or num_per_obj are specified
             if frac_per_obj is not None:
                 self.log.info(f"Subsampling each object to {frac_per_obj*100}%")
-            else:
+            else:  # num_per_obj is specified
                 self.log.info(f"Subsampling each object to {num_per_obj}")
             # iterate over all obj_ids
             mask = np.zeros(len(self.mpp), dtype=bool)
@@ -659,21 +680,21 @@ class MPPData:
                 obj_mask = self.obj_ids == obj_id
                 if frac_per_obj is not None:
                     cur_num = int(obj_mask.sum() * frac_per_obj)
-                else:
-                    cur_num = num_per_obj
+                else:  # num_per_obj is specified
+                    cur_num = num_per_obj  # type: ignore[assignment]
                 # TODO replace with self.rng if have reproduced datasets
                 rng = np.random.default_rng(seed=self.seed)
                 selected = rng.choice(len(obj_mask.nonzero()[0]), cur_num, replace=False)
                 selected_idx = idx[obj_mask][selected]
                 mask[selected_idx] = True
-            mpp_data = self.apply_mask(mask, copy=True)
+            mpp_data: MPPData = self.apply_mask(mask, copy=True)  # type: ignore[no-redef]
         if add_neighborhood:
             self.log.info(f"Adding neighborhood of size {neighborhood_size}")
             neighbor_mpp = self._get_neighborhood(mpp_data.obj_ids, mpp_data.x, mpp_data.y, size=neighborhood_size)
             mpp_data._data["mpp"] = neighbor_mpp
         return mpp_data
 
-    def add_neighborhood(self, size=3, copy=False):
+    def add_neighborhood(self, size: int = 3, copy: bool = False) -> "MPPData":
         """
         Extends mpp representation with a square neighbourhood around it.
 
@@ -701,8 +722,14 @@ class MPPData:
             assert not self.has_neighbor_data, "cannot add neighborhood, already has neighbor data"
             # TODO Nastassya: this should be in a unittest of self.get_neighborhood
             self._data["mpp"] = mpp
+            return self
 
-    def normalise(self, background_value=None, percentile=None, rescale_values=()):
+    def normalise(
+        self,
+        background_value: Optional[Union[float, List[float], str]] = None,
+        percentile: Optional[float] = None,
+        rescale_values: Iterable[float] = (),
+    ) -> None:
         """
         To prepare the data, pixel values can be normalized. For that, pixel values can be e.g. shifted and rescaled so
         that they end up ranging between 0 and 1:
@@ -735,10 +762,10 @@ class MPPData:
         if background_value is not None:
             self._subtract_background(background_value)
         if percentile is not None:
-            self._rescale_intensities_per_channel(percentile, rescale_values)
+            self._rescale_intensities_per_channel(percentile, list(rescale_values))
 
     # --- Helper functions ---
-    def apply_mask(self, mask, copy=False):
+    def apply_mask(self, mask: np.ndarray, copy: bool = False) -> "MPPData":
         """
         return new MPPData with masked self._data values
         """
@@ -749,6 +776,7 @@ class MPPData:
         if copy is False:
             self._data = data
             self.metadata = self.metadata[self.metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))]
+            return self
         else:
             return MPPData(
                 metadata=self.metadata,
@@ -758,7 +786,7 @@ class MPPData:
                 data_config=self.data_config_name,
             )
 
-    def _subtract_background(self, background_value):
+    def _subtract_background(self, background_value: Union[float, List[float], str]) -> None:
         """
         background_value: float value to be subtracted, or name of column in CHANNELS_METADATA
         NOTE: code copied/adapted from Scott Berry's MCU package
@@ -774,18 +802,20 @@ class MPPData:
         else:  # is column name
             self.log.info(f"Subtracting channel-specific background value defined in column {background_value}")
             channels_metadata = pd.read_csv(os.path.join(self.data_config.DATA_DIR, self.data_config.CHANNELS_METADATA))
-            background_value = channels_metadata.set_index("name").loc[self.channels.name][background_value]
+            background_value_df = channels_metadata.set_index("name").loc[self.channels.name][background_value]
             # replace nan with 0
-            for ch, val in zip(self.channels.name, background_value):
+            for ch, val in zip(self.channels.name, background_value_df):
                 if pd.isna(val):
                     self.log.warning(f"Missing background value for channel {ch}")
-            background_value = background_value.fillna(0)
-            self.log.debug(f"use background_value: {background_value}")
-            self._data["mpp"] = self.mpp.astype(np.float32) - np.array(background_value)
+            background_value_df = background_value_df.fillna(0)
+            self.log.debug(f"use background_value: {background_value_df}")
+            self._data["mpp"] = self.mpp.astype(np.float32) - np.array(background_value_df)
         # cut off at 0 (no negative values)
         self._data["mpp"][self.mpp < 0] = 0
 
-    def _rescale_intensities_per_channel(self, percentile=98.0, rescale_values=None):
+    def _rescale_intensities_per_channel(
+        self, percentile: float = 98.0, rescale_values: Optional[List[float]] = None
+    ) -> None:
         """
         TODO add more info
         NOTE converts self.mpp to float32
@@ -805,7 +835,9 @@ class MPPData:
         self._data["mpp"] = self.mpp.astype(np.float32)
 
     # ---- getting functions -----
-    def _get_per_mpp_value(self, per_obj_value):
+    def _get_per_mpp_value(
+        self, per_obj_value: Union[Mapping[str, Iterable[Any]], Iterable[Any]]
+    ) -> Union[pd.DataFrame, pd.Series]:
         """takes list of values corresponding to self.metadata[OBJ_ID]
         and propagates them to self.obj_id
 
@@ -815,8 +847,9 @@ class MPPData:
         Returns:
             pd.Series or pd.DataFrame
         """
+        # val: Union[List[str], str] = None
         if isinstance(per_obj_value, dict):
-            val = per_obj_value.keys()
+            val: Union[List[str], str] = list(per_obj_value.keys())
             per_obj_value.update({"MERGE_KEY": self.metadata[self.data_config.OBJ_ID]})
             per_obj_df = pd.DataFrame(per_obj_value)
         else:
@@ -831,7 +864,7 @@ class MPPData:
         per_mpp_value = df.merge(per_obj_df, left_on="MERGE_KEY", right_on="MERGE_KEY", how="left")[val]
         return per_mpp_value
 
-    def get_condition(self, desc, cond_params=None):
+    def get_condition(self, desc: str, cond_params: Optional[MutableMapping[str, Any]] = None) -> np.ndarray:
         """
         return condition based on desc (used by add_conditions).
         If cond is a list of conditions, return unique one-hot encoded vector combining multiple conditions
@@ -880,7 +913,9 @@ class MPPData:
                 )
         return cond
 
-    def get_adata(self, X="mpp", obsm=(), obs=()):
+    def get_adata(
+        self, X: str = "mpp", obsm: Union[Dict[str, str], List[str], Tuple[str, ...]] = (), obs: Iterable[str] = ()
+    ) -> ad.AnnData:
         """
         Create adata from information contained in MPPData.
 
@@ -897,26 +932,28 @@ class MPPData:
 
         if isinstance(obsm, list) or isinstance(obsm, tuple):
             obsm = {o: o for o in obsm}
-        obsm = {k: self.data(v).astype(np.float32) for k, v in obsm.items()}
+
+        assert len(set(obsm.values()).intersection(self._data.keys())) == len(obsm)
+        obsm = {k: self.data(v).astype(np.float32) for k, v in obsm.items()}  # type: ignore[union-attr]
         if X == "mpp":
             var = self.channels
-            X = self.center_mpp
+            X_ = self.center_mpp
         else:
             var = None
-            X = self.data(X)
+            X_ = self._data[X]
         # add spatial coords as obsm['spatial']
         obsm["spatial"] = np.stack([self.x, self.y]).T.astype(np.float32)
         # get per-pixel obs
         obs_ = self._get_per_mpp_value(self.metadata.to_dict(orient="list"))
         for o in obs:
             obs_[o] = self.data(o)
-        adata = ad.AnnData(X=X.astype(np.float32), obs=obs_, var=var, obsm=obsm)
+        adata = ad.AnnData(X=X_.astype(np.float32), obs=obs_, var=var, obsm=obsm)
         # set var_names if possible
         if var is not None:
             adata.var_names = adata.var["name"]
         return adata
 
-    def extract_csv(self, data="mpp", obs=()):
+    def extract_csv(self, data: str = "mpp", obs: Iterable[str] = ()) -> pd.DataFrame:
         """
         extract mpp_data.data into csv file.
 
@@ -930,7 +967,7 @@ class MPPData:
             columns = self.channels
             X = self.center_mpp
         else:
-            X = self.data(data)
+            X = self._data[data]
         df = pd.DataFrame(data=X, columns=columns)
         # add x,y,obj_id
         df["x"] = self.x
@@ -940,7 +977,14 @@ class MPPData:
         return df
 
     # TODO nastassya: test
-    def _get_neighborhood(self, obj_ids, xs, ys, size=3, border_mode="center"):
+    def _get_neighborhood(
+        self,
+        obj_ids: Union[np.ndarray, List[str]],
+        xs: np.ndarray,
+        ys: np.ndarray,
+        size: int = 3,
+        border_mode: str = "center",
+    ) -> np.ndarray:
         """return neighborhood information for given obj_ids + xs + ys"""
         data = np.zeros((len(obj_ids), size, size, len(self.channels)), dtype=self.mpp.dtype)
         for obj_id in np.unique(obj_ids):
@@ -953,7 +997,9 @@ class MPPData:
             data[mask] = np.array(vals)
         return data
 
-    def get_channel_ids(self, to_channels, from_channels=None):
+    def get_channel_ids(
+        self, to_channels: List[str], from_channels: Optional[Union[pd.DataFrame, List[str]]] = None
+    ) -> List[int]:
         """
         for a list of channels, return their ids in mpp_data
 
@@ -963,7 +1009,7 @@ class MPPData:
         """
         if from_channels is None:
             from_channels = self.channels.copy()
-            from_channels = from_channels.reset_index().set_index("name")
+            from_channels = from_channels.reset_index().set_index("name")  # type: ignore[union-attr]
         if not isinstance(from_channels, pd.DataFrame):
             from_channels = pd.DataFrame({"name": from_channels, "channel_id": np.arange(len(from_channels))})
             from_channels = from_channels.set_index("name")
@@ -972,7 +1018,9 @@ class MPPData:
 
     # --- image plotting (only for non-subsampled MPPData) ---
     @staticmethod
-    def _get_img_from_data(x, y, data, img_size=None, pad=0):
+    def _get_img_from_data(
+        x: np.ndarray, y: np.ndarray, data: np.ndarray, img_size: Optional[int] = None, pad: int = 0
+    ) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[int, int]]]:
         """
         Create image from x and y coordinates and fill with data.
         Args:
@@ -997,9 +1045,16 @@ class MPPData:
             return img
         else:
             # padding info is only relevant when not cropping img to shape
-            return img, (x.min() - pad, y.min() - pad)
+            return img, (int(x.min() - pad), int(y.min() - pad))
 
-    def get_object_img(self, obj_id, data="mpp", channel_ids=None, annotation_kwargs=None, **kwargs):
+    def get_object_img(
+        self,
+        obj_id: str,
+        data: str = "mpp",
+        channel_ids: Optional[Iterable[int]] = None,
+        annotation_kwargs: Mapping[str, Any] = None,
+        **kwargs: Any,
+    ) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[int, int]]]:
         """
         Calculate data image of given object id.
         args:
@@ -1037,7 +1092,13 @@ class MPPData:
                 img = annotate_img(img, from_col=data, **annotation_kwargs)
         return img
 
-    def get_object_imgs(self, data="mpp", channel_ids=None, annotation_kwargs=None, **kwargs):
+    def get_object_imgs(
+        self,
+        data: str = "mpp",
+        channel_ids: Optional[Iterable[int]] = None,
+        annotation_kwargs: Mapping[str, Any] = None,
+        **kwargs: Any,
+    ) -> List[np.ndarray]:
         """
         Return images for each obj_id in current data.
         Args: arguments for get_object_img
@@ -1055,9 +1116,11 @@ class MPPData:
                 # fn also returns padding info, which we don't need here
                 res = res[0]
             imgs.append(res)
-        return imgs
+        return imgs  # type: ignore[return-value]
 
-    def get_img(self, data="mpp", channel_ids=None, **kwargs):
+    def get_img(
+        self, data: str = "mpp", channel_ids: Optional[Iterable[str]] = None, **kwargs: Any
+    ) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[int, int]]]:
         """
         Calculate data image of all mpp data.
         data: key in self._data that should be plotted on the image
@@ -1075,7 +1138,7 @@ class MPPData:
             values = values[:, np.newaxis]
         return MPPData._get_img_from_data(self.x, self.y, values, **kwargs)
 
-    def compare(self, obj):
+    def compare(self, obj: "MPPData") -> Tuple[bool, Dict[str, bool]]:
 
         assert np.array_equal(list(self._data.keys()), list(obj._data.keys()))
         same_data = {}
@@ -1088,7 +1151,7 @@ class MPPData:
             same_data["metadata"] = self.metadata.reset_index(drop=True).equals(obj.metadata.reset_index(drop=True))
         else:
             same_data["metadata"] = False
-        return np.all(list(same_data.values())), same_data
+        return np.all(list(same_data.values())), same_data  # type: ignore[return-value]
 
 
 def _try_mmap_load(fname, mmap_mode="r", allow_not_existing=False):
@@ -1132,7 +1195,7 @@ def _get_keys(keys, optional_keys, base_mpp_data=None):
         # loading of mpp_data
         # check which of required keys are already loaded, and move them to optional
         res_keys = ["x", "y", "obj_ids"]
-        res_optional_keys = copy(optional_keys)
+        res_optional_keys = list(copy(optional_keys))
         for k in list(set(keys).difference(res_keys)):
             if base_mpp_data.data(k) is not None:
                 res_optional_keys.append(k)

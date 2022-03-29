@@ -6,14 +6,15 @@
 
 .. autoclass:: {{ fullname }}
 
-   .. automethod:: __init__
-
+   {% if 'Enum' not in objname %}
    {% block attributes %}
+
    {% if attributes %}
    .. rubric:: Attributes
 
    .. autosummary::
       :toctree: .
+
    {% for item in attributes %}
       ~{{ fullname }}.{{ item }}
    {%- endfor %}
@@ -33,5 +34,6 @@
    {%- endfor %}
    {% endif %}
    {% endblock %}
+   {% endif %}
 
    .. _sphx_glr_backref_{{fullname}}:

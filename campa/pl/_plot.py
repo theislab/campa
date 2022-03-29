@@ -48,5 +48,6 @@ def annotate_img(img, annotation=None, from_col="clustering", to_col=None, color
 
 
 def hex2rgb(h):
+    """Convert hex color string to rgb tuple."""
     h = h.lstrip("#")
     return [int(h[i : i + 2], 16) for i in (0, 2, 4)]
