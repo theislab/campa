@@ -58,7 +58,10 @@ intersphinx_mapping = dict(  # noqa: C408
     sklearn=("https://scikit-learn.org/stable/", None),
     numba=("https://numba.readthedocs.io/en/stable/", None),
     xarray=("https://xarray.pydata.org/en/stable/", None),
-    tensorflow=("https://www.tensorflow.org/api_docs/python", "https://github.com/GPflow/tensorflow-intersphinx/raw/master/tf2_py_objects.inv"),
+    tensorflow=(
+        "https://www.tensorflow.org/api_docs/python",
+        "https://github.com/GPflow/tensorflow-intersphinx/raw/master/tf2_py_objects.inv",
+    ),
 )
 
 # Add any paths that contain templates here, relative to this directory.

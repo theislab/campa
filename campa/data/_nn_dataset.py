@@ -1,7 +1,7 @@
-from typing import Any, List, Mapping, Optional, Iterable
+from typing import Any, List, Tuple, Union, Mapping, Iterable, Optional
+import os
 import json
 import logging
-import os
 
 import numpy as np
 import tensorflow as tf
@@ -10,7 +10,7 @@ from campa.constants import get_data_config
 from campa.data._data import MPPData
 
 
-def create_dataset(params: Mapping[str, Any]):
+def create_dataset(params: Mapping[str, Any]) -> None:
     """
     Create a :class:`NNDataset`.
 
@@ -115,7 +115,7 @@ class NNDataset:
     """
     Dataset for training and evaluation of neural networks.
 
-    A ``NNDataset`` is stored within ``DATA_DIR/dataset_name``. 
+    A ``NNDataset`` is stored within ``DATA_DIR/dataset_name``.
     This folder contains `train`/`val`/`test`/`val_img`/`test_img` folders with :class:`MPPData` objects.
 
     Parameters
@@ -155,27 +155,27 @@ class NNDataset:
         s += f" test: {len(self.data['test'].mpp)}"
         return s
 
-    def x(self, split:str, is_conditional:bool=False):
+    def x(self, split: str, is_conditional: bool = False) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """
         Inputs to neural network.
-        
+
         Parameters
         ----------
         split
             One of `train`, `val`, `test`.
-        is_conditional 
+        is_conditional
             Whether to add condition information to x
         """
         x = self.data[split].mpp.astype(np.float32)
         if is_conditional:
-            c = self.data[split].conditions.astype(np.float32)
-            x = (x, c)
+            c = self.data[split].conditions.astype(np.float32)  # type: ignore[union-attr]
+            x = (x, c)  # type: ignore[assignment]
         return x
 
-    def y(self, split:str, output_channels:Optional[Iterable[str]]=None):
+    def y(self, split: str, output_channels: Optional[Iterable[str]] = None) -> np.ndarray:
         """
         Groundtruth outputs of neural network.
-        
+
         Parameters
         ----------
         split
@@ -186,18 +186,18 @@ class NNDataset:
         """
         y = self.data[split].center_mpp
         if output_channels is not None:
-            channel_ids = self.data[split].get_channel_ids(output_channels)
+            channel_ids = self.data[split].get_channel_ids(list(output_channels))
             y = y[:, channel_ids]
         return y
 
     def get_tf_dataset(
         self,
-        split: str ="train",
-        output_channels: Optional[Iterable[str]]=None,
-        is_conditional: bool=False,
-        repeat_y: bool =False,
-        add_c_to_y: bool=False,
-        shuffled: bool =False,
+        split: str = "train",
+        output_channels: Optional[Iterable[str]] = None,
+        is_conditional: bool = False,
+        repeat_y: bool = False,
+        add_c_to_y: bool = False,
+        shuffled: bool = False,
     ) -> tf.data.Dataset:
         """
         :class:`tf.data.Dataset` of the desired split.
@@ -209,7 +209,7 @@ class NNDataset:
         output_channels
             Channels that should be predicted by the neural network.
             Defaults to all input channels.
-        is_conditional 
+        is_conditional
             Whether to add condition information to x
         repeat_y:
             Match output length to number of losses
@@ -217,9 +217,9 @@ class NNDataset:
         add_c_to_y
             Append condition to y. Needed for adversarial loss.
         shuffled
-            Shuffle indices before generating data. 
+            Shuffle indices before generating data.
             Will produce same order every time.
-      
+
         Returns
         -------
         :class:`tf.data.Dataset`
@@ -236,18 +236,18 @@ class NNDataset:
             output_types.append((tf.float32, tf.float32))
             output_shapes.append((tf.TensorShape(x[0].shape[1:]), tf.TensorShape(x[1].shape[1:])))
         else:
-            num = x.shape[0]
+            num = x.shape[0]  # type: ignore[union-attr]
             output_types.append(tf.float32)
-            output_shapes.append(tf.TensorShape(x.shape[1:]))
+            output_shapes.append(tf.TensorShape(x.shape[1:]))  # type: ignore[union-attr]
 
         # y
         y = self.y(split, output_channels)
         output_types.append(tf.float32)
         output_shapes.append(tf.TensorShape(y.shape[1:]))
         if repeat_y is not False:  # TODO concat c here instead of y! (for adv loss)
-            output_types[1] = tuple(tf.float32 for _ in range(repeat_y))
-            y = tuple(y for _ in range(repeat_y))
-            output_shapes[1] = tuple(output_shapes[1] for _ in range(repeat_y))
+            output_types[1] = tuple(tf.float32 for _ in range(repeat_y))  # type: ignore[assignment]
+            y = tuple(y for _ in range(repeat_y))  # type: ignore[assignment]
+            output_shapes[1] = tuple(output_shapes[1] for _ in range(repeat_y))  # type: ignore[assignment]
         if add_c_to_y is not False:
             assert is_conditional
             # get output_type and shape for c from first output
@@ -255,9 +255,9 @@ class NNDataset:
             c_output_shape = output_shapes[0][1]
             # add c to y and output data to types and shapes
             if isinstance(output_types[1], tuple):
-                output_types[1] = tuple(list(output_types[1]) + [c_output_type])
-                y = tuple(list(y) + [x[1]])
-                output_shapes[1] = tuple(list(output_shapes[1]) + [c_output_shape])
+                output_types[1] = tuple(list(output_types[1]) + [c_output_type])  # type: ignore[assignment]
+                y = tuple(list(y) + [x[1]])  # type: ignore[assignment]
+                output_shapes[1] = tuple(list(output_shapes[1]) + [c_output_shape])  # type: ignore[assignment]
             else:
                 output_types[1] = (output_types[1], c_output_type)
                 y = (y, x[1])
@@ -274,7 +274,7 @@ class NNDataset:
                 if is_conditional:
                     el_x = (x[0][i], x[1][i])
                 else:
-                    el_x = x[i]
+                    el_x = x[i]  # type: ignore[assignment]
                 if repeat_y is not False:
                     el_y = tuple(y[j][i] for j in range(len(y)))
                 else:

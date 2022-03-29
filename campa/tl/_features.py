@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Iterable, Optional, Union, Mapping
+from typing import Any, Dict, List, Union, Mapping, Iterable, Optional
 from functools import partial
 import os
 import time
@@ -26,7 +26,7 @@ ft = nt.float32
 it = nt.int64
 
 
-def extract_features(params: Mapping[str, Any]):
+def extract_features(params: Mapping[str, Any]) -> None:
     """
     Extract features from clustered dataset using :class:`FeaturesExtractor`.
 
@@ -142,9 +142,9 @@ class FeatureExtractor:
         exp: Experiment,
         data_dir: str,
         cluster_name: str,
-        cluster_dir: Optional[str] =None,
-        cluster_col: Optional[str]=None,
-        adata: Optional[ad.AnnData]=None,
+        cluster_dir: Optional[str] = None,
+        cluster_col: Optional[str] = None,
+        adata: Optional[ad.AnnData] = None,
     ):
         self.log = logging.getLogger(self.__class__.__name__)
         self.exp = exp
@@ -158,16 +158,15 @@ class FeatureExtractor:
         }
         self.adata = adata
 
-        self.annotation = self.exp.get_cluster_annotation(self.params["cluster_name"], self.params["cluster_dir"])
+        self.annotation = self.exp.get_cluster_annotation(str(self.params["cluster_name"]), self.params["cluster_dir"])
         clusters = list(np.unique(self.annotation[self.params["cluster_col"]]))
         clusters.remove("")
         self.clusters = clusters
 
-        self._mpp_data = None
-
+        self._mpp_data: Union[MPPData, None] = None
 
     @classmethod
-    def from_adata(cls, fname: str):
+    def from_adata(cls, fname: str) -> "FeatureExtractor":
         """
         Initialise from existing features :class:`ad.AnnData` object.
 
@@ -183,30 +182,28 @@ class FeatureExtractor:
         self.fname = fname
         return self
 
-
     @property
-    def mpp_data(self):
+    def mpp_data(self) -> MPPData:
         """
         :class:`MPPData` object containing pixel-wise clustered data from ``data_dir``.
         """
         if self._mpp_data is None:
             self._mpp_data = MPPData.from_data_dir(
-                self.params["data_dir"],
+                str(self.params["data_dir"]),
                 base_dir=os.path.join(self.exp.full_path, "aggregated/full_data"),
-                keys=["x", "y", "mpp", "obj_ids", self.params["cluster_name"]],
+                keys=["x", "y", "mpp", "obj_ids", str(self.params["cluster_name"])],
                 data_config=self.exp.config["data"]["data_config"],
             )
             # ensure that cluster data is string
-            self._mpp_data._data[self.params["cluster_name"]] = self._mpp_data._data[
-                self.params["cluster_name"]
+            self._mpp_data._data[str(self.params["cluster_name"])] = self._mpp_data._data[
+                str(self.params["cluster_name"])
             ].astype(str)
             # prepare according to data_params
             data_params = deepcopy(self.exp.data_params)
             self._mpp_data.prepare(data_params)
         return self._mpp_data
 
-
-    def extract_intensity_size(self, force:bool=False, fname:str="features.h5ad"):
+    def extract_intensity_size(self, force: bool = False, fname: str = "features.h5ad") -> None:
         """
         Calculate per cluster mean intensity and size for each object.
 
@@ -261,7 +258,7 @@ class FeatureExtractor:
             self.log.debug(f"processing {c}")
             # get cluster ids to mask
             c_ids = list(self.annotation[self.annotation[self.params["cluster_col"]] == c][self.params["cluster_name"]])
-            mask = np.where(np.isin(self.mpp_data.data(self.params["cluster_name"]), c_ids))
+            mask = np.where(np.isin(self.mpp_data.data(str(self.params["cluster_name"])), c_ids))
             cur_df = df.iloc[mask]
             # group by obj_id
             grouped = cur_df.groupby(cur_df.index)
@@ -280,25 +277,27 @@ class FeatureExtractor:
         self.adata = adata
 
         # write to disk
-        fname = os.path.join(self.exp.full_path, "aggregated/full_data", self.params["data_dir"], fname)
+        fname = os.path.join(self.exp.full_path, "aggregated/full_data", str(self.params["data_dir"]), fname)
         self.log.info(f"saving adata to {fname}")
         self.fname = fname
         self.adata.write(self.fname)
 
     def extract_object_stats(
         self,
-        features: Iterable[str] =("area", "circularity", "elongation", "extent"),
-        intensity_channels: Iterable[str]=(),
-    ):
+        features: Iterable[str] = ("area", "circularity", "elongation", "extent"),
+        intensity_channels: Iterable[str] = (),
+    ) -> None:
         """
         Extract features from connected components per cluster for each cell.
 
         Implemented features are: `area`, `circlularity`, `elongation`, and `extent` of connected components
         per cluster for each cell.
-        In addition, the mean intensity per component/region of channels specified in intensity_channels is calculated.
+        In addition, the mean intensity per component/region of
+        channels specified in intensity_channels is calculated.
         Per component/region features are calculated and stored in ``uns['object_stats']``,
         together with OBJ_ID and cluster that this region belongs to.
-        To aggregate these computed stats in a mean/median values per OBJ_ID, use :meth:`FeatureExtractor.get_object_stats`.
+        To aggregate these computed stats in a mean/median values per OBJ_ID,
+        use :meth:`FeatureExtractor.get_object_stats`.
 
         $circularity = (4 * pi * Area) / Perimeter^2$
 
@@ -325,8 +324,10 @@ class FeatureExtractor:
             return
         if features is None:
             features = []
+        features = list(features)
         if intensity_channels is None:
             intensity_channels = []
+        intensity_channels = list(intensity_channels)
         assert len(features) + len(intensity_channels) > 0, "nothing to compute"
         self.log.info(
             f"calculating object stats {features} and channels {intensity_channels}"
@@ -336,12 +337,14 @@ class FeatureExtractor:
 
         feature_names = features
         intensity_feature_names = [f"mean_{ch}" for ch in intensity_channels]
-        features = {feature: [] for feature in feature_names + intensity_feature_names + ["mapobject_id", "clustering"]}
+        features: Dict[str, List[Any]] = {
+            feature: [] for feature in feature_names + intensity_feature_names + ["mapobject_id", "clustering"]
+        }  # ignore: type[assignment]
         for obj_id in self.mpp_data.unique_obj_ids:
             mpp_data = self.mpp_data.subset(obj_ids=[obj_id], copy=True)
             img, _ = mpp_data.get_object_img(
                 obj_id,
-                data=self.params["cluster_name"],
+                data=str(self.params["cluster_name"]),
                 annotation_kwargs={
                     "annotation": self.annotation,
                     "to_col": self.params["cluster_col"],
@@ -406,8 +409,8 @@ class FeatureExtractor:
         self,
         interval: Iterable[float],
         algorithm: Union[str, CoOccAlgo] = CoOccAlgo.OPT,
-        num_processes: Optional[int]=None,
-    ):
+        num_processes: Optional[int] = None,
+    ) -> None:
         """
         Extract co_occurrence for each cell invididually.
 
@@ -458,7 +461,7 @@ class FeatureExtractor:
                 mpp_data = self.mpp_data.subset(obj_ids=[obj_id], copy=True)
                 img, (pad_x, pad_y) = mpp_data.get_object_img(
                     obj_id,
-                    data=self.params["cluster_name"],
+                    data=str(self.params["cluster_name"]),
                     annotation_kwargs={
                         "annotation": self.annotation,
                         "to_col": self.params["cluster_col"],
@@ -468,9 +471,9 @@ class FeatureExtractor:
                 img = np.vectorize(cluster_names.__getitem__)(img)
                 clusters1 = np.vectorize(cluster_names.__getitem__)(
                     annotate_clustering(
-                        mpp_data.data(self.params["cluster_name"]),
+                        mpp_data._data[str(self.params["cluster_name"])],
                         self.annotation,
-                        self.params["cluster_name"],
+                        str(self.params["cluster_name"]),
                         self.params["cluster_col"],
                     )
                 )
@@ -488,16 +491,18 @@ class FeatureExtractor:
                     num_processes=num_processes,
                 )
             elif CoOccAlgo(algorithm) == CoOccAlgo.SQUIDPY:
-                adata = self.mpp_data.subset(obj_ids=[obj_id], copy=True).get_adata(obs=[self.params["cluster_name"]])
+                adata = self.mpp_data.subset(obj_ids=[obj_id], copy=True).get_adata(
+                    obs=[str(self.params["cluster_name"])]
+                )
                 # ensure that cluster annotation is present in adata
                 if self.params["cluster_name"] != self.params["cluster_col"]:
                     adata.obs[self.params["cluster_col"]] = annotate_clustering(
                         adata.obs[self.params["cluster_name"]],
                         self.annotation,
-                        self.params["cluster_name"],
+                        str(self.params["cluster_name"]),
                         self.params["cluster_col"],
                     )
-                adata.obs[self.params["cluster_col"]] = adata.obs[self.params["cluster_col"]].astype("category")
+                adata.obs[str(self.params["cluster_col"])] = adata.obs[self.params["cluster_col"]].astype("category")
                 self.log.info(f"co-occurrence for {obj_id}, with shape {adata.shape}")
                 cur_co_occ, _ = sq.gr.co_occurrence(
                     adata,
@@ -509,12 +514,12 @@ class FeatureExtractor:
                     n_splits=1,
                 )
                 # ensure that co_occ has correct format incase of missing clusters
-                co_occ = np.zeros((len(self.clusters), len(self.clusters), len(interval) - 1))
+                co_occ = np.zeros((len(self.clusters), len(self.clusters), len(list(interval)) - 1))
                 cur_clusters = np.vectorize(cluster_names.__getitem__)(
                     np.array(adata.obs[self.params["cluster_col"]].cat.categories)
                 )
                 grid = np.meshgrid(cur_clusters, cur_clusters)
-                co_occ[grid[0].flat, grid[1].flat] = cur_co_occ.reshape(-1, len(interval) - 1)
+                co_occ[grid[0].flat, grid[1].flat] = cur_co_occ.reshape(-1, len(list(interval)) - 1)
             co_occs.append(co_occ.copy())
             obj_ids.append(obj_id)
 
@@ -529,7 +534,7 @@ class FeatureExtractor:
                         df = pd.DataFrame(
                             co_occ[:, i1, i2],
                             index=obj_ids,
-                            columns=np.arange(len(interval) - 1).astype(str),
+                            columns=np.arange(len(list(interval)) - 1).astype(str),
                         )
                         df.index = df.index.astype(str)
                         # ensure obj_ids are in correct order
@@ -555,12 +560,14 @@ class FeatureExtractor:
                 co_occs = []
                 obj_ids = []
 
-    def get_intensity_adata(self):
+    def get_intensity_adata(self) -> ad.AnnData:
         """
-        Adata object with intensity per cluster combined in X. 
-        
+        Adata object with intensity per cluster combined in X.
+
         Needed for intensity and dotplots.
         """
+        if self.adata is None:
+            raise ValueError("adata is None, need to calculate first.")
         adata = self.adata
         adatas = {}
         cur_adata = ad.AnnData(X=adata.X, obs=adata.obs, var=adata.var)
@@ -574,7 +581,9 @@ class FeatureExtractor:
         comb_adata = ad.concat(adatas, uns_merge="same", index_unique="-", label="cluster")
         return comb_adata
 
-    def get_object_stats(self, area_threshold:int=10, agg: Union[Iterable[str], Mapping[str, str]]=("median",), save:bool=False):
+    def get_object_stats(
+        self, area_threshold: int = 10, agg: Union[Iterable[str], Mapping[str, str]] = ("median",), save: bool = False
+    ) -> pd.DataFrame:
         """
         Aggregate object stats per obj_id.
 
@@ -583,7 +592,7 @@ class FeatureExtractor:
         area_threshold
             All components smaller than this threshold are discarded.
         agg
-            List of aggregation function or dict with ``{feature: function}``. 
+            List of aggregation function or dict with ``{feature: function}``.
             Passed to :func:`pd.GroupBy.agg`
         save
             Save adata object with `object_stats_agg` entry in ``obsm``.
@@ -591,10 +600,12 @@ class FeatureExtractor:
         Returns
         -------
         pd.DataFrame
-            obj_id x (clustering, feature) dataframe 
-            
+            obj_id x (clustering, feature) dataframe
+
         Additionally stores result in ``self.adata.obsm['object_stats_agg']``
         """
+        if self.adata is None:
+            raise ValueError("adata is None, need to calculate first.")
         assert (
             "object_stats" in self.adata.uns.keys()
         ), "No object stats found. Use self.extract_object_stats to calculate."
@@ -636,7 +647,7 @@ class FeatureExtractor:
             self.adata.write(self.fname)
         return agg_stats
 
-    def extract_intensity_csv(self, obs: Optional[Iterable[str]]=None):
+    def extract_intensity_csv(self, obs: Optional[Iterable[str]] = None) -> None:
         """
         Extract csv file containing obj_id, mean cluster intensity and size for each channel.
 
@@ -661,8 +672,9 @@ class FeatureExtractor:
         df["cluster"] = np.array(adata.obs["cluster"])
         df[OBJ_ID] = np.array(adata.obs[OBJ_ID])
         # add additional obs
-        for col in obs:
-            df[col] = np.array(adata.obs[col])
+        if obs is not None:
+            for col in obs:
+                df[col] = np.array(adata.obs[col])
         # save csv
         df.to_csv(os.path.splitext(self.fname)[0] + ".csv")
 
@@ -670,6 +682,8 @@ class FeatureExtractor:
         """
         Return those obj_ids that do not yet have co-occurence scores calculated.
         """
+        if self.adata is None:
+            raise ValueError("adata is None, need to calculate first.")
         n = f"co_occurrence_{self.clusters[0]}_{self.clusters[0]}"
         if n not in self.adata.obsm.keys():
             # no co-occ calculated
@@ -733,7 +747,7 @@ def _co_occ_opt(
     clusters1: np.ndarray,  # int64
     img: np.ndarray,  # int64
     num_clusters: int,
-    num_processes=None,
+    num_processes: Optional[int] = None,
 ) -> np.ndarray:
     """
     Calculate co-occurrence scores for several intervals.
@@ -818,7 +832,7 @@ def _prepare_co_occ(interval):
     arr = np.zeros((int(interval[-1]) * 2 + 1, int(interval[-1]) * 2 + 1))
     # calc distances for interval range (assuming c as center px)
     c = int(interval[-1]) + 1
-    c = np.array([c, c]).T
+    c: np.ndarray = np.array([c, c]).T
     xx, yy = np.meshgrid(np.arange(len(arr)), np.arange(len(arr)))
     coords = np.array([xx.flatten(), yy.flatten()]).T
     dists = np.sqrt(np.sum((coords - c) ** 2, axis=-1))

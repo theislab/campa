@@ -6,6 +6,17 @@ import tensorflow as tf
 
 
 class LossEnum(str, Enum):
+    """
+    Loss functions.
+
+    Possible values are:
+
+    - ``LossEnum.MSE``: "mean_squared_error" (:func:`tf.losses.mean_squared_error`)
+    - ``LossEnum.SIGMA_MSE``: "sigma_vae_mse", MSE loss for sigma VAE
+    - ``LossEnum.KL``: "kl_divergence"
+    - ``LossEnum.MSE_METRIC``: "mean_squared_error_metric" (:class:`tf.keras.metrics.MeanSquaredError`)
+    """
+
     MSE = "mean_squared_error"
     KL = "kl_divergence"
     SIGMA_MSE = "sigma_vae_mse"
@@ -15,6 +26,7 @@ class LossEnum(str, Enum):
     SOFTMAX = "softmax"
 
     MSE_metric = "mean_squared_error_metric"
+
     ACC_metric = "accuracy_metric"
 
     def get_fn(self):

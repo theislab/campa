@@ -19,7 +19,7 @@ def prepare_config(args):
         p = os.path.abspath(p)
         if not os.path.isdir(p):
             print(f"{p} is not a valid directory")
-            return get_path_input()
+            return get_path_input(name)
         return p
 
     def change_path(config, name, section="DEFAULT"):

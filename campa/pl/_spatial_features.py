@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import anndata as ad
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -39,7 +40,19 @@ def plot_co_occurrence(adata, cluster1, cluster2, condition, condition_values=No
     ax.axhline(y=0, color="black")
 
 
-def plot_co_occurrence_grid(adata, condition, condition_values=None, figsize=(10, 10), **kwargs):
+def plot_co_occurrence_grid(adata: ad.AnnData, condition: str, condition_values=None, figsize=(10, 10), **kwargs):
+    """
+    Plot co-occurrence for all cluster-cluster pairs in a grid.
+
+    Parameters
+    ----------
+    adata
+        Adata containing co-occurrence scores in ``adata.obsm['co_occurrence_{cluster1}_{cluster2}']``.
+    condition
+        Categorical condition to group obs in adata by. Must be a column in ``adata.obs``.
+    condition_values
+
+    """
     fig, axes = plt.subplots(
         len(adata.uns["clusters"]),
         len(adata.uns["clusters"]),

@@ -1,5 +1,6 @@
 # read constants defined in config.ini
 from enum import Enum
+from typing import Any
 from pathlib import Path
 from configparser import ConfigParser, NoOptionError, NoSectionError
 
@@ -38,8 +39,12 @@ EXPERIMENT_DIR = get_value(config, key="experiment_dir")
 BASE_DATA_DIR = get_value(config, key="data_dir")
 
 
-def get_data_config(data_config="TestData"):
-    return load_config(get_value(config, section="data", key=data_config))
+def get_data_config(data_config: str = "TestData") -> Any:
+    module = load_config(get_value(config, section="data", key=data_config))
+    if module is None:
+        raise ValueError(f"Unknown data_config {data_config}")
+    else:
+        return module
 
 
 CO_OCC_CHUNK_SIZE = get_value(config, key="co_occ_chunk_size", section="co_occ")

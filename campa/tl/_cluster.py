@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, TYPE_CHECKING
+from typing import Any, Mapping, Iterable, TYPE_CHECKING, MutableMapping
 
 if TYPE_CHECKING:
     from campa.tl import Experiment
@@ -25,7 +25,31 @@ from campa.tl._evaluate import Predictor
 
 
 # annotation fns
-def annotate_clustering(clustering, annotation, cluster_name, annotation_col=None):
+def annotate_clustering(
+    clustering: Iterable[str | int],
+    annotation: pd.DataFrame,
+    cluster_name: str,
+    annotation_col: str | None = None,
+) -> Iterable[str | int]:
+    """
+    Annotate clustering according to annotation.
+
+    Parameters
+    ----------
+    clustering
+        Clustering to annotate.
+    annotation
+        Annotation table containing mapping from clustering values to annotated values.
+    cluster_name
+        Column in ``annotation`` containing current clustering values.
+    annotation_col
+        Columns in ``annotation`` containing desired annotation.
+
+    Returns
+    -------
+    Iterable[str, int]
+        Annotated clustering.
+    """
     if annotation_col is None:
         return clustering
     if cluster_name == annotation_col:
@@ -35,7 +59,8 @@ def annotate_clustering(clustering, annotation, cluster_name, annotation_col=Non
 
 def add_clustering_to_adata(data_dir, cluster_name, adata, annotation, added_name=None, annotation_col=None):
     """
-    adds cluster_name to adata.obs (as added_name) and cmap values for each cluster stored in
+    Add cluster_name to adata.obs (as added_name) and cmap values for each cluster stored in.
+
     cluster_name_annotation.csv to adata.uns
     uses annotation_col column if is not None
 
@@ -62,20 +87,47 @@ def add_clustering_to_adata(data_dir, cluster_name, adata, annotation, added_nam
 
 class Cluster:
     """
-    cluster MPPData.
+    Cluster data.
 
-    Has functions to create a (subsampled) MPPData for clustering, cluster_mpp, cluster it,
+    Contains functions to create a (subsampled) :class:`MPPData` for clustering, cluster it,
     and to project the clustering to other MPPDatas.
+
+    Cluster is initialised from a cluster config dictionary with the following keys:
+
+    - ``data_config``: name of the data config to use, should be registered in ``campa.ini``
+    - ``data_dirs``: where to read data from (relative to ``DATA_DIR`` defined in data config)
+    - ``process_like_dataset``: name of dataset that gives params for processing (except subsampling/subsetting)
+    - ``subsample``: (bool) subsampling of pixels
+    - ``subsample_kwargs``: kwargs for :meth:`MPPData.subsample` defining the fraction of pixels to be sampled
+    - ``subset``: (bool) subset to objects with certain metadata.
+    - ``subset_kwargs``: kwargs to :meth:`MPPData.subset` defining which object to subset to
+    - ``seed``: random seed to make subsampling reproducible
+    - ``cluster_data_dir``: name of the dir containing the mpp_data that is clustered. Relative to EXPERIMENT_DIR
+    - ``cluster_name``: name of the cluster assignment file
+    - ``cluster_rep``: representation that should be clustered
+      (name of existing file, should be predicted with :meth:`Predictor.get_representation`).
+    - ``cluster_method``: leiden or kmeans (kmeans not tested).
+    - ``leiden_resolution``: resolution parameter for leiden clustering.
+    - ``kmeans_n``: number of clusters for kmeans.
+    - ``umap``: (bool) predict UMAP of ``cluster_rep``.
+
+    Parameters
+    ----------
+    config
+        Cluster config.
+    cluster_mpp
+        Data to cluster.
+    save_config
+        Save cluster config in ``{config['cluster_data_dir']}/cluster_params.json``.
     """
 
-    config: dict[str, Any] = {
+    config: MutableMapping[str, Any] = {
         # --- cluster data creation (mpp_data is saved to cluster_data_dir) ---
         "data_config": "NascentRNA",
         "data_dirs": [],
         # name of dataset that gives params for processing (except subsampling/subsetting)
         "process_like_dataset": None,
-        "subsample": False,  # either 'subsample' or 'som'
-        "som_kwargs": {},
+        "subsample": False,
         "subsample_kwargs": {},
         "subset": False,
         "subset_kwargs": {},
@@ -93,9 +145,11 @@ class Cluster:
         "umap": True,  # calculate umap of cluster data
     }
 
-    def __init__(self, config, cluster_mpp=None, save_config=False):
+    def __init__(self, config: Mapping[str, Any], cluster_mpp: MPPData = None, save_config: bool = False):
         self.log = logging.getLogger(self.__class__.__name__)
         self.config = merged_config(self.config, config)
+        """Cluster config."""
+
         self.data_config_name = self.config["data_config"]
         self.data_config = get_data_config(self.data_config_name)
         # load dataset_params
@@ -113,7 +167,7 @@ class Cluster:
         self.cluster_mpp
 
         # initialise annotation
-        self._cluster_annotation = None
+        self._cluster_annotation: pd.DataFrame | None = None
         self.cluster_annotation
 
         # save config
@@ -123,9 +177,15 @@ class Cluster:
             json.dump(self.config, open(config_fname, "w"), indent=4)
 
     @classmethod
-    def from_cluster_data_dir(cls, data_dir):
+    def from_cluster_data_dir(cls, data_dir: str) -> Cluster:
         """
-        data_dir: containing complete mpp_data with cluster_rep and cluster_name files. Relative to EXPERIMENT_DIR
+        Initialise from existing ``cluster_data_dir``.
+
+        Parameters
+        ----------
+        data_dir
+            Dir containing complete :class:`MPPData` with ``cluster_rep`` and ``cluster_name`` files.
+            Relative to ``EXPERIMENT_DIR``.
         """
         # load mpp_data and cluster_params (for reference) from data_dir
         # TODO
@@ -134,34 +194,47 @@ class Cluster:
         return cls(config, save_config=False)
 
     @classmethod
-    def from_exp(cls, exp: Experiment, cluster_config=None, data_dir=None):
+    def from_exp(
+        cls, exp: Experiment, cluster_config: Mapping[str, Any] | None = None, data_dir: str = None
+    ) -> Cluster:
         """
-        Init from experiment for clustering of entire data that went into creating training data
+        Initialise from experiment for clustering of entire data that went into creating training data.
 
-        Args;
-            exp: Experiment
-            cluster_config: additional cluster params (like subsampling etc)
-            data_dir: directory containing cluster_mpp (relative to exp.dir/exp.name)
+        Cluster params are read from ``Experiment.config['cluster']``.
+
+        Parameters
+        ----------
+        exp
+            Trained Experiment.
+        cluster_config
+            Additional cluster params (like subsampling etc). Overwrites default cluster params.
+        data_dir
+            Directory containing ``cluster_mpp`` (relative to ``{exp.dir}/{exp.name}``).
         """
         add_cluster_config = cluster_config if cluster_config is not None else {}
-        cluster_config = deepcopy(exp.config["cluster"])
+        cur_cluster_config = deepcopy(exp.config["cluster"])
         # add information on data to cluster
-        cluster_config["data_config"] = exp.config["data"]["data_config"]
-        cluster_config["data_dirs"] = exp.data_params["data_dirs"]
+        cur_cluster_config["data_config"] = exp.config["data"]["data_config"]
+        cur_cluster_config["data_dirs"] = exp.data_params["data_dirs"]
         # only process data for model if experiment has model to evaluate
-        cluster_config["process_like_dataset"] = exp.config["data"]["dataset_name"]
-        cluster_config["seed"] = exp.data_params["seed"]
+        cur_cluster_config["process_like_dataset"] = exp.config["data"]["dataset_name"]
+        cur_cluster_config["seed"] = exp.data_params["seed"]
         if data_dir is None:
-            data_dir = os.path.join("aggregated", "sub-" + cluster_config["subsample_kwargs"]["frac"])
-        cluster_config["cluster_data_dir"] = os.path.join(exp.dir, exp.name, data_dir)
+            data_dir = os.path.join("aggregated", "sub-" + cur_cluster_config["subsample_kwargs"]["frac"])
+        cur_cluster_config["cluster_data_dir"] = os.path.join(exp.dir, exp.name, data_dir)
         # add passed cluster_config
-        cluster_config = merged_config(cluster_config, add_cluster_config)
-        return cls(cluster_config, save_config=True)
+        cur_cluster_config = merged_config(cur_cluster_config, add_cluster_config)
+        return cls(cur_cluster_config, save_config=True)
 
     @classmethod
-    def from_exp_split(cls, exp: Experiment):
+    def from_exp_split(cls, exp: Experiment) -> Cluster:
         """
-        Init from experiment for clustering of val/test split
+        Initialise from experiment for clustering of val/test split.
+
+        Parameters
+        ----------
+        exp
+            Trained Experiment.
         """
         # TODO load exp
         # est = Estimator(exp.set_to_evaluate())
@@ -182,7 +255,7 @@ class Cluster:
 
     def set_cluster_name(self, cluster_name):
         """
-        changes the cluster name and reloads cluster_mpp, and cluster_annotation
+        Change the cluster name and reloads ``cluster_mpp``, and ``cluster_annotation``.
         """
         if self.config["cluster_name"] != cluster_name:
             self.config["cluster_name"] = cluster_name
@@ -191,22 +264,25 @@ class Cluster:
 
     # --- Properties and loading fns ---
     @property
-    def cluster_mpp(self):
+    def cluster_mpp(self) -> MPPData | None:
         """
-        MPPData that is used for clustering.
+        :class:`MPPData` that is used for clustering.
+
+        None if data could not be loaded.
         """
         if self._cluster_mpp is None:
             self._cluster_mpp = self._load_cluster_mpp()
         return self._cluster_mpp
 
-    def _load_cluster_mpp(self, reload=False):
+    def _load_cluster_mpp(self) -> MPPData | None:
         """
         Load MPPData that is used for clustering.
 
         Tries to read MPPData with cluster_rep and cluster_name from cluster_data_dir.
 
-        Returns:
-            MPPData or None if data could not be loaded
+        Returns
+        -------
+        :class:`MPPData` or None if data could not be loaded.
         """
         data_dir = self.config["cluster_data_dir"]
         rep = self.config["cluster_rep"]
@@ -230,14 +306,17 @@ class Cluster:
             return None
 
     @property
-    def cluster_annotation(self):
+    def cluster_annotation(self) -> pd.DataFrame:
+        """
+        Cluster annotation `pd.DataFrame`, read from ``{cluster_name}_annotation.csv``.
+        """
         if self._cluster_annotation is None:
             self._cluster_annotation = self._load_cluster_annotation()
         return self._cluster_annotation
 
-    def _load_cluster_annotation(self, recreate=False):
+    def _load_cluster_annotation(self, recreate: bool = False) -> pd.DataFrame:
         """
-        Read cluster annotation file / create it
+        Read cluster annotation file / create it.
         """
         fname = os.path.join(
             EXPERIMENT_DIR,
@@ -272,17 +351,28 @@ class Cluster:
             return self._cluster_annotation
 
     # --- fns modifying annotation ---
-    def add_cluster_annotation(self, annotation, to_col, from_col=None, colors=None):
+    def add_cluster_annotation(
+        self,
+        annotation: Mapping[str, str],
+        to_col: str,
+        from_col: str | None = None,
+        colors: Mapping[str, str] | None = None,
+    ) -> None:
         """
-        add annotation and colormap to clustering.
+        Add annotation and colormap to clustering.
 
-        Is saved in cluster_name_annotation.csv
+        Is saved in ``{cluster_name}_annotation.csv``
 
-        Args:
-            annotation: dict with keys from "from_col" and values the annotation.
-            to_col: name under which the annotation should be saved
-            from_col: optionally set the annotation name from which to annotate. Default is cluster_name.
-            colors: color dict, with annotation as keys and hex colors as values. Default is using tab20 colormap
+        Parameters
+        ----------
+        annotation:
+            Dict mapping from values of ``from_col`` to the annotation.
+        to_col
+            Name under which the annotation should be saved.
+        from_col
+            Optionally set the annotation name from which to annotate. Default is ``cluster_name``.
+        colors
+            Color dict, mapping from annotations to hex colors. Default is using tab20 colormap.
         """
         if from_col is None:
             from_col = self.config["cluster_name"]
@@ -303,16 +393,20 @@ class Cluster:
         # add colors
         self.add_cluster_colors(colors, to_col)
 
-    def add_cluster_colors(self, colors, from_col=None):
+    def add_cluster_colors(self, colors: Mapping[str, str] | None, from_col: str | None = None) -> None:
         """
-        add colors to clustering or to annotation.
+        Add colors to clustering or to annotation.
 
-        adds column from_col"_colors" to self.cluster_annotation and saves it to cluster_name"_annotation.csv"
+        Adds column ``{from_col}_colors`` to :attr:`Cluster.cluster_annotation`
+        and saves it to ``{cluster_name}_annotation.csv``.
 
-        Args:
-            colors: color dict, with unique clustering values from from_col as keys and hex colors as values.
-                Default is using tab20 colormap
-            from_col: optionally set clustering name for which to add colors. Default is cluster_name.
+        Parameters
+        ----------
+        colors
+            Color dict, mapping from unique clustering values from ``from_col`` to hex colors.
+            Default is using tab20 colormap.
+        from_col
+            Optionally set clustering name for which to add colors. Default is ``cluster_name``.
         """
         if from_col is None:
             from_col = self.config["cluster_name"]
@@ -344,16 +438,20 @@ class Cluster:
 
     # --- getters ---
     def get_nndescent_index(self, recreate=False):
+        """
+        Calculate and return pynndescent index of existing clustering for fast prediction of new data.
+        """
         index_fname = os.path.join(EXPERIMENT_DIR, self.config["cluster_data_dir"], "pynndescent_index.pickle")
         if os.path.isfile(index_fname) and not recreate:
             # load and return index
             return pickle.load(open(index_fname, "rb"))
         # need to create index
         # check that cluster_rep has been computed already for cluster_mpp
+        assert self.cluster_mpp is not None
         assert self.cluster_mpp.data(self.config["cluster_rep"]) is not None
         self.log.info(f"Creating pynndescent index for {self.config['cluster_rep']}")
 
-        data = self.cluster_mpp.data(self.config["cluster_rep"])
+        data = self.cluster_mpp._data[self.config["cluster_rep"]]
         if self.config["cluster_rep"] == "mpp":
             data = self.cluster_mpp.center_mpp
         index = NNDescent(data.astype(np.float32))
@@ -363,9 +461,11 @@ class Cluster:
     # --- functions creating and adding data to cluster_mpp ---
     def create_cluster_mpp(self):
         """
-        Use cluster_params to create and save mpp_data to use for clustering
+        Use cluster params to create and save :attr:`Cluster.cluster_mpp` to use for clustering.
 
-        Raises: ValueError if config does not contain data_dirs and process_like_dataset
+        Raises
+        ------
+        ValueError if config does not contain keys ``data_dirs`` and ``process_like_dataset``.
         """
         # TODO: add option how to process data (e.g. for MPPcluster, do not need to add neighborhood)
         self.log.info("creating cluster mpp from config")
@@ -411,10 +511,18 @@ class Cluster:
         if self.config["cluster_data_dir"] is not None:
             self._cluster_mpp.write(os.path.join(EXPERIMENT_DIR, self.config["cluster_data_dir"]))
 
-    def predict_cluster_rep(self, exp):
+    def predict_cluster_rep(self, exp: Experiment) -> None:
         """
-        Use exp to predict the necessary cluster representation
+        Use experiment to predict the necessary cluster representation.
+
+        Saves predicted representations to ``cluster_data_dir``.
+
+        Parameters
+        ----------
+        exp
+            Experiment to use for predicting cluster_rep.
         """
+        assert self.cluster_mpp is not None
         if self.cluster_mpp.data(self.config["cluster_rep"]) is not None:
             self.log.info(f"cluster_mpp already contains key {self.config['cluster_rep']}. Not recalculating.")
             return
@@ -428,15 +536,18 @@ class Cluster:
                 save_keys=[self.config["cluster_rep"]],
             )
 
-    def create_clustering(self):
+    def create_clustering(self) -> None:
         """
-        Cluster cluster_mpp using cluster_method defined in config.
+        Cluster :attr:`Cluster.cluster_mpp` using ``cluster_method`` defined in :attr:`Cluster.config`.
 
-        If cluster_data_dir is defined, saves clustering there.
+        If ``cluster_data_dir`` is defined, saves clustering there.
 
-        Raises: ValueError if cluster_rep is not available
+        Raises
+        ------
+        ValueError if cluster_rep is not available
         """
         # check that have cluster_rep
+        assert self.cluster_mpp is not None
         if self.cluster_mpp.data(self.config["cluster_rep"]) is None:
             raise ValueError(f"Key {self.config['cluster_rep']} is not available for clustering.")
         save_keys = [self.config["cluster_name"]]
@@ -485,10 +596,11 @@ class Cluster:
         # recreate annotation file
         self._cluster_annotation = self._load_cluster_annotation(recreate=True)
 
-    def add_umap(self):
+    def add_umap(self) -> None:
         """
-        if umap does not yet exist, but should be calculated, calculates umap
+        If umap does not yet exist, but should be calculated, calculates umap.
         """
+        assert self.cluster_mpp is not None
         if self.config["umap"]:
             if self.cluster_mpp.data("umap") is not None:
                 # already have umap, no need to calculate
@@ -507,17 +619,23 @@ class Cluster:
                 )
 
     # --- using existing cluster_mpp, project clustering ---
-    def project_clustering(self, mpp_data: MPPData, save_dir=None, batch_size=200000):
+    def project_clustering(self, mpp_data: MPPData, save_dir: str | None = None, batch_size: int = 200000) -> MPPData:
         """
-        Project already computed clustering from cluster_mpp to mpp_data
+        Project already computed clustering from :attr:`Cluster.cluster_mpp` to ``mpp_data``.
 
-        Args:
-            mpp_data: MPPData to project the clustering to. Should contain cluster_rep
-            save_dir: optional, full path to dir where the clustering should be saved
-            batch_size: iterate over data in batches of size batch_size
+        Parameters
+        ----------
+        mpp_data
+            Data to project the clustering to. Should contain ``cluster_rep``.
+        save_dir
+            Full path to dir where the clustering should be saved.
+        batch_size
+            Iterate over data in batches of size ``batch_size``.
 
-        Returns:
-            mpp_data with clustering
+        Returns
+        -------
+        :class:`MPPData`
+            Data with clustering.
         """
         # check that clustering has been computed already for cluster_mpp
         assert self.cluster_mpp is not None
@@ -535,7 +653,7 @@ class Cluster:
 
         # project clusters
         clustering = []
-        samples = mpp_data.data(self.config["cluster_rep"])
+        samples = mpp_data._data[str(self.config["cluster_rep"])]
         if self.config["cluster_rep"] == "mpp":  # use center mpp in this special case
             samples = mpp_data.center_mpp
         for i in np.arange(0, samples.shape[0], batch_size):
@@ -545,8 +663,8 @@ class Cluster:
             # NOTE: do not use apply_along_axis, because dtype is inferred incorrectly!
             clustering.append(
                 np.array(
-                    [most_frequent(row) for row in self.cluster_mpp.data(self.config["cluster_name"])[neighs]],
-                    dtype=self.cluster_mpp.data(self.config["cluster_name"]).dtype,
+                    [most_frequent(row) for row in self.cluster_mpp._data[self.config["cluster_name"]][neighs]],
+                    dtype=self.cluster_mpp._data[self.config["cluster_name"]].dtype,
                 )
             )
         # convert from str to int to save space when saving full data NOTE new
@@ -557,9 +675,14 @@ class Cluster:
             mpp_data.write(save_dir, save_keys=[self.config["cluster_name"]])
         return mpp_data
 
-    def predict_cluster_imgs(self, exp):
+    def predict_cluster_imgs(self, exp: Experiment) -> MPPData | None:
         """
-        Predict cluster imgs from experiment
+        Predict cluster imgs from experiment.
+
+        Parameters
+        ----------
+        exp
+            Experiment.
         """
         if exp.is_trainable:
             # create Predictor
@@ -583,7 +706,7 @@ class Cluster:
                 self.log.warn(
                     f"Did not find {self.config['cluster_rep']} in {img_save_dir}. Run create_clustering first."
                 )
-                return
+                return None
         else:
             img_save_dir = os.path.join(
                 exp.full_path,
@@ -595,16 +718,16 @@ class Cluster:
         return self.project_clustering(mpp_imgs, save_dir=img_save_dir)
 
 
-def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_data"):
+def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_data") -> None:
     """
     Prepare all data for clustering by predicting cluster-rep.
 
     Parameters
     ----------
     experiment_dir
-        Experiment directory releative to EXPERIMENT_PATH.
+        Experiment directory releative to ``EXPERIMENT_PATH``.
     save_dir
-        Directory to save prepared full data to, relative to experiment dir.
+        Directory to save prepared full data to, relative to ``experiment_dir``.
     """
     from campa.tl import Experiment
 
@@ -613,7 +736,10 @@ def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_d
     # iterate over all data dirs
     for data_dir in exp.data_params["data_dirs"]:
         log.info(f"Processing data_dir {data_dir}")
-        mpp_data = MPPData.from_data_dir(data_dir, data_config=exp.config["data"]["data_config"],)
+        mpp_data = MPPData.from_data_dir(
+            data_dir,
+            data_config=exp.config["data"]["data_config"],
+        )
         # params for partial saving of mpp_data
         mpp_params = {"base_data_dir": data_dir, "subset": True}
         # prepare mpp_data
@@ -642,8 +768,12 @@ def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_d
 
 
 def create_cluster_data(
-    experiment_dir, subsample: bool = False, frac: float = 0.005, save_dir: str | None = None, cluster: bool = False
-):
+    experiment_dir: str,
+    subsample: bool = False,
+    frac: float = 0.005,
+    save_dir: str | None = None,
+    cluster: bool = False,
+) -> None:
     """
     Create (subsampled) data for clustering.
 
@@ -652,16 +782,16 @@ def create_cluster_data(
     Parameters
     ----------
     experiment_dir
-        experiment directory releative to EXPERIMENT_PATH
+        Experiment directory releative to ``EXPERIMENT_PATH``.
     subsample
-        subsample the data
+        Subsample the data.
     frac
-        Fraction of pixels to use for clustering if subsample is True
+        Fraction of pixels to use for clustering if ``subsample`` is True.
     save_dir
-        directory to save subsampled cluster data, relative to experiment dir.
-        default is aggregated/sub-FRAC
+        Directory to save subsampled cluster data, relative to ``experiment_dir``.
+        Default is ``aggregated/sub-FRAC``.
     cluster
-        use cluster params in Experiment config to cluster the subsetted data.
+        Use cluster params in Experiment config to cluster the subsetted data.
     """
     from campa.tl import Experiment
 
@@ -690,23 +820,23 @@ def project_cluster_data(
     cluster_name: str = "clustering",
     save_dir: str = "aggregated/full_data",
     data_dir: str | None = None,
-):
+) -> None:
     """
-    Project existing clustering to new data
+    Project existing clustering to new data.
 
     Parameters
     ----------
     experiment_dir
-        experiment directory releative to EXPERIMENT_PATH
+        Experiment directory releative to ``EXPERIMENT_PATH``.
     cluster_data_dir
-        directory in which clustering is stored relative to experiment dir. Usually in aggregated/sub-FRAC
+        Directory in which clustering is stored relative to experiment dir. Usually in ``aggregated/sub-FRAC``.
     cluster_name
-        name of clustering to project
+        Name of clustering to project.
     save_dir
-        directory in which the data to be projected is stored, relative to experiment dir.
+        Directory in which the data to be projected is stored, relative to ``experiment_dir``.
     data_dir
-        data_dir to project. If not specified, project all data_dirs in save_dir.
-        Relative to save_dir
+        Data_dir to project. If not specified, project all ``data_dir``s in ``save_dir``.
+        Relative to ``save_dir``.
     """
     from campa.tl import Experiment
 
@@ -714,6 +844,7 @@ def project_cluster_data(
     # set up cluster data
     cl = Cluster.from_cluster_data_dir(os.path.join(exp.dir, exp.name, cluster_data_dir))
     cl.set_cluster_name(cluster_name)
+    assert cl.cluster_mpp is not None
     assert cl.cluster_mpp.data(cluster_name) is not None, f"cluster data needs to contain clustering {cluster_name}"
     # iterate over all data dirs
     data_dirs: Iterable[str] = exp.data_params["data_dirs"] if data_dir is None else [data_dir]

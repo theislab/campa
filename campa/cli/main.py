@@ -77,7 +77,7 @@ Available subcommands are:
         else:
             exps = campa.tl.Experiment.get_experiments_from_config(config_fname=args.config)
             # NOTE exp_name is not respected here!
-        campa.tl.run_experiments(args.mode, exps)
+        campa.tl.run_experiments(exps=exps, mode=args.mode)
 
     def cluster(self):
         parser = argparse.ArgumentParser(description="Cluster data and project clustering")
@@ -141,7 +141,7 @@ Available subcommands are:
             parser.error("too few arguments")
         func(**vars(args))
 
-    def extract_features(args):
+    def extract_features(self):
         parser = argparse.ArgumentParser(description=("Extract features from clustered dataset"))
         parser.add_argument("params", help="path to feature_params.py")
         args = parser.parse_args(sys.argv[2:])

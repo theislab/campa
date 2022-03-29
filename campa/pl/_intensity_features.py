@@ -1,6 +1,5 @@
-from typing import Iterable, Mapping, Optional, Union
+from typing import Union, Mapping, Iterable, Optional
 import warnings
-import matplotlib
 
 from scipy.stats import zscore
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
@@ -9,6 +8,7 @@ import scipy
 import pandas as pd
 import scanpy as sc
 import anndata as ad
+import matplotlib
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
@@ -242,15 +242,15 @@ def mixed_model(ref_expr, g_expr, ref_well_name, g_well_name):
 def get_intensity_change(
     adata: ad.AnnData,
     groupby: str,
-    marker_dict: Optional[Union[Mapping[str, Iterable[str]], Iterable[str]]]=None,
-    limit_to_groups: Optional[Mapping[str, Iterable[str]]]=None,
-    reference: Optional[str] =None,
-    reference_group: Optional[str]=None,
-    color: str ="logfoldchange",
-    size: str ="mean_reference",
-    group_sizes_barplot: Optional[str]=None,
-    pval: str ="ttest",
-    alpha: float =0.05,
+    marker_dict: Optional[Union[Mapping[str, Iterable[str]], Iterable[str]]] = None,
+    limit_to_groups: Optional[Mapping[str, Iterable[str]]] = None,
+    reference: Optional[str] = None,
+    reference_group: Optional[str] = None,
+    color: str = "logfoldchange",
+    size: str = "mean_reference",
+    group_sizes_barplot: Optional[str] = None,
+    pval: str = "ttest",
+    alpha: float = 0.05,
     norm_by_group=None,
 ):
     """
@@ -265,7 +265,7 @@ def get_intensity_change(
     Parameters
     ----------
     adata
-        Adata containing aggregated information by clusters. 
+        Adata containing aggregated information by clusters.
         E.g. result of :meth:`FeatureExtractor.get_intensity_adata`.
     groupby
         column in ``adata.obs`` containing the groups to compare.
@@ -286,7 +286,7 @@ def get_intensity_change(
         Mean size of groups shown as a bar plot to the right.
         Either None (do not show), `mean` (mean size of groups),
         `meanchange` (mean difference of group size from reference), `foldchange`.
-    pval 
+    pval
         Type of test done to determine pvalues. Either `ttest` or `mixed_model`.
         `mixed_model` calculates a mixed model using wells as random effects and should be preferred.
     alpha
@@ -463,21 +463,20 @@ def plot_intensity_change(
     groupby,
     plot_data,
     alpha,
-    adjust_height: bool =True,
-    ax: Optional[matplotlib.axes.Axes]=None,
-    figsize: Iterable[int]=(10, 3),
-    save: Optional[str]=None,
+    adjust_height: bool = True,
+    ax: Optional[matplotlib.axes.Axes] = None,
+    figsize: Iterable[int] = (10, 3),
+    save: Optional[str] = None,
     **kwargs,
 ):
     """
     Plot mean intensity differences between perturbations or clusters.
 
-    Takes returns of :func:`get_intensity_change` as input: 
+    Takes returns of :func:`get_intensity_change` as input:
     ``plot_intensity_change(**get_intensity_change(...))``
 
     Parameters
     ----------
-        ... results of :func:`get_intensity_change`.
         adjust_height
             Option to make plots a bit more streamlined.
         ax
@@ -486,7 +485,7 @@ def plot_intensity_change(
             Size of figure.
         save
             Path to save figure to.
-        kwargs 
+        kwargs
             Keyword arguments for :func:`sc.pl.dotplot`.
     """
     kwargs["vmin"] = kwargs.get("vmin", -1)
@@ -570,7 +569,7 @@ def plot_size_change(
     Parameters
     ----------
     adata
-        Adata containing aggregated information by clusters. 
+        Adata containing aggregated information by clusters.
         E.g. result of :meth:`FeatureExtractor.get_intensity_adata`.
     groupby_row
         Column in ``adata.obs`` containing the row-wise grouping.
@@ -596,7 +595,7 @@ def plot_size_change(
         Sizes of dots, either `mean_size` or `pval` (distinguish significant and non-significant dots).
     limit_to_groups
         Dict with obs as keys and groups from obs as values, to subset adata before plotting.
-    kwargs 
+    kwargs
         Keyword arguments for :func:`sc.pl.dotplot`.
     """
     if limit_to_groups is None:

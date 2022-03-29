@@ -1,4 +1,5 @@
 # functions for converting conditions to strings or one-hot encoded vectors
+from typing import Any, List, Tuple, Optional, MutableMapping
 import logging
 
 import numpy as np
@@ -6,12 +7,12 @@ import numpy as np
 from campa.constants import get_data_config
 
 
-def get_one_hot(targets, nb_classes):
-    res = np.eye(nb_classes)[np.array(targets).reshape(-1)]
+def get_one_hot(targets: np.ndarray, nb_classes: int) -> np.ndarray:
+    res: np.ndarray = np.eye(nb_classes)[np.array(targets).reshape(-1)]
     return res.reshape(list(targets.shape) + [nb_classes])
 
 
-def get_combined_one_hot(arrs):
+def get_combined_one_hot(arrs: List[np.ndarray]) -> np.ndarray:
     if len(arrs) != 2:
         raise NotImplementedError(f"combine {len(arrs)} arrs")
     mask = (~np.isnan(arrs[0][:, 0])) & (~np.isnan(arrs[1][:, 0]))
@@ -24,7 +25,10 @@ def get_combined_one_hot(arrs):
     return res
 
 
-def convert_condition(arr, desc, one_hot=False, data_config=None):
+def convert_condition(
+    arr: np.ndarray, desc: str, one_hot: bool = False, data_config: Optional[Any] = None
+) -> np.ndarray:
+    """Convert condition array according to desc."""
     log = logging.getLogger("convert_condition")
     if data_config is None:
         log.warn("using default data config")
@@ -45,7 +49,7 @@ def convert_condition(arr, desc, one_hot=False, data_config=None):
                 conv_arr = get_one_hot(conv_arr, len(cur_conditions))
         else:
             log.info(f"Converting condition {desc} to strings")
-            conv_arr = np.zeros(arr.shape, dtype=np.object)
+            conv_arr = np.zeros(arr.shape, dtype=np.object)  # type: ignore[attr-defined]
             for i, c in enumerate(cur_conditions):
                 conv_arr[arr == i] = c
         return conv_arr
@@ -54,7 +58,7 @@ def convert_condition(arr, desc, one_hot=False, data_config=None):
         return arr
 
 
-def process_condition_desc(desc):
+def process_condition_desc(desc: str) -> Tuple[str, Optional[str]]:
     postprocess = None
     for proc in ["_one_hot", "_bin_3", "_lowhigh_bin_2", "_zscore"]:
         if proc in desc:
@@ -63,7 +67,9 @@ def process_condition_desc(desc):
     return desc, postprocess
 
 
-def get_bin_3_condition(cond, desc, cond_params):
+def get_bin_3_condition(
+    cond: np.ndarray, desc: str, cond_params: MutableMapping[str, Any]
+) -> Tuple[np.ndarray, List[float]]:
     """
     look for desc_bin_3_quantile kwarg specifying the quantile.
     If not present, calculate the quantiles based on cond.
@@ -81,7 +87,9 @@ def get_bin_3_condition(cond, desc, cond_params):
     return cond_bin, list(q)
 
 
-def get_lowhigh_bin_2_condition(cond, desc, cond_params):
+def get_lowhigh_bin_2_condition(
+    cond: np.ndarray, desc: str, cond_params: MutableMapping[str, Any]
+) -> Tuple[np.ndarray, List[float]]:
     # bin in 4 quantiles, take low and high TR cells (2 classes)
     # remainder of cells has nan values - can be filtered out later
     if cond_params.get(f"{desc}_lowhigh_bin_2_quantile", None) is not None:
@@ -94,7 +102,9 @@ def get_lowhigh_bin_2_condition(cond, desc, cond_params):
     return cond_bin, list(q)
 
 
-def get_zscore_condition(cond, desc, cond_params):
+def get_zscore_condition(
+    cond: np.ndarray, desc: str, cond_params: MutableMapping[str, Any]
+) -> Tuple[np.ndarray, List[float]]:
     # z-score TR
     # contiinous nbr, normalizes it
     # should work only after split up
