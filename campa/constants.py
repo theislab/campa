@@ -20,9 +20,9 @@ SCRIPTS_DIR = Path(__file__).parent.parent
 
 # look for configs in .config folder and in current dir
 config_fnames = [
+    Path.cwd() / "campa.ini",
     Path(__file__).resolve().parent.parent
     / "config.ini",  # TODO this is for legacy reasons, should be removed at some point
-    Path.cwd() / "campa.ini",
     Path.home() / ".config" / "campa" / "campa.ini",
 ]
 config = ConfigParser()
@@ -39,7 +39,7 @@ EXPERIMENT_DIR = get_value(config, key="experiment_dir")
 BASE_DATA_DIR = get_value(config, key="data_dir")
 
 
-def get_data_config(data_config: str = "TestData") -> Any:
+def get_data_config(data_config: str = "ExampleData") -> Any:
     module = load_config(get_value(config, section="data", key=data_config))
     if module is None:
         raise ValueError(f"Unknown data_config {data_config}")

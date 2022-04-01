@@ -194,7 +194,7 @@ class Experiment:
     @property
     def is_trainable(self) -> bool:
         """
-        False, if this is not a traineable experiment (e.g. raw pixel clustering).
+        Return false, if this is not a traineable experiment.
         """
         return self.config["model"] is not None and self.config["training"] is not None
 

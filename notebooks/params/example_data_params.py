@@ -4,7 +4,7 @@ data_params = {
     # name of the resulting dataset that is defined by these params (relative to DATA_DIR/datasets)
     "dataset_name": "184A1_test_dataset",
     # name of data config (registered in config.ini)
-    "data_config": "TestData",
+    "data_config": "ExampleData",
     # where to read data from (relative to DATA_DIR defined in data config)
     "data_dirs": [os.path.join("184A1_unperturbed", well) for well in ["I09", "I11"]]
     + [os.path.join("184A1_meayamycin", well) for well in ["I12", "I20"]],

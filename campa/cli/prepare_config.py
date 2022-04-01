@@ -49,14 +49,14 @@ def prepare_config(args):
     # check test data
     config = ConfigParser()
     config.read(config_path)
-    cur_test_data = config.get("data", "TestData")
+    cur_test_data = config.get("data", "ExampleData")
     if cur_test_data == "" or not Path(cur_test_data).is_file():
-        print("setting up TestData config")
+        print("setting up ExampleData config")
         # add test data
         config.set(
             "data",
-            "TestData",
-            str(Path(__file__).resolve().parent.parent.parent / "notebooks" / "params" / "TestData_constants.py"),
+            "ExampleData",
+            str(Path(__file__).resolve().parent.parent.parent / "notebooks" / "params" / "ExampleData_constants.py"),
         )
         with open(config_path, "w") as configfile:
             config.write(configfile)

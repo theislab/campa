@@ -34,7 +34,7 @@ This file contains the following sections:
     - ``DataName=<path>``. Each constant here contains a path to a python file,
       where parameters that are specific to the required data load are stored.
       Please refer to the `MPPData notebook`_ and
-      the `TestData_constants.py <https://github.com/theislab/campa/blob/main/notebooks/params/TestData_constants.py>`_
+      the `ExampleData_constants.py <https://github.com/theislab/campa/blob/main/notebooks/params/ExampleData_constants.py>`_
       to see an example.
 
 .. _MPPData notebook: notebooks/mpp_data.ipynb

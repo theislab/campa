@@ -6,7 +6,7 @@ experiment_dir =
 [data]
 ; register individual constants files for different data sources here
 ; they will be referenced by the chosen name in the code
-TestData =
+ExampleData =
 
 [co_occ]
 ; maximal size of co-occ matrix. If number of coordinates that need to be checked is larger, co-occ is computed in chunks.

@@ -138,13 +138,13 @@ class NNDataset:
 
         # data
         self.data = {
-            "train": MPPData.from_data_dir(os.path.join(self.dataset_folder, "train"), base_dir=""),
-            "val": MPPData.from_data_dir(os.path.join(self.dataset_folder, "val"), base_dir=""),
-            "test": MPPData.from_data_dir(os.path.join(self.dataset_folder, "test"), base_dir=""),
+            "train": MPPData.from_data_dir(os.path.join(self.dataset_folder, "train"), base_dir="", data_config=self.data_config_name),
+            "val": MPPData.from_data_dir(os.path.join(self.dataset_folder, "val"), base_dir="", data_config=self.data_config_name),
+            "test": MPPData.from_data_dir(os.path.join(self.dataset_folder, "test"), base_dir="", data_config=self.data_config_name),
         }
         self.imgs = {
-            "val": MPPData.from_data_dir(os.path.join(self.dataset_folder, "val_imgs"), base_dir=""),
-            "test": MPPData.from_data_dir(os.path.join(self.dataset_folder, "test_imgs"), base_dir=""),
+            "val": MPPData.from_data_dir(os.path.join(self.dataset_folder, "val_imgs"), base_dir="", data_config=self.data_config_name),
+            "test": MPPData.from_data_dir(os.path.join(self.dataset_folder, "test_imgs"), base_dir="", data_config=self.data_config_name),
         }
         self.channels = self.data["train"].channels.reset_index().set_index("name")
         self.params = json.load(open(os.path.join(self.dataset_folder, "params.json")))

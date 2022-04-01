@@ -7,7 +7,7 @@ base_config = {
         "save_config": True,
     },
     "data": {
-        "data_config": "TestData",
+        "data_config": "ExampleData",
         "dataset_name": "184A1_test_dataset",
         "output_channels": None,
     },

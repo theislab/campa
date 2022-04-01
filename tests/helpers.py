@@ -101,7 +101,7 @@ def gen_mppdata(
     num_obj_ids: int = 5,
     possible_cell_cycles: list = None,
     channels: list = None,
-    data_config: str = "TestData",
+    data_config: str = "ExampleData",
     **kwargs,
 ) -> MPPData:
     """\
