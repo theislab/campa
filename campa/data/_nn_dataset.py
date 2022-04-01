@@ -195,7 +195,7 @@ class NNDataset:
         split: str = "train",
         output_channels: Optional[Iterable[str]] = None,
         is_conditional: bool = False,
-        repeat_y: bool = False,
+        repeat_y: Union[bool, int] = False,
         add_c_to_y: bool = False,
         shuffled: bool = False,
     ) -> tf.data.Dataset:

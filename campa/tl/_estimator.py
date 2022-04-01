@@ -143,7 +143,7 @@ class Estimator:
             split=split,
             output_channels=self.output_channels,
             is_conditional=self.model.is_conditional,
-            repeat_y=bool(self.repeat_y),
+            repeat_y=self.repeat_y,
             add_c_to_y=self.add_c_to_y,
             shuffled=shuffled,
         )
