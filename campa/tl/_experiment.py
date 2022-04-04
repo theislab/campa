@@ -174,7 +174,7 @@ class Experiment:
         """
         # load config from json
         config_fname = os.path.join(EXPERIMENT_DIR, exp_path, "config.json")
-        assert os.path.exists(config_fname), f"no config.json in {exp_path}"
+        assert os.path.exists(config_fname), f"no config.json in {EXPERIMENT_DIR}/{exp_path}"
         config = json.load(open(config_fname))
         # set save_config to False to avoid overwriting
         config["experiment"]["save_config"] = False

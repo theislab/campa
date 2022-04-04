@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Dict, List, Union, Mapping, Iterable, Optional
+from typing import Any, Dict, List, Tuple, Union, Mapping, Iterable, Optional
 from functools import partial
 import os
 import time
@@ -414,6 +414,8 @@ class FeatureExtractor:
         """
         Extract co_occurrence for each cell invididually.
 
+        TODO: add reset flag, that sets existing co-occ matrices to 0 before running co_occ algo.
+
         Parameters
         ----------
         interval
@@ -697,6 +699,64 @@ class FeatureExtractor:
                     masks.append((self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1))
             obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
             return obj_ids
+    
+    def compare(self, obj: "FeatureExtractor") -> Tuple[bool, Dict[str, bool]]:
+        """
+        Compare feature extractors.
+
+        Compares all features contained in adata and annotation dict.
+        
+        Parameters
+        ----------
+        obj
+            Object to compare to.
+        
+        Returns
+        -------
+        Tuple of (``overall_result``, ``results_dict``).
+            ``overall_result`` is True, if all data in ``results_dict`` is True.
+            ``results_dict`` contains for each tested key True or False.
+        """
+        def array_comp(arr1, arr2):
+            comp = arr1 == arr2
+            if comp is False:
+                return False
+            else:
+                return comp.all()
+
+        results_dict = {}
+        results_dict['annotation'] = self.annotation.equals(obj.annotation)
+        res = {}
+        res['X'] = array_comp(self.adata.X, obj.adata.X)
+        res['obs'] = self.adata.obs.equals(obj.adata.obs)
+        res['obsm'] = {}
+        for key in self.adata.obsm.keys():
+            res['obsm'][key] = self.adata.obsm[key].equals(obj.adata.obsm[key])
+        res['layers'] = {}
+        for key in self.adata.layers.keys():
+            res['layers'][key] = array_comp(self.adata.layers[key], obj.adata.layers[key])
+        res['uns'] = {}
+        for key in self.adata.uns.keys():
+            if key == 'params':
+                # params are experiment specific, but here we just care about the resulting values
+                continue
+            if key == 'object_stats':
+                res['uns'][key] = self.adata.uns[key].equals(obj.adata.uns[key])
+            elif key == 'clusters':
+                res['uns'][key] = array_comp(self.adata.uns[key], obj.adata.uns[key])
+            elif key in ('object_stats_params', 'co_occurrence_params'):
+                res['uns'][key] = {}
+                for k in self.adata.uns[key].keys():
+                    res['uns'][key][k] = array_comp(self.adata.uns[key][k], obj.adata.uns[key][k])
+            else:
+                res['uns'][key] = self.adata.uns[key] == obj.adata.uns[key]
+        results_dict['adata'] = res
+
+        # summarise results
+        # flatten dict
+        df = pd.json_normalize(results_dict, sep='_')
+        vals = df.to_dict(orient='records')[0].values()
+        return np.all(list(vals)), results_dict
 
 
 @jit(ft[:, :](it[:], it[:], it), fastmath=True)
