@@ -138,5 +138,5 @@ docs/source/classes
 docs/source/models
 
 # data
-tests/test_dataset
-
+tests/_data
+tests/_experiments

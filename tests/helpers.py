@@ -1,16 +1,11 @@
 from string import ascii_letters
-from pathlib import Path
-import os
-import shutil
-import tempfile
+from typing import TYPE_CHECKING
 
-from tqdm import tqdm
+if TYPE_CHECKING:
+    from campa.data import MPPData
+
 import numpy as np
 import pandas as pd
-import requests
-
-from campa.data import MPPData
-from campa.data import load_example_data
 
 
 def gen_vstr_recarray(m, n, dtype=None):
@@ -101,9 +96,9 @@ def gen_mppdata(
     num_obj_ids: int = 5,
     possible_cell_cycles: list = None,
     channels: list = None,
-    data_config: str = "ExampleData",
+    data_config: str = "TestData",
     **kwargs,
-) -> MPPData:
+) -> "MPPData":
     """\
     generate several obj ids, for each - generate X, Y, MPP withing bounding box:
     1. generate obj_ids (number defined)
@@ -119,6 +114,7 @@ def gen_mppdata(
     ------
 
     """
+    from campa.data import MPPData
 
     obj_ids = np.array([np.uint32(i) for i in range(num_obj_ids)])
 
@@ -147,9 +143,3 @@ def gen_mppdata(
     }
     mppdata = MPPData(metadata, channels_df, data, data_config=data_config)
     return mppdata
-
-
-if __name__ == "__main__":
-    # tmp1=gen_mppdata()
-    folder_dir = load_example_data()
-    print(folder_dir)

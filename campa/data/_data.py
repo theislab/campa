@@ -329,7 +329,7 @@ class MPPData:
             save_keys = self._data.keys()
         else:
             if mpp_params is None or mpp_params.get("base_data_dir", None) is None:
-                self.log.warn("Saving partial keys of mpp data without a base_data_dir to enable correct loading")
+                self.log.warning("Saving partial keys of mpp data without a base_data_dir to enable correct loading")
             else:
                 # save mpp_params
                 mpp_params = {

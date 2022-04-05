@@ -289,7 +289,7 @@ class Cluster:
         name = self.config["cluster_name"]
         # check that dir is defined
         if data_dir is None:
-            self.log.warn("Cluster_data_dir is None, cannot load cluster_mpp")
+            self.log.warning("Cluster_data_dir is None, cannot load cluster_mpp")
             return None
         # load data
         try:
@@ -302,7 +302,7 @@ class Cluster:
             self.log.info(f"Loaded cluster_mpp {mpp_data}")
             return mpp_data
         except FileNotFoundError:
-            self.log.warn(f"Could not load MPPData from {data_dir}")
+            self.log.warning(f"Could not load MPPData from {data_dir}")
             return None
 
     @property
@@ -703,7 +703,7 @@ class Cluster:
                     base_dir="",
                 )
             except FileNotFoundError:
-                self.log.warn(
+                self.log.warning(
                     f"Did not find {self.config['cluster_rep']} in {img_save_dir}. Run create_clustering first."
                 )
                 return None

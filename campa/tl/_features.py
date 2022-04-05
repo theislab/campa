@@ -661,7 +661,7 @@ class FeatureExtractor:
             column names from `metadata.csv` that should be additionally stored.
         """
         if self.adata is None:
-            self.log.warn(
+            self.log.warning(
                 "Intensity and size information is not present. Calculate extract_intensity_size first! Exiting."
             )
             return
@@ -699,24 +699,25 @@ class FeatureExtractor:
                     masks.append((self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1))
             obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
             return obj_ids
-    
-    def compare(self, obj: "FeatureExtractor") -> Tuple[bool, Dict[str, bool]]:
+
+    def compare(self, obj: "FeatureExtractor") -> Tuple[bool, Dict[str, Any]]:
         """
         Compare feature extractors.
 
         Compares all features contained in adata and annotation dict.
-        
+
         Parameters
         ----------
         obj
             Object to compare to.
-        
+
         Returns
         -------
         Tuple of (``overall_result``, ``results_dict``).
             ``overall_result`` is True, if all data in ``results_dict`` is True.
             ``results_dict`` contains for each tested key True or False.
         """
+
         def array_comp(arr1, arr2):
             comp = arr1 == arr2
             if comp is False:
@@ -724,39 +725,42 @@ class FeatureExtractor:
             else:
                 return comp.all()
 
+        if self.adata is None or obj.adata is None:
+            self.log.warning("Cannot compare FeatureExtractors, one or more adatas is None")
+            return False, {}
         results_dict = {}
-        results_dict['annotation'] = self.annotation.equals(obj.annotation)
+        results_dict["annotation"] = self.annotation.equals(obj.annotation)
         res = {}
-        res['X'] = array_comp(self.adata.X, obj.adata.X)
-        res['obs'] = self.adata.obs.equals(obj.adata.obs)
-        res['obsm'] = {}
+        res["X"] = array_comp(self.adata.X, obj.adata.X)
+        res["obs"] = self.adata.obs.equals(obj.adata.obs)
+        res["obsm"] = {}
         for key in self.adata.obsm.keys():
-            res['obsm'][key] = self.adata.obsm[key].equals(obj.adata.obsm[key])
-        res['layers'] = {}
+            res["obsm"][key] = self.adata.obsm[key].equals(obj.adata.obsm[key])
+        res["layers"] = {}
         for key in self.adata.layers.keys():
-            res['layers'][key] = array_comp(self.adata.layers[key], obj.adata.layers[key])
-        res['uns'] = {}
+            res["layers"][key] = array_comp(self.adata.layers[key], obj.adata.layers[key])
+        res["uns"] = {}
         for key in self.adata.uns.keys():
-            if key == 'params':
+            if key == "params":
                 # params are experiment specific, but here we just care about the resulting values
                 continue
-            if key == 'object_stats':
-                res['uns'][key] = self.adata.uns[key].equals(obj.adata.uns[key])
-            elif key == 'clusters':
-                res['uns'][key] = array_comp(self.adata.uns[key], obj.adata.uns[key])
-            elif key in ('object_stats_params', 'co_occurrence_params'):
-                res['uns'][key] = {}
+            if key == "object_stats":
+                res["uns"][key] = self.adata.uns[key].equals(obj.adata.uns[key])
+            elif key == "clusters":
+                res["uns"][key] = array_comp(self.adata.uns[key], obj.adata.uns[key])
+            elif key in ("object_stats_params", "co_occurrence_params"):
+                res["uns"][key] = {}
                 for k in self.adata.uns[key].keys():
-                    res['uns'][key][k] = array_comp(self.adata.uns[key][k], obj.adata.uns[key][k])
+                    res["uns"][key][k] = array_comp(self.adata.uns[key][k], obj.adata.uns[key][k])
             else:
-                res['uns'][key] = self.adata.uns[key] == obj.adata.uns[key]
-        results_dict['adata'] = res
+                res["uns"][key] = self.adata.uns[key] == obj.adata.uns[key]
+        results_dict["adata"] = res
 
         # summarise results
         # flatten dict
-        df = pd.json_normalize(results_dict, sep='_')
-        vals = df.to_dict(orient='records')[0].values()
-        return np.all(list(vals)), results_dict
+        df = pd.json_normalize(results_dict, sep="_")
+        vals = df.to_dict(orient="records")[0].values()
+        return all(list(vals)), results_dict
 
 
 @jit(ft[:, :](it[:], it[:], it), fastmath=True)
