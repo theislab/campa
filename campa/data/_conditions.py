@@ -31,7 +31,7 @@ def convert_condition(
     """Convert condition array according to desc."""
     log = logging.getLogger("convert_condition")
     if data_config is None:
-        log.warn("using default data config")
+        log.warning("using default data config")
         data_config = get_data_config()
     # check if is a condition that can convert:
     if desc in data_config.CONDITIONS.keys():

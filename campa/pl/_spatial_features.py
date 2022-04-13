@@ -1,3 +1,6 @@
+from typing import Any, Tuple, Iterable, Optional
+
+from matplotlib.axes import Axes as MplAxes
 import numpy as np
 import pandas as pd
 import anndata as ad
@@ -5,7 +8,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-def _co_occ_scores(adata, condition, condition_value, cluster1, cluster2):
+def _co_occ_scores(
+    adata: ad.AnnData, condition: str, condition_value: Any, cluster1: str, cluster2: str
+) -> pd.DataFrame:
     scores = adata[adata.obs[condition] == condition_value].obsm[f"co_occurrence_{cluster1}_{cluster2}"]
     # filter nans from scores (cells in which either cluster1 or cluster2 does not exist)
     scores = scores[~np.isnan(scores).all(axis=1)]
@@ -20,7 +25,15 @@ def _co_occ_scores(adata, condition, condition_value, cluster1, cluster2):
     return scores_log.melt(value_name="score", var_name="distance")
 
 
-def plot_co_occurrence(adata, cluster1, cluster2, condition, condition_values=None, ax=None, **kwargs):
+def plot_co_occurrence(
+    adata: ad.AnnData,
+    cluster1: str,
+    cluster2: str,
+    condition: str,
+    condition_values: Optional[Iterable[str]] = None,
+    ax: MplAxes = None,
+    **kwargs: Any,
+) -> None:
     """
     kwargs: additional arguments to sns.lineplot
     """
@@ -40,7 +53,13 @@ def plot_co_occurrence(adata, cluster1, cluster2, condition, condition_values=No
     ax.axhline(y=0, color="black")
 
 
-def plot_co_occurrence_grid(adata: ad.AnnData, condition: str, condition_values=None, figsize=(10, 10), **kwargs):
+def plot_co_occurrence_grid(
+    adata: ad.AnnData,
+    condition: str,
+    condition_values: Optional[Iterable[str]] = None,
+    figsize: Tuple[int, int] = (10, 10),
+    **kwargs: Any,
+) -> Any:
     """
     Plot co-occurrence for all cluster-cluster pairs in a grid.
 

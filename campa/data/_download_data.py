@@ -1,25 +1,22 @@
-
-from string import ascii_letters
+from typing import Union
 from pathlib import Path
 import os
 import shutil
 import tempfile
-from typing import Union
 
 from tqdm import tqdm
-import numpy as np
-import pandas as pd
 import requests
 
-from campa.data import MPPData
+Path_t = Union[str, Path]
 
-def load_example_data(data_dir: str =None) -> Union[os.PathLike, str]:
+
+def load_example_data(data_dir: Path_t = None) -> Path_t:
     """
     Download example data to ``data_dir``.
 
     Parameters
     ----------
-    data_dir 
+    data_dir
         Defaults to ``notebooks/example_data``
 
     Returns
@@ -27,7 +24,6 @@ def load_example_data(data_dir: str =None) -> Union[os.PathLike, str]:
         Path to folder where dataset is stored
     """
     from pathlib import Path
-    import os
 
     fname = "example_data"
     if data_dir is None:
@@ -41,7 +37,7 @@ def load_example_data(data_dir: str =None) -> Union[os.PathLike, str]:
     return folder_dir
 
 
-def load_dataset(dataset_path, fname, backup_url):
+def load_dataset(dataset_path: Path_t, fname: str, backup_url: str) -> Path_t:
     """
     Generic function to load dataset
     In dataset_path, creates ierarhy of folders "raw", "archive".
@@ -89,6 +85,7 @@ def load_dataset(dataset_path, fname, backup_url):
 
     return uncpacked_dir
 
+
 def getFilename_fromCd(cd):
     """
     Get filename from content-disposition or url request
@@ -109,7 +106,7 @@ def getFilename_fromCd(cd):
 
 def download(
     url: str,
-    output_path=None,
+    output_path: Path_t = None,
     block_size: int = 1024,
     overwrite: bool = False,
 ) -> None:
@@ -129,7 +126,7 @@ def download(
     filename = getFilename_fromCd(response.headers.get("content-disposition"))
 
     # currently supports zip, tar, gztar, bztar, xztar
-    download_to_folder = output_path.parent
+    download_to_folder = Path(output_path).parent
     os.makedirs(download_to_folder, exist_ok=True)
 
     archive_formats, _ = zip(*shutil.get_archive_formats())

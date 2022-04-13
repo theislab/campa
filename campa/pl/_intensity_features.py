@@ -1,7 +1,8 @@
-from typing import Union, Mapping, Iterable, Optional
+from typing import Any, List, Tuple, Union, Mapping, Iterable, Optional
 import warnings
 
 from scipy.stats import zscore
+from matplotlib.axes import Axes as MplAxes
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 import numpy as np
 import scipy
@@ -35,7 +36,7 @@ def _adjust_plotheight(scplot):
     scplot.width = mainplot_width + scplot.legends_width
 
 
-def _ensure_categorical(adata, col):
+def _ensure_categorical(adata: ad.AnnData, col: str) -> None:
     if isinstance(adata.obs[col].dtype, pd.CategoricalDtype):
         # nothing todo
         return
@@ -45,19 +46,19 @@ def _ensure_categorical(adata, col):
 
 # TODO add group size similar to dotplot here!
 def plot_mean_intensity(
-    adata,
-    groupby="cluster",
-    marker_dict=None,
-    save=None,
-    dendrogram=False,
-    limit_to_groups=None,
-    type="matrixplot",  # noqa: A002
-    cmap="viridis",
-    adjust_height=True,
-    figsize=(10, 5),
-    ax=None,
-    **kwargs,
-):
+    adata: ad.AnnData,
+    groupby: str = "cluster",
+    marker_dict: Optional[Union[Mapping[str, Iterable[str]], Iterable[str]]] = None,
+    save: Optional[str] = None,
+    dendrogram: bool = False,
+    limit_to_groups: Optional[Mapping[str, Union[str, List[str]]]] = None,
+    type: str = "matrixplot",  # noqa: A002
+    cmap: str = "viridis",
+    adjust_height: bool = True,
+    figsize: Tuple[int, int] = (10, 5),
+    ax: MplAxes = None,
+    **kwargs: Any,
+) -> None:
     """
     Show per cluster intensity of each channel.
 
@@ -150,17 +151,17 @@ def plot_mean_intensity(
 
 
 def plot_mean_size(
-    adata,
-    groupby_row="cluster",
-    groupby_col="well_name",
-    normby_row=None,
-    normby_col=None,
-    ax=None,
-    figsize=None,
-    adjust_height=False,
-    save=None,
-    **kwargs,
-):
+    adata: ad.AnnData,
+    groupby_row: str = "cluster",
+    groupby_col: str = "well_name",
+    normby_row: Optional[str] = None,
+    normby_col: Optional[str] = None,
+    ax: MplAxes = None,
+    figsize: Tuple[int, int] = None,
+    adjust_height: bool = False,
+    save: Optional[str] = None,
+    **kwargs: Any,
+) -> None:
     """
     Plot mean cluster sizes per cell, grouped by different columns in obs.
 
@@ -211,7 +212,7 @@ def plot_mean_size(
 
 def mixed_model(ref_expr, g_expr, ref_well_name, g_well_name):
     # res_data = {'resid'}
-    res_data = {"df": [], "resid": []}
+    res_data: Mapping[str, List[Any]] = {"df": [], "resid": []}
     # if True:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -243,16 +244,16 @@ def get_intensity_change(
     adata: ad.AnnData,
     groupby: str,
     marker_dict: Optional[Union[Mapping[str, Iterable[str]], Iterable[str]]] = None,
-    limit_to_groups: Optional[Mapping[str, Iterable[str]]] = None,
-    reference: Optional[str] = None,
+    limit_to_groups: Optional[Mapping[str, Union[str, List[str]]]] = None,
+    reference: Optional[Union[List[str], str]] = None,
     reference_group: Optional[str] = None,
     color: str = "logfoldchange",
     size: str = "mean_reference",
     group_sizes_barplot: Optional[str] = None,
     pval: str = "ttest",
     alpha: float = 0.05,
-    norm_by_group=None,
-):
+    norm_by_group: Optional[str] = None,
+) -> Mapping[str, Any]:
     """
     Get data for plotting intensity comparison with :func:`plot_intensity_change`.
 
@@ -340,6 +341,7 @@ def get_intensity_change(
     for g in adata.obs[groupby].cat.categories:
         # reference expression
         if reference is not None:
+            assert adata_ref is not None
             if reference_group != groupby:
                 # reference expression is the current group in the reference group
                 # (which is a distinct grouping from the groupby categories)
@@ -357,6 +359,7 @@ def get_intensity_change(
         if norm_by_group is not None:
             assert reference is not None, "Need a reference for norm by group"
             assert reference_group != groupby, "Can only norm by group if reference_group is different to groupby"
+            assert adata_ref is not None
             cur_ref_expr = cur_ref_expr / adata_ref[adata_ref.obs[groupby] == norm_by_group].X
         cur_ref_size = adata_cur_ref.obs["size"]
 
@@ -426,7 +429,10 @@ def get_intensity_change(
     lmt_str = ", ".join([f'{key}: {",".join(val)}' for key, val in limit_to_groups.items()])
     if limit_to_groups == {}:
         lmt_str = "all"
-    title = f'{color} of {lmt_str} wrt {reference_group}: {",".join([str(r) for r in reference])}'
+    if reference is not None:
+        title = f'{color} of {lmt_str} wrt {reference_group}: {",".join([str(r) for r in reference])}'
+    else:
+        title = f"{color} of {lmt_str} wrt rest"
     cbar_title = f"{color} in group"
     if norm_by_group is not None:
         cbar_title = f"relative {color} in group\nwrt {norm_by_group}"
@@ -453,22 +459,22 @@ def get_intensity_change(
 
 
 def plot_intensity_change(
-    adata,
-    color_values,
-    size_values,
-    p_values,
-    p_values_data,
-    group_size,
-    marker_dict,
-    groupby,
-    plot_data,
-    alpha,
+    adata: ad.AnnData,
+    color_values: pd.DataFrame,
+    size_values: pd.DataFrame,
+    p_values: pd.DataFrame,
+    p_values_data: Mapping[str, Any],
+    group_size: Mapping[str, Any],
+    marker_dict: Optional[Union[Mapping[str, Iterable[str]], Iterable[str]]],
+    groupby: str,
+    plot_data: Mapping[str, Any],
+    alpha: float,
     adjust_height: bool = True,
     ax: Optional[matplotlib.axes.Axes] = None,
     figsize: Iterable[int] = (10, 3),
     save: Optional[str] = None,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> None:
     """
     Plot mean intensity differences between perturbations or clusters.
 
@@ -515,7 +521,7 @@ def plot_intensity_change(
 
     # add group sizes
     if plot_data["group_sizes_barplot"] is not None:
-        group_size = pd.Series(data=group_size)
+        group_size: pd.Series = pd.Series(data=group_size)  # type: ignore[no-redef]
         scplot.group_extra_size = 0.8
         scplot.plot_group_extra = {
             "kind": "group_totals",
@@ -535,6 +541,7 @@ def plot_intensity_change(
 
     # allow negative values in barplot
     if plot_data["group_sizes_barplot"] == "meanchange":
+        assert isinstance(group_size, pd.Series)
         scplot.ax_dict["group_extra_ax"].set_xlim(
             (
                 group_size.min() - np.abs(group_size.min()) * 0.4,
@@ -547,24 +554,22 @@ def plot_intensity_change(
 
 
 def plot_size_change(
-    adata,
-    groupby_row="cluster",
-    groupby_col="well_name",
-    reference_row=None,
-    reference_col=None,
-    figsize=None,
-    adjust_height=True,
-    ax=None,
-    pval=0.05,
-    save=None,
-    size="mean_size",
-    limit_to_groups=None,
-    **kwargs,
-):
+    adata: ad.AnnData,
+    groupby_row: str = "cluster",
+    groupby_col: str = "well_name",
+    reference_row: Optional[str] = None,
+    reference_col: Optional[str] = None,
+    figsize: Optional[Tuple[int, int]] = None,
+    adjust_height: bool = True,
+    ax: MplAxes = None,
+    pval: float = 0.05,
+    save: Optional[str] = None,
+    size: str = "mean_size",
+    limit_to_groups: Optional[Mapping[str, Union[List[str], str]]] = None,
+    **kwargs: Any,
+) -> None:
     """
     Plot mean intensity differences between perturbations and clusters.
-
-    TODO type annotations
 
     Parameters
     ----------
