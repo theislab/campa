@@ -7,6 +7,6 @@ from ._cluster import (
     project_cluster_data,
 )
 from ._evaluate import Predictor, ModelComparator
-from ._features import extract_features, FeatureExtractor
+from ._features import extract_features, FeatureExtractor, thresholded_count, thresholded_median
 from ._estimator import Estimator
 from ._experiment import Experiment, run_experiments

@@ -25,6 +25,53 @@ it = nt.int64
 ft = nt.float32
 it = nt.int64
 
+def thresholded_count(df, threshold=0.9):
+    """
+    Count largest CSL objects per cell.
+    
+    Sort objects by area (largest areas first) and count how many are needed to exceed threshold % of the total area.
+    This is essentially a small object invariant way of counting big objects.
+    Can be used as aggregation function in :meth:`FeatureExtractor.get_object_stats`.
+
+    Parameters
+    ----------
+    threshold
+        Only consider large objects up to cumsum of 90% of the total area.
+
+    Returns
+    -------
+    count
+    """
+    total = df.sum()
+    cumsum = (df/total).sort_values(ascending=False).cumsum()
+    count = (cumsum < threshold).sum() + 1
+    return count
+
+def thresholded_median(df, threshold=0.9):
+    """
+    Calculate median area of large CSL objects per cell.
+    
+    Sort objects by area (largest areas first) and compute the median area of all objects that are below cumsum of threshold.
+    This is essentially a small object invariant way of computing median.
+    Can be used as aggregation function in :meth:`FeatureExtractor.get_object_stats`.
+
+    Parameters
+    ----------
+    threshold
+        Only consider large objects up to cumsum of 90% of the total area.
+
+    Returns
+    -------
+    median
+    """
+    total = df.sum()
+    cumsum = (df/total).sort_values(ascending=False).cumsum()
+    mask = cumsum < threshold
+    # object that will finally exceed threshold (would like to include in median calc, as is also included in count)
+    idx = (cumsum >= threshold).idxmax()  
+    mask[idx] = True
+    median = df[cumsum[mask].index].median()
+    return median
 
 def extract_features(params: Mapping[str, Any]) -> None:
     """
@@ -653,7 +700,7 @@ class FeatureExtractor:
         """
         Extract csv file containing obj_id, mean cluster intensity and size for each channel.
 
-        Saves csv as ``{self.fname}.csv``.
+        Saves csv as ``export/intensity_{self.fname}.csv``.
 
         Parameters
         ----------
@@ -678,7 +725,97 @@ class FeatureExtractor:
             for col in obs:
                 df[col] = np.array(adata.obs[col])
         # save csv
-        df.to_csv(os.path.splitext(self.fname)[0] + ".csv")
+        dirname = os.path.join(os.path.dirname(self.fname), "export")
+        os.makedirs(dirname, exist_ok=True)
+        df.to_csv(os.path.join(dirname, f"intensity_{os.path.basename(os.path.splitext(self.fname)[0])}.csv"))
+
+
+    def extract_object_stats_csv(self, obs: Optional[Iterable[str]] = None, features=None, clusters=None ) -> None:
+        """
+        Extract csv files containing obj_id, co_occurrence scores at each distance interval for every cluster-cluster pair.
+
+        Saves csv as ``export/co_occurrence_{cluster1}_{cluster2}_{self.fname}.csv``.
+
+        Parameters
+        ----------
+        obs
+            column names from `metadata.csv` that should be additionally stored.
+        clusters
+            List of cluster names for which pairwise co_occurrence scores should be calculated
+        features: list of features to display. Must be columns of adata.obsm['object_stats_agg'].
+                If None, all features are displayed.
+            clusters: list of clusters to display. Must be columns of adata.obsm['object_stats_agg'].
+                If None, all clusters are displayed.
+        """
+        if self.adata is None or 'object_stats_agg' not in self.adata.obsm:
+            self.log.warn(
+                "Object stats information is not present. Calculate extract_object_stats and get_objects_stats first! Exiting."
+            )
+            return
+        
+        agg_stats = deepcopy(self.adata.obsm["object_stats_agg"])
+        if not isinstance(agg_stats.columns, pd.MultiIndex):
+            # restore multiindex for easier access
+            agg_stats.columns = pd.MultiIndex.from_tuples([tuple(i.split("|")) for i in agg_stats.columns])
+        if features is None:
+            features = agg_stats.columns.levels[0]
+        if clusters is None:
+            clusters = agg_stats.columns.levels[1]
+        
+        df = {}
+        for feature in features:
+            for cluster in clusters:
+                name = f'{feature}|{cluster}'
+                df[name] = agg_stats[feature][cluster]
+        df = pd.DataFrame(df)
+        # add obj_id
+        OBJ_ID = get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID
+        df[OBJ_ID] = np.array(self.adata.obs[OBJ_ID])
+        # add additional obs
+        if obs is not None:
+            for col in obs:
+                df[col] = np.array(self.adata.obs[col])
+        # save csv
+        dirname = os.path.join(os.path.dirname(self.fname), "export")
+        os.makedirs(dirname, exist_ok=True)
+        df.to_csv(os.path.join(dirname, f"object_stats_{os.path.basename(os.path.splitext(self.fname)[0])}.csv"))
+
+    def extract_co_occurrence_csv(self, obs: Optional[Iterable[str]] = None, clusters: Optional[Iterable[str]]=None) -> None:
+        """
+        Extract csv files containing obj_id, co_occurrence scores at each distance interval for every cluster-cluster pair.
+
+        Saves csv as ``export/co_occurrence_{cluster1}_{cluster2}_{self.fname}.csv``.
+
+        Parameters
+        ----------
+        obs
+            column names from `metadata.csv` that should be additionally stored.
+        clusters
+            List of cluster names for which pairwise co_occurrence scores should be calculated
+        """
+        if self.adata is None:
+            self.log.warn(
+                "Co-occurrence information is not present. Calculate extract_co_occurrence first! Exiting."
+            )
+            return
+        if clusters is None:
+            clusters = self.adata.uns['clusters']
+        for c1 in clusters:
+            for c2 in clusters:
+                columns = list(map(lambda x: f'{x[0]:.2f}-{x[1]:.2f}', zip(self.adata.uns['co_occurrence_params']['interval'][:-1], self.adata.uns['co_occurrence_params']['interval'][1:])))
+                df = self.adata.obsm[f'co_occurrence_{c1}_{c2}']
+                df.columns = columns
+                # add obj_id
+                OBJ_ID = get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID
+                df[OBJ_ID] = np.array(self.adata.obs[OBJ_ID])
+                # add additional obs
+                if obs is not None:
+                    for col in obs:
+                        df[col] = np.array(self.adata.obs[col])
+                # save csv
+                dirname = os.path.join(os.path.dirname(self.fname), "export")
+                os.makedirs(dirname, exist_ok=True)
+                df.to_csv(os.path.join(dirname, f"co_occurrence_{c1}_{c2}_{os.path.basename(os.path.splitext(self.fname)[0])}.csv"))
 
     def _missing_co_occ_obj_ids(self):
         """
