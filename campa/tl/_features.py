@@ -15,7 +15,7 @@ import squidpy as sq
 import numba.types as nt
 
 from campa.data import MPPData
-from campa.constants import CoOccAlgo, get_data_config, CO_OCC_CHUNK_SIZE
+from campa.constants import CoOccAlgo, campa_config
 from campa.tl._cluster import annotate_clustering
 from campa.tl._experiment import Experiment
 
@@ -35,7 +35,7 @@ def extract_features(params: Mapping[str, Any]) -> None:
     Params determine what features are extracted from a given clustering.
     The following keys in params are expected:
 
-    - ``experiment_dir``: path to experiment directory relative to EXPERIMENT_DIR.
+    - ``experiment_dir``: path to experiment directory relative to campa_config.EXPERIMENT_DIR.
     - ``cluster_name``: name of clustering to use.
     - ``cluster_dir``: dir of subsampled clustering to load annotation.
       Relative to experiment_dir.
@@ -611,7 +611,7 @@ class FeatureExtractor:
         assert (
             "object_stats" in self.adata.uns.keys()
         ), "No object stats found. Use self.extract_object_stats to calculate."
-        OBJ_ID = get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID
+        OBJ_ID = campa_config.get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID
         df = self.adata.uns["object_stats"]
         # filter out small regions
         df = df[df["area"] > area_threshold]
@@ -670,7 +670,7 @@ class FeatureExtractor:
         # add size
         df["size"] = np.array(adata.obs["size"])
         # add cluster and obj_id
-        OBJ_ID = get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID
+        OBJ_ID = campa_config.get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID
         df["cluster"] = np.array(adata.obs["cluster"])
         df[OBJ_ID] = np.array(adata.obs[OBJ_ID])
         # add additional obs
@@ -691,7 +691,7 @@ class FeatureExtractor:
             # no co-occ calculated
             return self.mpp_data.unique_obj_ids
         else:
-            OBJ_ID = get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID
+            OBJ_ID = campa_config.get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID
             masks = []
             for c1 in self.clusters:
                 for c2 in self.clusters:
@@ -835,9 +835,9 @@ def _co_occ_opt(
     if num_processes is not None:
         pool = multiprocessing.Pool(num_processes)
         log.info(f"using {num_processes} processes to calculate co-occ scores.")
-    if coords1.shape[1] > CO_OCC_CHUNK_SIZE:
+    if coords1.shape[1] > campa_config.CO_OCC_CHUNK_SIZE:
         raise ValueError(
-            f"coords1 with size {coords1.shape[1]} is larger than CO_OCC_CHUNK_SIZE {CO_OCC_CHUNK_SIZE}."
+            f"coords1 with size {coords1.shape[1]} is larger than CO_OCC_CHUNK_SIZE {campa_config.CO_OCC_CHUNK_SIZE}."
             + " Cannot compute _co_occ_opt"
         )
     out = np.zeros((num_clusters, num_clusters, len(coords2_list)), dtype=np.float32)
@@ -845,8 +845,8 @@ def _co_occ_opt(
     for idx, coords2 in enumerate(coords2_list):
         # log.info(f'co occ for interval {idx+1}/{len(coords2_list)},
         # with {coords1.shape[1]} x {coords2.shape[1]} coord pairs')
-        if (coords1.shape[1] * coords2.shape[1]) > CO_OCC_CHUNK_SIZE:
-            chunk_size = int(CO_OCC_CHUNK_SIZE / coords1.shape[1])
+        if (coords1.shape[1] * coords2.shape[1]) > campa_config.CO_OCC_CHUNK_SIZE:
+            chunk_size = int(campa_config.CO_OCC_CHUNK_SIZE / coords1.shape[1])
             coords2_chunks = np.split(coords2, np.arange(0, coords2.shape[1], chunk_size), axis=1)
             # log.info(f'splitting coords2 in {len(coords2_chunks)} chunks')
         else:
