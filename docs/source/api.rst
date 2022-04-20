@@ -14,6 +14,7 @@ Data
 
     data.create_dataset
     data.load_example_data
+    data.load_example_experiment
 
 Tools
 ~~~~~
@@ -28,7 +29,12 @@ Tools
     tl.create_cluster_data
     tl.prepare_full_dataset
     tl.project_cluster_data
+    tl.load_full_data_dict
+    tl.project_cluster_data
+    tl.add_clustering_to_adata
     tl.extract_features
+    tl.thresholded_count
+    tl.thresholded_median    
 
 Plotting
 ~~~~~~~~
@@ -57,10 +63,7 @@ Other
 .. autosummary::
     :toctree: api
 
+    constants.campa_config
     utils.load_config
     utils.merged_config
     utils.init_logging
-    constants.get_data_config
-    constants.EXPERIMENT_DIR
-    constants.BASE_DATA_DIR
-    constants.CO_OCC_CHUNK_SIZE

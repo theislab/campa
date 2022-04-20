@@ -17,11 +17,11 @@ def load_example_data(data_dir: Path_t = None) -> Path_t:
     Parameters
     ----------
     data_dir
-        Defaults to ``notebooks/example_data``
+        Defaults to ``notebooks/example_data``.
 
     Returns
     -------
-        Path to folder where dataset is stored
+        Path to folder where dataset is stored.
     """
     from pathlib import Path
 
@@ -36,6 +36,42 @@ def load_example_data(data_dir: Path_t = None) -> Path_t:
     )
     return folder_dir
 
+def load_example_experiment(experiment_dir: Path_t = None) -> Path_t:
+    """
+    Download example experiment to ``experiment_dir``.
+
+    Parameters
+    ----------
+    experiment_dir
+        Defaults to ``notebooks/example_experiments``.
+
+    Returns
+    -------
+        Path to folder where experiment is stored
+    """
+    if experiment_dir is None:
+        experiment_dir = Path(__file__).parent.parent.parent / "notebooks" / "example_experiments"
+    url = "https://hmgubox2.helmholtz-muenchen.de/index.php/s/42ZLMskc38ka9SQ/download/test_pre_trained.zip"
+
+    uncpacked_dir = Path(os.path.join(experiment_dir, "test_pre_trained"))
+    archive_path = Path(os.path.join(experiment_dir, "test_pre_trained.zip"))
+    os.makedirs(uncpacked_dir, exist_ok=True)
+    foldercontent = os.listdir(str(uncpacked_dir))
+    if "weights_epoch010.index" in foldercontent:
+        return uncpacked_dir
+    elif archive_path.exists():
+        shutil.unpack_archive(archive_path, uncpacked_dir)
+        return uncpacked_dir
+    elif not archive_path.exists():
+        print("Path or dataset does not yet exist. Attempting to download...")
+        download(
+            url,
+            output_path=archive_path,
+        )
+
+        shutil.unpack_archive(archive_path, uncpacked_dir)
+    return uncpacked_dir
+    
 
 def load_dataset(dataset_path: Path_t, fname: str, backup_url: str) -> Path_t:
     """

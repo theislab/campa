@@ -43,7 +43,7 @@ class Predictor:
         """
         Predict val/test split and images.
 
-        Uses :meth:`Experiment.evaluate_config` for settings.
+        Uses :meth:`Experiment.evaluate_config` for settings, and calls :meth:`Predictor.predict_split`.
         """
         config = self.exp.evaluate_config
         # predict split

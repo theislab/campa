@@ -9,6 +9,7 @@ Classes representing data, experiment, and evaluation objects.
 .. autosummary::
     :toctree: classes
 
+    constants.CAMPAConfig
     data.MPPData
     data.NNDataset
     tl.Experiment
@@ -17,3 +18,7 @@ Classes representing data, experiment, and evaluation objects.
     tl.ModelComparator
     tl.Cluster
     tl.FeatureExtractor
+    tl.BaseAEModel
+    tl.VAEModel
+    tl.ModelEnum
+    tl.LossEnum

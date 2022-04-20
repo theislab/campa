@@ -19,7 +19,7 @@ import pandas as pd
 import anndata as ad
 
 from campa.pl import annotate_img
-from campa.constants import get_data_config
+from campa.constants import campa_config
 from campa.data._img_utils import pad_border, BoundingBox
 from campa.data._conditions import (
     get_one_hot,
@@ -78,7 +78,7 @@ class MPPData:
         self.rng = np.random.RandomState(seed=self.seed)
         # save attributes
         self.data_config_name = kwargs.get("data_config", "NascentRNA")
-        self.data_config = get_data_config(self.data_config_name)
+        self.data_config = campa_config.get_data_config(self.data_config_name)
         self.channels = channels
         self._data = data
         # data dir and base dir
@@ -131,7 +131,7 @@ class MPPData:
             base_dir: look for data in base_dir/data_dir. Default in DATA_DIR
         """
         # load data_config
-        data_config = get_data_config(kwargs.get("data_config", "NascentRNA"))
+        data_config = campa_config.get_data_config(kwargs.get("data_config", "NascentRNA"))
         if base_dir is None:
             base_dir = data_config.DATA_DIR
 
@@ -187,7 +187,7 @@ class MPPData:
         """
         # get base_dir
         if base_dir is None:
-            data_config = get_data_config(kwargs.get("data_config", "NascentRNA"))
+            data_config = campa_config.get_data_config(kwargs.get("data_config", "NascentRNA"))
             base_dir = data_config.DATA_DIR
 
         metadata = pd.read_csv(os.path.join(base_dir, data_dir, "metadata.csv"), index_col=0).reset_index(drop=True)

@@ -11,8 +11,9 @@ Conditional Autoencoder for Multiplexed Pixel Analysis
    :caption: Contents
 
    installation
+   overview
    api
    classes
    models
-   notebooks/workflow
+   cli
    tutorials

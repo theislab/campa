@@ -21,14 +21,16 @@ Setup
 =====
 
 To find data and experiment folders, and dataset specific parameters,
-CAMPA needs a config file, ``campa.ini``.
+CAMPA needs a config file, ``campa.ini``. In the code, this is going to be
+represented as ``campa.constants.cama_config``.
 This file contains the following sections:
 
 - ``[DEFAULT]``
     - ``experiment_dir``: default path to the directory where experiment
       results are stored.
-      This is going to be loaded in ``campa.constants.EXPERIMENT_DIR``
+      This is going to be loaded in ``campa_config.EXPERIMENT_DIR``
     - ``data_dir``: default path of the directory where all data is stored.
+      This is going to be loaded in ``campa_config.BASE_DATA_DIR``.
       For more information on the data format, see the `MPPData notebook`_.
       Note that any given data config for specific data may overwrite
       ``data_dir``, and all functions will use ``data_config.DATA_DIR``
@@ -44,9 +46,8 @@ This file contains the following sections:
 
 .. _MPPData notebook: notebooks/mpp_data.ipynb
 
-CAMPA will look for config files in:
+CAMPA will look for config ``campa.ini`` files in:
 
-- the CAMPA code directory
 - the current directory
 - ``$HOME/.config/campa``
 

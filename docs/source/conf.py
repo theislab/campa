@@ -41,6 +41,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "nbsphinx",
     "sphinx.ext.intersphinx",
+    "sphinxarg.ext",
 ]
 
 intersphinx_mapping = dict(  # noqa: C408

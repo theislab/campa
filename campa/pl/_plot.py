@@ -1,27 +1,27 @@
 # --- Plotting functions for evaluating experiments ---
 import numpy as np
 
-
 # TODO remove? TODO don't think its needed anymore
-def map_img(imgs, value_map=None):
-    """
-    maps list of images containing map keys to map values.
-    Used for displaying cluster images. If map is None, create and return a default one
-    """
-    if value_map is None:
-        vals = sorted(set(np.concatenate([np.unique(i) for i in imgs])))
-        value_map = {val: i for i, val in enumerate(vals)}
-    outs = []
-    for img in imgs:
-        out = np.zeros(img.shape)
-        for key, val in value_map.items():
-            out[img == key] = val
-        outs.append(out)
-    return outs, value_map
+# def map_img(imgs, value_map=None):
+#    """
+#    maps list of images containing map keys to map values.
+#    Used for displaying cluster images. If map is None, create and return a default one
+#    """
+#    if value_map is None:
+#        vals = sorted(set(np.concatenate([np.unique(i) for i in imgs])))
+#        value_map = {val: i for i, val in enumerate(vals)}
+#    outs = []
+#    for img in imgs:
+#        out = np.zeros(img.shape)
+#        for key, val in value_map.items():
+#            out[img == key] = val
+#        outs.append(out)
+#    return outs, value_map
 
 
 def annotate_img(img, annotation=None, from_col="clustering", to_col=None, color=False):
     """
+
     Args:
         img: image to annotate
         annotation: pd.DataFrame containing annotation (from Cluster)

@@ -10,6 +10,8 @@ import numpy as np
 import pytest
 import anndata as ad
 
+from campa.constants import campa_config
+
 
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return "".join(random.choice(chars) for _ in range(size))
@@ -19,10 +21,8 @@ def prepare_test_experiment(name, cluster_subset=False, full_data_prediction=Fal
     """
     Copy reference_experiment with the specified components to name
     """
-    from campa.constants import EXPERIMENT_DIR
-
-    from_dir = Path(EXPERIMENT_DIR) / "reference_experiment/cVAE"
-    to_dir = Path(EXPERIMENT_DIR) / "test_experiment" / name
+    from_dir = Path(campa_config.EXPERIMENT_DIR) / "reference_experiment/cVAE"
+    to_dir = Path(campa_config.EXPERIMENT_DIR) / "test_experiment" / name
     # delete to_dir if it exists
     if to_dir.exists():
         shutil.rmtree(to_dir)
@@ -89,47 +89,39 @@ def _ensure_test_data():
 
 @pytest.fixture()
 def test_experiment(_ensure_test_data):
-    from campa.constants import EXPERIMENT_DIR
-
-    print(EXPERIMENT_DIR)
+    print(campa_config.EXPERIMENT_DIR)
     model_name = id_generator(size=6)
     prepare_test_experiment(model_name, cluster_subset=False, full_data_prediction=False, full_data_clustering=False)
     yield "test_experiment/" + model_name
     # remove experiment
-    shutil.rmtree(os.path.join(EXPERIMENT_DIR, "test_experiment", model_name))
+    shutil.rmtree(os.path.join(campa_config.EXPERIMENT_DIR, "test_experiment", model_name))
 
 
 @pytest.fixture()
 def test_experiment_clustered(_ensure_test_data):
-    from campa.constants import EXPERIMENT_DIR
-
     model_name = id_generator(size=6)
     prepare_test_experiment(model_name, cluster_subset=True, full_data_prediction=False, full_data_clustering=False)
     yield "test_experiment/" + model_name
     # remove experiment
-    shutil.rmtree(os.path.join(EXPERIMENT_DIR, "test_experiment", model_name))
+    shutil.rmtree(os.path.join(campa_config.EXPERIMENT_DIR, "test_experiment", model_name))
 
 
 @pytest.fixture()
 def test_experiment_full_data(_ensure_test_data):
-    from campa.constants import EXPERIMENT_DIR
-
     model_name = id_generator(size=6)
     prepare_test_experiment(model_name, cluster_subset=True, full_data_prediction=True, full_data_clustering=False)
     yield "test_experiment/" + model_name
     # remove experiment
-    shutil.rmtree(os.path.join(EXPERIMENT_DIR, "test_experiment", model_name))
+    shutil.rmtree(os.path.join(campa_config.EXPERIMENT_DIR, "test_experiment", model_name))
 
 
 @pytest.fixture()
 def test_experiment_full_data_clustered(_ensure_test_data):
-    from campa.constants import EXPERIMENT_DIR
-
     model_name = id_generator(size=6)
     prepare_test_experiment(model_name, cluster_subset=True, full_data_prediction=True, full_data_clustering=True)
     yield "test_experiment/" + model_name
     # remove experiment
-    shutil.rmtree(os.path.join(EXPERIMENT_DIR, "test_experiment", model_name))
+    shutil.rmtree(os.path.join(campa_config.EXPERIMENT_DIR, "test_experiment", model_name))
 
 
 # --- HELPER FNS ---
@@ -285,7 +277,6 @@ def extract_test_features(test_experiment):
 
 
 # --- TESTS ---
-# @pytest.mark.usefixtures(_ensure_test_data)
 def test_nn_dataset(_ensure_test_data):
     from campa.data import NNDataset
 
@@ -300,7 +291,6 @@ def test_nn_dataset(_ensure_test_data):
         assert test_ds.imgs[split].compare(reference_ds.imgs[split])[0]
 
 
-# @pytest.mark.usefixtures(_ensure_test_data)
 def test_model_training(_ensure_test_data):
     from campa.tl import Estimator, Experiment
 
@@ -343,7 +333,6 @@ def test_cluster_subset(test_experiment):
 def test_predict_full_data(test_experiment_clustered):
     from campa.tl import prepare_full_dataset
     from campa.data import MPPData
-    from campa.constants import EXPERIMENT_DIR
 
     test_experiment = test_experiment_clustered
     # predict full data
@@ -354,13 +343,13 @@ def test_predict_full_data(test_experiment_clustered):
         # load mpp_data with cluster_rep
         test_mpp_data = MPPData.from_data_dir(
             data_dir,
-            base_dir=os.path.join(EXPERIMENT_DIR, test_experiment, "aggregated/full_data"),
+            base_dir=os.path.join(campa_config.EXPERIMENT_DIR, test_experiment, "aggregated/full_data"),
             keys=["x", "y", "obj_ids", "latent"],
             data_config="TestData",
         )
         reference_mpp_data = MPPData.from_data_dir(
             data_dir,
-            base_dir=os.path.join(EXPERIMENT_DIR, test_experiment, "aggregated/full_data"),
+            base_dir=os.path.join(campa_config.EXPERIMENT_DIR, test_experiment, "aggregated/full_data"),
             keys=["x", "y", "obj_ids", "latent"],
             data_config="TestData",
         )
@@ -376,7 +365,6 @@ def test_predict_full_data(test_experiment_clustered):
 def test_cluster_full_data(test_experiment_full_data):
     from campa.tl import project_cluster_data
     from campa.data import MPPData
-    from campa.constants import EXPERIMENT_DIR
 
     test_experiment = test_experiment_full_data
 
@@ -393,13 +381,13 @@ def test_cluster_full_data(test_experiment_full_data):
         # load mpp_data with cluster_rep
         test_mpp_data = MPPData.from_data_dir(
             data_dir,
-            base_dir=os.path.join(EXPERIMENT_DIR, test_experiment, "aggregated/full_data"),
+            base_dir=os.path.join(campa_config.EXPERIMENT_DIR, test_experiment, "aggregated/full_data"),
             keys=["x", "y", "obj_ids", "clustering"],
             data_config="TestData",
         )
         reference_mpp_data = MPPData.from_data_dir(
             data_dir,
-            base_dir=os.path.join(EXPERIMENT_DIR, test_experiment, "aggregated/full_data"),
+            base_dir=os.path.join(campa_config.EXPERIMENT_DIR, test_experiment, "aggregated/full_data"),
             keys=["x", "y", "obj_ids", "clustering"],
             data_config="TestData",
         )
@@ -409,7 +397,6 @@ def test_cluster_full_data(test_experiment_full_data):
 
 def test_extract_features(test_experiment_full_data_clustered):
     from campa.tl import FeatureExtractor
-    from campa.constants import EXPERIMENT_DIR
 
     test_experiment = test_experiment_full_data_clustered
     extract_test_features(test_experiment)
@@ -418,15 +405,18 @@ def test_extract_features(test_experiment_full_data_clustered):
     for data_dir in ["184A1_unperturbed/I09", "184A1_meayamycin/I12"]:
         # load feature extractor from test data
         test_extr = FeatureExtractor.from_adata(
-            os.path.join(EXPERIMENT_DIR, test_experiment, "aggregated/full_data", data_dir, "features.h5ad")
+            os.path.join(
+                campa_config.EXPERIMENT_DIR, test_experiment, "aggregated/full_data", data_dir, "features.h5ad"
+            )
         )
         reference_extr = FeatureExtractor.from_adata(
-            os.path.join(EXPERIMENT_DIR, "reference_experiment/cVAE/aggregated/full_data", data_dir, "features.h5ad")
+            os.path.join(
+                campa_config.EXPERIMENT_DIR, "reference_experiment/cVAE/aggregated/full_data", data_dir, "features.h5ad"
+            )
         )
         assert test_extr.compare(reference_extr)[0]
 
 
-# @pytest.mark.usefixtures(_ensure_test_data)
 def test_plot_intensity_features(_ensure_test_data):
     from campa.pl import (
         plot_mean_size,
@@ -492,7 +482,6 @@ def test_plot_intensity_features(_ensure_test_data):
     plot_intensity_change(**res, adjust_height=True, figsize=(15, 5), vmin=-2, vmax=2)
 
 
-# @pytest.mark.usefixtures(_ensure_test_data)
 def test_plot_co_occ_features(_ensure_test_data):
     from campa.pl import plot_co_occurrence, plot_co_occurrence_grid
     from campa.tl import Experiment, FeatureExtractor
@@ -522,7 +511,6 @@ def test_plot_co_occ_features(_ensure_test_data):
     )
 
 
-# @pytest.mark.usefixtures(_ensure_test_data)
 def test_plot_obj_stats(_ensure_test_data):
     from campa.pl import plot_object_stats
     from campa.tl import Experiment, FeatureExtractor

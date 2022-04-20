@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Iterable, TYPE_CHECKING, MutableMapping
+from typing import Any, Mapping, Iterable, TYPE_CHECKING, MutableMapping, Optional
 
 if TYPE_CHECKING:
     from campa.tl import Experiment
+    import anndata as ad
 
 from copy import deepcopy
 import os
@@ -18,9 +19,10 @@ import pandas as pd
 import scanpy as sc
 import matplotlib.pyplot as plt
 
+
 from campa.data import MPPData
 from campa.utils import merged_config
-from campa.constants import EXPERIMENT_DIR, get_data_config
+from campa.constants import campa_config
 from campa.tl._evaluate import Predictor
 
 
@@ -57,15 +59,32 @@ def annotate_clustering(
     return np.array(annotation.set_index(cluster_name)[annotation_col].loc[clustering])
 
 
-def add_clustering_to_adata(data_dir, cluster_name, adata, annotation, added_name=None, annotation_col=None):
+def add_clustering_to_adata(data_dir: str, cluster_name:str, adata: ad.AnnData, annotation: pd.DataFrame, 
+    added_name:str=None, annotation_col: str=None)-> None:
     """
-    Add cluster_name to adata.obs (as added_name) and cmap values for each cluster stored in.
+    Add clustering to adata.
 
-    cluster_name_annotation.csv to adata.uns
-    uses annotation_col column if is not None
+    Adds `cluster_name` to `adata.obs[added_name]` and color values for each cluster stored in the annotation dict.
+    Assumes that adata has the same dimentionality as the clustering.
 
-    name: name in adata.obs of added clustering
-    annotation: annotation pandas dataframe
+    Parameters
+    ----------
+    data_dir
+        Full path to directory containing ``{cluster_name}.npy``.
+    cluster_name
+        Column in ``annotation`` containing current clustering values.
+    adata
+        Adata to which to add the clustering to.
+    annotation
+        Annotation table containing mapping from clustering values to annotated values.
+    added_name
+        Name to use for clustering in adata. Defaults to `annotation_col`
+    annotation_col
+        Columns in ``annotation`` containing desired annotation. Defaults to `cluster_name`.
+
+    Returns
+    -------
+    Nothing, adds clustering to `adata.obs[added_name]`.
     """
     if added_name is None:
         added_name = annotation_col
@@ -132,7 +151,7 @@ class Cluster:
         "subset": False,
         "subset_kwargs": {},
         "seed": 42,
-        # name of the dir containing the mpp_data that is clustered. Relative to EXPERIMENT_DIR
+        # name of the dir containing the mpp_data that is clustered. Relative to campa_config.EXPERIMENT_DIR
         "cluster_data_dir": None,
         # --- cluster params ---
         # name of the cluster assignment file
@@ -151,7 +170,7 @@ class Cluster:
         """Cluster config."""
 
         self.data_config_name = self.config["data_config"]
-        self.data_config = get_data_config(self.data_config_name)
+        self.data_config = campa_config.get_data_config(self.data_config_name)
         # load dataset_params
         self.dataset_params = None
         if self.config["process_like_dataset"] is not None:
@@ -172,7 +191,9 @@ class Cluster:
 
         # save config
         if save_config:
-            config_fname = os.path.join(EXPERIMENT_DIR, self.config["cluster_data_dir"], "cluster_params.json")
+            config_fname = os.path.join(
+                campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"], "cluster_params.json"
+            )
             os.makedirs(os.path.dirname(config_fname), exist_ok=True)
             json.dump(self.config, open(config_fname, "w"), indent=4)
 
@@ -185,11 +206,11 @@ class Cluster:
         ----------
         data_dir
             Dir containing complete :class:`MPPData` with ``cluster_rep`` and ``cluster_name`` files.
-            Relative to ``EXPERIMENT_DIR``.
+            Relative to ``campa_config.EXPERIMENT_DIR``.
         """
         # load mpp_data and cluster_params (for reference) from data_dir
         # TODO
-        config_fname = os.path.join(EXPERIMENT_DIR, data_dir, "cluster_params.json")
+        config_fname = os.path.join(campa_config.EXPERIMENT_DIR, data_dir, "cluster_params.json")
         config = json.load(open(config_fname))
         return cls(config, save_config=False)
 
@@ -295,7 +316,7 @@ class Cluster:
         try:
             mpp_data = MPPData.from_data_dir(
                 data_dir,
-                base_dir=EXPERIMENT_DIR,
+                base_dir=campa_config.EXPERIMENT_DIR,
                 optional_keys=["mpp", rep, name, "umap"],
                 data_config=self.data_config_name,
             )
@@ -319,7 +340,7 @@ class Cluster:
         Read cluster annotation file / create it.
         """
         fname = os.path.join(
-            EXPERIMENT_DIR,
+            campa_config.EXPERIMENT_DIR,
             self.config["cluster_data_dir"],
             f"{self.config['cluster_name']}_annotation.csv",
         )
@@ -385,7 +406,7 @@ class Cluster:
         self._cluster_annotation = annotation
         # save to disk
         fname = os.path.join(
-            EXPERIMENT_DIR,
+            campa_config.EXPERIMENT_DIR,
             self.config["cluster_data_dir"],
             f"{self.config['cluster_name']}_annotation.csv",
         )
@@ -430,7 +451,7 @@ class Cluster:
         self._cluster_annotation = annotation
         # save to disk
         fname = os.path.join(
-            EXPERIMENT_DIR,
+            campa_config.EXPERIMENT_DIR,
             self.config["cluster_data_dir"],
             f"{self.config['cluster_name']}_annotation.csv",
         )
@@ -441,7 +462,9 @@ class Cluster:
         """
         Calculate and return pynndescent index of existing clustering for fast prediction of new data.
         """
-        index_fname = os.path.join(EXPERIMENT_DIR, self.config["cluster_data_dir"], "pynndescent_index.pickle")
+        index_fname = os.path.join(
+            campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"], "pynndescent_index.pickle"
+        )
         if os.path.isfile(index_fname) and not recreate:
             # load and return index
             return pickle.load(open(index_fname, "rb"))
@@ -474,7 +497,7 @@ class Cluster:
             raise ValueError("Cannot create cluster data without data_dirs")
         self.log.info(f"processing cluster_mpp like dataset {self.config['process_like_dataset']}")
         # load params to use when processing
-        data_config = get_data_config(self.config["data_config"])
+        data_config = campa_config.get_data_config(self.config["data_config"])
         data_params = json.load(
             open(
                 os.path.join(
@@ -509,7 +532,7 @@ class Cluster:
 
         self._cluster_mpp = mpp_data
         if self.config["cluster_data_dir"] is not None:
-            self._cluster_mpp.write(os.path.join(EXPERIMENT_DIR, self.config["cluster_data_dir"]))
+            self._cluster_mpp.write(os.path.join(campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"]))
 
     def predict_cluster_rep(self, exp: Experiment) -> None:
         """
@@ -532,7 +555,7 @@ class Cluster:
         # save cluster_rep
         if self.config["cluster_data_dir"] is not None:
             self.cluster_mpp.write(
-                os.path.join(EXPERIMENT_DIR, self.config["cluster_data_dir"]),
+                os.path.join(campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"]),
                 save_keys=[self.config["cluster_rep"]],
             )
 
@@ -585,7 +608,7 @@ class Cluster:
         # save to cluster_data_dir
         if self.config["cluster_data_dir"] is not None:
             self.cluster_mpp.write(
-                os.path.join(EXPERIMENT_DIR, self.config["cluster_data_dir"]),
+                os.path.join(campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"]),
                 save_keys=save_keys,
             )
 
@@ -614,7 +637,7 @@ class Cluster:
             # save to cluster_data_dir
             if self.config["cluster_data_dir"] is not None:
                 self.cluster_mpp.write(
-                    os.path.join(EXPERIMENT_DIR, self.config["cluster_data_dir"]),
+                    os.path.join(campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"]),
                     save_keys=["umap"],
                 )
 
@@ -850,10 +873,85 @@ def project_cluster_data(
     data_dirs: Iterable[str] = exp.data_params["data_dirs"] if data_dir is None else [data_dir]
     for cur_data_dir in data_dirs:
         # load mpp_data with cluster_rep
-        mpp_data = MPPData.from_data_dir(
-            cur_data_dir,
-            base_dir=os.path.join(exp.full_path, save_dir),
-            keys=["x", "y", "obj_ids", cl.config["cluster_rep"]],
-            data_config=exp.config["data"]["data_config"],
-        )
+        mpp_data = load_full_data_dict(exp, keys=["x", "y", "obj_ids", cl.config["cluster_rep"]], data_dirs=[cur_data_dir], save_dir=save_dir)[cur_data_dir]
         cl.project_clustering(mpp_data, save_dir=os.path.join(exp.full_path, save_dir, cur_data_dir))
+
+
+def load_full_data_dict(exp: Experiment, keys: Iterable[str]=("x", "y", "obj_ids", "latent"), 
+    data_dirs: Optional[Iterable[str]]=None, save_dir: str= 'aggregated/full_data') -> Mapping[str, MPPData]:
+    """
+    Load mpp_datas used in experiment in a dict.
+
+    NOTE: this might take a few minutes, as all data needs to be loaded.
+
+    Parameters
+    ----------
+    exp
+        Experiment from which to load the mpp_datas.
+    keys
+        Controls which np data matrices are being loaded. Passed to :meth:`MPPData.from_data_dir`, 
+        with `optional_keys` set to empty list. Excluding mpp here speeds up loading.
+    data_dirs
+        Dirs that should be loaded, if None, all data_dirs are loaded.
+    save_dir
+        Directory in which the data to be loaded is stored, relative to ``{exp.dir}/{exp.name}``.
+
+
+    Returns
+    -------
+    Dictonary with `data_dirs` as keys and :class:`MPPData` as values.
+    """
+    if data_dirs is None:
+        data_dirs = exp.data_params['data_dirs']
+    mpp_datas = {}
+    for data_dir in data_dirs:
+        mpp_datas[data_dir] = MPPData.from_data_dir(
+            data_dir, base_dir=os.path.join(exp.full_path, save_dir), keys=keys, optional_keys=[],
+            data_config = exp.config["data"]["data_config"],
+        )
+    return mpp_datas
+
+
+def get_clustered_cells(mpp_datas: Mapping[str, MPPData], cl: Cluster, cluster_name: str, num_objs: int=5
+    ) ->  Mapping[str, Mapping[str, MPPData]]:
+    """
+    Get `num_objs` example cells for each `mpp_data`.
+
+    Parameters
+    ----------
+    mpp_datas
+        Data from which to sample and cluster cells.
+    cl
+        Clustering object to use.
+    cluster_name
+        Name of the clustering.
+    num_objs
+        Number of objects (cells) to sample from each mpp_data.
+
+    Returns
+    -------
+    dictionary containing clustered cells in `cluster_name` and colored cells in `cluster_name_colored`.
+    """
+    from campa.pl import annotate_img
+
+    cl.set_cluster_name(cluster_name)
+    res = {cluster_name: {}, cluster_name + "_colored": {}}
+    for data_dir, mpp_data in mpp_datas.items():
+        print(data_dir)
+        # get random obj_ids for this mpp_data
+        rng = np.random.default_rng(seed=42)
+        obj_ids = rng.choice(mpp_data.unique_obj_ids, num_objs, replace=False)
+        # subset mpp_data to obj_ids
+        sub_mpp_data = mpp_data.subset(obj_ids=obj_ids, copy=True)
+        # project_clustering
+        sub_mpp_data = cl.project_clustering(sub_mpp_data)
+        
+        # if only need colored cells, can pass annotation_kwargs to get_object_imgs
+        res[cluster_name][data_dir] = sub_mpp_data.get_object_imgs(
+            data=cluster_name
+        )  # annotation_kwargs={'color': True, 'annotation': cl.cluster_annotation})
+        res[cluster_name + "_colored"][data_dir] = [
+            annotate_img(img, annotation=cl.cluster_annotation, from_col=cluster_name, color=True)
+            for img in res[cluster_name][data_dir]
+        ]
+    return res

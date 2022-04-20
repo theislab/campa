@@ -1,16 +1,19 @@
+import os
+
 import pytest
 
 
 @pytest.fixture(autouse=True)
-def _execute_from_tests_dir():
-    # TODO this does not work as expected, still need to test from pytest dir
-    # ensure that current dir is tests dir
-    # reload constants to have correct EXPERIMENT_DIR
-    import os
-    import importlib
+def _set_config():
+    """
+    set EXPERIMENT_DIR and BASE_DATA_DIR in campa config
+    """
+    from campa.constants import SCRIPTS_DIR, campa_config
 
-    from campa.constants import SCRIPTS_DIR
-    import campa
+    campa_config.EXPERIMENT_DIR = os.path.join(SCRIPTS_DIR, "tests", "_experiments")
+    campa_config.BASE_DATA_DIR = os.path.join(SCRIPTS_DIR, "tests/_data")
+    campa_config.add_data_config("TestData", os.path.join(SCRIPTS_DIR, "tests/_data/TestData_constants.py"))
+    campa_config.CO_OCC_CHUNK_SIZE = 1e7
 
-    os.chdir(os.path.join(SCRIPTS_DIR, "tests"))
-    importlib.reload(campa.constants)
+    print("CAMPA CONFIG:")
+    print(campa_config)

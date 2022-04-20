@@ -1,8 +1,8 @@
 #!python
 from pathlib import Path
-from configparser import ConfigParser
 import os
-import shutil
+
+from campa.constants import campa_config
 
 
 def prepare_config(args):
@@ -14,68 +14,52 @@ def prepare_config(args):
             return True
         return False
 
-    def get_path_input(name):
-        p = input(f"Please enter the full path to {name}:\n")
-        p = os.path.abspath(p)
-        if not os.path.isdir(p):
-            print(f"{p} is not a valid directory")
-            return get_path_input(name)
-        return p
-
-    def change_path(config, name, section="DEFAULT"):
-        print(f"The current {name} is {config.get(section, name)}. Would you like to change it? (y/n)")
+    def get_path_input(name, current_value=None):
+        print(f"The current {name} is {current_value}. Would you like to change it? (y/n)")
         if not get_yn_input():
             print(f"Leaving {name} unchanged.")
+            return current_value
         else:
-            new_path = get_path_input(name)
-            config.set(section, name, new_path)
-            with open(config_path, "w") as configfile:
-                config.write(configfile)
-            print(f"Successfully changed {name} to {new_path}")
+            p = input(f"Please enter the full path to {name}:\n")
+            p = os.path.abspath(p.strip())
+            if not os.path.isdir(p):
+                print(f"{p} is not a valid directory")
+                return get_path_input(name)
+            return p
 
-    config_path = Path.home() / ".config" / "campa" / "campa.ini"
-    # read config file from scripts_dir (parent dir of dir that this file is in)
-    example_config_path = Path(__file__).resolve().parent.parent / "campa.ini.example"
-    print(example_config_path)
-    # check if custom config exists
-    if not config_path.is_file() or args.force:
-        print(f"No campa.ini found in {config_path}. Creating default config file.")
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(example_config_path, config_path)
-
+    if campa_config.config_fname is not None:
+        print(f"Found existing config in {campa_config.config_fname}")
+        config_fname = campa_config.config_fname
     else:
-        print(f"Found existing campa.ini in {config_path}")
+        config_fname = Path.home() / ".config" / "campa" / "campa.ini"
+        print(f"No config found. Creating default config in {config_fname}.")
+        # read config file from scripts_dir (parent dir of dir that this file is in)
+        example_config_path = Path(__file__).resolve().parent.parent / "campa.ini.example"
+        campa_config.config_fname = example_config_path
+        campa_config.write(config_fname)
 
     # check test data
-    config = ConfigParser()
-    config.read(config_path)
-    cur_test_data = config.get("data", "ExampleData")
-    if cur_test_data == "" or not Path(cur_test_data).is_file():
+    cur_test_data = campa_config.data_configs.get("ExampleData", None)
+    if cur_test_data in ("", None) or not Path(cur_test_data).is_file():
         print("setting up ExampleData config")
         # add test data
-        config.set(
-            "data",
+        campa_config.add_data_config(
             "ExampleData",
             str(Path(__file__).resolve().parent.parent.parent / "notebooks" / "params" / "ExampleData_constants.py"),
         )
-        with open(config_path, "w") as configfile:
-            config.write(configfile)
+        campa_config.write()
 
     print("Would you like to configure your campa.ini config now? (y/n)")
     if get_yn_input():
         # read config file
-        config = ConfigParser()
-        config.read(config_path)
-        change_path(config, "experiment_dir")
-        change_path(config, "data_dir")
+        campa_config.EXPERIMENT_DIR = get_path_input("EXPERIMENT_DIR", campa_config.EXPERIMENT_DIR)
+        campa_config.BASE_DATA_DIR = get_path_input("BASE_DATA_DIR", campa_config.BASE_DATA_DIR)
+        campa_config.write()
     else:
         print("Exiting without setting up campa.ini")
 
     # print currently registered data config files
-    config = ConfigParser()
-    config.read(config_path)
-    print(f"Currently registered data configs in {config_path}:")
-    for key, val in config.items("data"):
-        if key not in ["experiment_dir", "data_dir"]:
-            print(f"\t{key}: {val}")
-    print(f"To change or add data configs, please edit {config_path} directly.")
+    print(f"Currently registered data configs in {campa_config.config_fname}:")
+    for key, val in campa_config.data_configs.items():
+        print(f"\t{key}: {val}")
+    print(f"To change or add data configs, please edit {campa_config.config_fname} directly.")

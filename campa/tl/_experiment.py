@@ -12,7 +12,7 @@ import tensorflow as tf
 from campa.tl import LossEnum, ModelEnum
 from campa.data import MPPData
 from campa.utils import load_config, merged_config
-from campa.constants import EXPERIMENT_DIR, get_data_config
+from campa.constants import campa_config
 
 
 class Experiment:
@@ -136,7 +136,7 @@ class Experiment:
         """
         self.log = logging.getLogger(self.__class__.__name__)
         self.log.info(f"Setting up experiment {self.dir}/{self.name}")
-        data_config = get_data_config(self.config["data"]["data_config"])
+        data_config = campa_config.get_data_config(self.config["data"]["data_config"])
         # load data_params
         self.data_params = json.load(
             open(
@@ -170,11 +170,11 @@ class Experiment:
         Parameters
         ----------
         exp_path
-            path to experiment, relative to EXPERIMENT_DIR
+            path to experiment, relative to campa_config.EXPERIMENT_DIR
         """
         # load config from json
-        config_fname = os.path.join(EXPERIMENT_DIR, exp_path, "config.json")
-        assert os.path.exists(config_fname), f"no config.json in {EXPERIMENT_DIR}/{exp_path}"
+        config_fname = os.path.join(campa_config.EXPERIMENT_DIR, exp_path, "config.json")
+        assert os.path.exists(config_fname), f"no config.json in {campa_config.EXPERIMENT_DIR}/{exp_path}"
         config = json.load(open(config_fname))
         # set save_config to False to avoid overwriting
         config["experiment"]["save_config"] = False
@@ -217,7 +217,7 @@ class Experiment:
         """
         Full path to Experiment.
         """
-        return os.path.join(EXPERIMENT_DIR, self.dir, self.name)
+        return os.path.join(campa_config.EXPERIMENT_DIR, self.dir, self.name)
 
     @property
     def estimator_config(self) -> Mapping[str, Any]:
@@ -410,7 +410,7 @@ class Experiment:
         Parameters
         ----------
         exp_dir
-            Experiment directory, relative to EXPERIMENT_DIR.
+            Experiment directory, relative to campa_config.EXPERIMENT_DIR.
         exp_names
             List of experiment names to load. If None, all are loaded.
         only_trainable
@@ -422,8 +422,8 @@ class Experiment:
             Initialised experiments.
         """
         exps = []
-        for exp_name in next(os.walk(os.path.join(EXPERIMENT_DIR, exp_dir)))[1]:
-            config_fname = os.path.join(EXPERIMENT_DIR, exp_dir, exp_name, "config.json")
+        for exp_name in next(os.walk(os.path.join(campa_config.EXPERIMENT_DIR, exp_dir)))[1]:
+            config_fname = os.path.join(campa_config.EXPERIMENT_DIR, exp_dir, exp_name, "config.json")
             if os.path.exists(config_fname) and ((exp_names is None) or (exp_name in exp_names)):
                 exp = Experiment.from_dir(os.path.join(exp_dir, exp_name))
                 if not only_trainable or exp.is_trainable:
@@ -480,7 +480,7 @@ def run_experiments(exps: Iterable[Experiment], mode: str = "all") -> None:
     # compare models
     if mode in ("all", "compare"):
         # assumes that all experiments have the same experiment_dir
-        comp = ModelComparator(exps, save_dir=os.path.join(EXPERIMENT_DIR, list(exps)[0].dir))
+        comp = ModelComparator(exps, save_dir=os.path.join(campa_config.EXPERIMENT_DIR, list(exps)[0].dir))
         comp.plot_history(values=["val_loss", "val_decoder_loss"])
         comp.plot_final_score(
             score="val_decoder_loss",

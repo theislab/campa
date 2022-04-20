@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 
-from campa.constants import get_data_config
+from campa.constants import campa_config
 
 
 def get_one_hot(targets: np.ndarray, nb_classes: int) -> np.ndarray:
@@ -32,7 +32,7 @@ def convert_condition(
     log = logging.getLogger("convert_condition")
     if data_config is None:
         log.warning("using default data config")
-        data_config = get_data_config()
+        data_config = campa_config.get_data_config()
     # check if is a condition that can convert:
     if desc in data_config.CONDITIONS.keys():
         cur_conditions = data_config.CONDITIONS[desc]

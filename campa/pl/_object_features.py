@@ -6,17 +6,26 @@ import matplotlib.pyplot as plt
 
 
 def plot_object_stats(adata, group_key, features=None, clusters=None, figsize_mult=(2, 2), **kwargs):
-    """Compare objects stats of groups in group_key.
+    """
+    Barplot of object statistics.
 
-    Uses stats in adata.obsm['object_stats_agg'], resulting from calling extr.get_object_stats()
-    Args:
-        adata: anndata object with 'object_stats_agg' in obsm
-        group_key: categorical value in adata.obs to group by
-        features: list of features to display. Must be columns of adata.obsm['object_stats_agg'].
-            If None, all features are displayed.
-        clusters: list of clusters to display. Must be columns of adata.obsm['object_stats_agg'].
-            If None, all clusters are displayed.
-        kwargs: passed to sns.boxplot
+    Parameters
+    ----------
+    adata
+        Adata containing object statistics in ``adata.obsm['object_stats_agg']``.
+        E.g. result of :meth:`FeatureExtractor.get_object_stats`.
+    group_key
+        Categorical value in ``adata.obs`` to group by.
+    features
+        List of features to display.
+        Must be columns of ``adata.obsm['object_stats_agg']``.
+        If None, all features are displayed.
+    clusters
+        List of clusters to display.
+        Must be columns of ``adata.obsm['object_stats_agg']``.
+        If None, all clusters are displayed.
+    kwargs
+        Keyword arguments passed to :meth:`sns.boxplot`.
     """
     agg_stats = deepcopy(adata.obsm["object_stats_agg"])
     if not isinstance(agg_stats.columns, pd.MultiIndex):

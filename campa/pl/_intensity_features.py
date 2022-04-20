@@ -66,8 +66,31 @@ def plot_mean_intensity(
 
     Parameters
     ----------
-    TODO
-
+    adata
+        Adata containing aggregated information by clusters.
+        E.g. result of :meth:`FeatureExtractor.get_intensity_adata`.
+    groupby
+        column in ``adata.obs`` containing the groups to compare.
+    marker_dict
+        Limit/group vars that are shown, either by passing list or dict (adds annotations to plot).
+    save
+        Path to save figure to.
+    dendrogram
+        Show dendrogram over columns.
+    limit_to_groups
+        Dict with obs as keys and groups from obs as values, to subset adata before plotting.
+    type
+        Type of plot, either `matrixplot` or `violinplot`.
+    cmap
+        Matplotlib colormap to use.
+    adjust_height
+        Option to make plots a bit more streamlined.
+    figsize
+        Size of figure.
+    ax
+        Axis to plot in.
+    kwargs
+        Keyword arguments for :func:`sc.pl.stacked_violin`/:func:`sc.pl.matrixplot`.
     """
     if limit_to_groups is None:
         limit_to_groups = {}
@@ -167,7 +190,27 @@ def plot_mean_size(
 
     Parameters
     ----------
-    TODO
+    adata
+        Adata containing aggregated information by clusters.
+        E.g. result of :meth:`FeatureExtractor.get_intensity_adata`.
+    groupby_row
+        Column in ``adata.obs`` containing the row-wise grouping.
+    groupby_col
+        Column in ``adata.obs`` containing the column-wise grouping.
+    normby_row
+        Value in ``groupby_row`` to normalise rows by.
+    normby_col
+        Value in ``groupby_col`` to normalise columns by.
+    ax
+        Axis to plot in.
+    figsize
+        Size of figure.
+    adjust_height
+        Option to make plots a bit more streamlined.
+    save
+        Path to save figure to.
+    kwargs
+        Keyword arguments for :func:`sc.pl.matrixplot`.
     """
     _ensure_categorical(adata, groupby_row)
     _ensure_categorical(adata, groupby_col)

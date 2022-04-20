@@ -6,3 +6,4 @@ pypandoc
 sphinx>=4
 sphinx-autodoc-typehints>=1.10.3
 sphinx_rtd_theme
+sphinx-argparse
