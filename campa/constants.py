@@ -4,6 +4,7 @@ from typing import Any, Union, Optional
 from pathlib import Path
 from configparser import ConfigParser, NoOptionError, NoSectionError
 import os
+import multiprocessing
 
 from campa.utils import load_config
 
@@ -44,7 +45,8 @@ class CAMPAConfig:
     def _load_config_from_file(self):
         assert self.config_fname is not None
         config = ConfigParser()
-        print(f"Reading config from {str(self.config_fname)}")
+        if multiprocessing.parent_process() is None:  # silence print in child processes
+            print(f"Reading config from {str(self.config_fname)}")
         config.read(self.config_fname)
 
         self._EXPERIMENT_DIR = _get_value(config, key="experiment_dir")

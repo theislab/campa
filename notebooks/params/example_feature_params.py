@@ -2,7 +2,7 @@
 feature_params = {  # type: ignore[var-annotated]
     # -- set up data to extract features from --
     # path to experiment directory relative to EXPERIMENT_DIR
-    "experiment_dir": "test/CondVAE_pert-CC",
+    "experiment_dir": "test_pre_trained/CondVAE_pert-CC",
     # name of clustering to use
     "cluster_name": "clustering_res0.2",
     # dir of subsampled clustering to load annotation. Relative to experiment_dir.
@@ -35,12 +35,12 @@ feature_params = {  # type: ignore[var-annotated]
     "co_occurrence_params": {
         # size of distances interval
         "min": 2.0,
-        "max": 80.0,
-        "nsteps": 20,
+        "max": 60.0,
+        "nsteps": 5,
         # use log spacing of co-occurrence intervals
         "logspace": True,
         # number of processes to use to compute co-occurrence scores
-        "num_processes": 8,
+        "num_processes": None,
     },
     # parameters for object-stats calculation
     "object_stats_params": {

@@ -14,15 +14,21 @@ def init_logging(level=logging.INFO):
     logging.basicConfig(level=level)  # need one of this?
     logging.getLogger().setLevel(level)  # need one of this?
     # ignore tensorflow warnings
-    # logging.getLogger('tensorflow').setLevel(logging.ERROR)
+    logging.getLogger('tensorflow').setLevel(logging.ERROR)
     # ignore scanpy / anndata warnings
     logging.getLogger("scanpy").setLevel(logging.WARNING)
     logging.getLogger("anndata").setLevel(logging.ERROR)
     # logging.getLogger('get_version').setLevel(logging.WARNING)
     # logging.getLogger('numexpr.utils').setLevel(logging.WARNING)
-    # ignore number warnings
+    # ignore numba warnings
     # warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
-    warnings.filterwarnings("ignore", category=FutureWarning)
+    # filter irrelevant / non-fixeable anndata warnings
+    # anndata uses inplace from pandas, which is depreciated
+    warnings.filterwarnings("ignore", category=FutureWarning, 
+        message='.*The `inplace` parameter in pandas.Categorical.reorder_categories \
+is deprecated and will be removed in a future version. \
+Removing unused categories will always return a new Categorical object.*')
+    # implicit modification warnings from anndata
     warnings.filterwarnings("ignore", category=ImplicitModificationWarning)
 
 

@@ -17,40 +17,40 @@ Basic usage
     :func: _get_base_parser
     :prog: campa
 
-setup
------
+campa setup
+-----------
 
 .. argparse::
     :module: campa.cli.main
     :func: _get_setup_parser
     :prog: campa setup
 
-create_dataset
---------------
+campa create_dataset
+-------------------
 
 .. argparse::
     :module: campa.cli.main
     :func: _get_create_dataset_parser
     :prog: campa create_dataset
 
-train
------
+campa train
+-----------
 
 .. argparse::
     :module: campa.cli.main
     :func: _get_train_parser
     :prog: campa train
 
-cluster
--------
+campa cluster
+-------------
 
 .. argparse::
     :module: campa.cli.main
     :func: _get_cluster_parser
     :prog: campa cluster
 
-extract_features
-----------------
+campa extract_features
+----------------------
 
 .. argparse::
     :module: campa.cli.main

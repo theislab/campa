@@ -114,7 +114,7 @@ def plot_mean_intensity(
     for g in adata.obs[groupby].cat.categories:
         color = "mean intensity"
         g_expr = adata[adata.obs[groupby] == g].X
-        g_size = adata[adata.obs[groupby] == g].obs["size"]
+        g_size = np.array(adata[adata.obs[groupby] == g].obs["size"])
         color_values[g] = (g_expr * g_size[:, np.newaxis]).sum(axis=0) / g_size.sum()
     color_values = color_values.loc[marker_list]
 
@@ -253,6 +253,9 @@ def plot_mean_size(
         plt.savefig(save, dpi=100)
 
 
+from numpy.linalg import LinAlgError
+import statsmodels.formula.api as smf
+
 def mixed_model(ref_expr, g_expr, ref_well_name, g_well_name):
     # res_data = {'resid'}
     res_data: Mapping[str, List[Any]] = {"df": [], "resid": []}
@@ -260,25 +263,31 @@ def mixed_model(ref_expr, g_expr, ref_well_name, g_well_name):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-        # warnings.filterwarnings("ignore", category=SettingWithCopyWarning)
+        warnings.filterwarnings('ignore', category=UserWarning, message='.*Random effects covariance is singular.*')
         # iterate over all channels in the data
         pvals = []
         for i in range(ref_expr.shape[-1]):
             # create dataframe for mixed model
             df = pd.DataFrame(index=range(len(ref_expr) + len(g_expr)))
             df["mean_expr"] = np.log2(np.concatenate([ref_expr[:, i], g_expr[:, i]]))
-            df["group"] = [0] * len(df.index)
-            df["group"].iloc[len(ref_expr) :] = 1
+            df["group"] = [0] * len(ref_expr) + [1] * len(g_expr)
             df["well"] = np.concatenate([ref_well_name, g_well_name])
             df.replace([np.inf, -np.inf], np.nan, inplace=True)
             df = df.dropna()
+
             # display(df)
             # sns.distplot(df[df['group']==0]['mean_expr'])
             # sns.distplot(df[df['group']==1]['mean_expr'])
 
             model = sm.MixedLM.from_formula("mean_expr ~ group", re_formula="~1", groups="well", data=df)
-            result = model.fit()
-            pvals.append(result.summary().tables[1].loc["group"]["P>|z|"])
+            try:
+                result = model.fit()
+            except LinAlgError as e:
+                print(f'Singular fit with mixed model for column {i}, replacing with OLS.')
+                model = smf.ols(formula="mean_expr ~ group", data=df)
+                result = model.fit()
+
+            pvals.append(result.pvalues['group']) 
             res_data["df"].append(df)
     return np.array(pvals).astype("float"), res_data
 
@@ -333,6 +342,8 @@ def get_intensity_change(
     pval
         Type of test done to determine pvalues. Either `ttest` or `mixed_model`.
         `mixed_model` calculates a mixed model using wells as random effects and should be preferred.
+        Note that when using `norm_by_group`, the mixed model will be calculated on the normalised values,
+        which differs from the model used in the original publication.
     alpha
         ``pval`` threshold above which dots are not shown
     norm_by_group
@@ -404,13 +415,13 @@ def get_intensity_change(
             assert reference_group != groupby, "Can only norm by group if reference_group is different to groupby"
             assert adata_ref is not None
             cur_ref_expr = cur_ref_expr / adata_ref[adata_ref.obs[groupby] == norm_by_group].X
-        cur_ref_size = adata_cur_ref.obs["size"]
+        cur_ref_size = np.array(adata_cur_ref.obs["size"])
 
         # group expression
         g_expr = adata[adata.obs[groupby] == g].X
         if norm_by_group is not None:
             g_expr = g_expr / adata[adata.obs[groupby] == norm_by_group].X
-        g_size = adata[adata.obs[groupby] == g].obs["size"]
+        g_size = np.array(adata[adata.obs[groupby] == g].obs["size"])
 
         # mean group expression
         mean_g = (g_expr * g_size[:, np.newaxis]).sum(axis=0) / g_size.sum()
@@ -433,11 +444,11 @@ def get_intensity_change(
                 pvals = np.array([1] * len(adata.var.index))
                 pvals_data = {}
             else:
-                g_well_name = adata[adata.obs[groupby] == g].obs["well_name_x"]
+                g_well_name = adata[adata.obs[groupby] == g].obs["well_name"]
                 pvals, pvals_data = mixed_model(
                     cur_ref_expr,
                     g_expr,
-                    ref_well_name=adata_cur_ref.obs["well_name_x"],
+                    ref_well_name=adata_cur_ref.obs["well_name"],
                     g_well_name=g_well_name,
                 )
         elif pval == "ttest":

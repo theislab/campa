@@ -819,7 +819,7 @@ class FeatureExtractor:
                         ),
                     )
                 )
-                df = self.adata.obsm[f"co_occurrence_{c1}_{c2}"]
+                df = self.adata.obsm[f"co_occurrence_{c1}_{c2}"].copy()
                 df.columns = columns
                 # add obj_id
                 OBJ_ID = campa_config.get_data_config(self.exp.config["data"]["data_config"]).OBJ_ID

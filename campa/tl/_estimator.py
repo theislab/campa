@@ -213,6 +213,9 @@ class Estimator:
         config = self.config["training"]
         if not self.compiled_model:
             self._compile_model()
+        # reset epoch when overwriting history
+        if config['overwrite_history']:
+            self.epoch = 0
         self.log.info("Training model for {} epochs".format(config["epochs"]))
         history = self.model.model.fit(
             # TODO this is only shuffling the first 10000 samples, but as data is shuffled already should be ok
