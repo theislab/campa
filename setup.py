@@ -16,6 +16,8 @@ except ImportError:
 
 setup(
     name="campa",
+    use_scm_version=True,
+    setup_requires=["setuptools_scm"],
     version=__version__,
     author=__author__,
     author_email=__email__,
