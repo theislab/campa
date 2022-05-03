@@ -42,8 +42,6 @@ setup(
             "pytest",
             "pytest-cov",
             "pytest-dependency",
-            # "nbconvert",
-            # "ipykernel",
         ],
         docs=[
             l.strip()

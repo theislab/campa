@@ -12,7 +12,7 @@ and spatial arrangement of CSLs inside each cell.
 
     <p align="center">
         <a href="">
-            <img src="https://raw.githubusercontent.com/theislab/campa/master/docs/source/_static/img/Figure1ab.png"
+            <img src="https://raw.githubusercontent.com/theislab/campa/master/docs/source/_static/img/Figure1ab.jpg"
              width="400px" alt="CAMPA title figure">
         </a>
     </p>
@@ -42,6 +42,6 @@ Contributing
 We are happy about any contributions! Before you start, check out our `contributing guide <CONTRIBUTING.rst>`_.
 
 .. _anndata: https://anndata.readthedocs.io/en/stable/
-.. _documentation: .
-.. _`data and experiment paths`: .
+.. _documentation: https://campa.readthedocs.io/en/stable/
+.. _`data and experiment paths`: https://campa.readthedocs.io/en/stable/overview.html#campa-config
 .. _`Spitzer, Berry et al. (2022)`: .
