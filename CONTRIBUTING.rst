@@ -42,7 +42,6 @@ You can use ``tox`` to check the changes::
     tox -e lint
 
 
-
 Testing
 -------
 We use ``tox`` to automate our testing, as well as linting and
@@ -70,3 +69,50 @@ To validate the links inside the documentation, run::
 If you need to clean the artifacts from previous documentation builds, run::
 
     tox -e clean-docs
+
+Creating a relase
+-----------------
+
+Before creating a new relase, ensure that all tests pass and that the documentation
+is build successfully.
+
+1. create a new branch for this release::
+
+    git checkout -b release/VERSION
+
+2. check that `README_pypi.rst <README_pypi.rst>`_ renders correctly on pypi::
+
+    tox -e readme
+
+3. create a new version using ``bump2version`` (``pip install bump2version``)::
+
+    bump2version {major,minor,patch}
+
+4. build and test the package::
+
+    rm -r dist
+    python setup.py sdist
+    twine check dist/*
+
+   Check out the created ``*.tar`` file in ``dist`` and ensure that all new auxiliary files
+   needed for this relase are included. Otherwise, include them in `MANIFEST.in <MANIFEST.in>`_
+   and try again.
+
+5. upload to TestPyPi. For this it is useful to set up a
+   `token <https://test.pypi.org/help/#apitoken>`_ in
+   `~/.pypirc <https://truveris.github.io/articles/configuring-pypirc/>`_::
+
+    twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+4. download and test
+5. merge release branch to main::
+
+    git co main
+    git merge release/VERSION
+
+3. create relase on github by adding a tag::
+
+    git tag VERSION
+    git push --tags
+
+   Edit and publish the relase on github and add release notes.

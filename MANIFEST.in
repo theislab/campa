@@ -1,2 +1,11 @@
 include requirements.txt
+include LICENSE
+include README.rst
+
 include campa/config.ini.example
+
+prune tests/_data
+prune tests/_experiments
+exclude tests/_test_data.zip
+prune docs
+prune notebooks

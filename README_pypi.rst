@@ -8,14 +8,11 @@ The output of the CAMPA workflow is an `anndata`_ object that contains interpret
 per-cell features summarizing the molecular composition
 and spatial arrangement of CSLs inside each cell.
 
-.. raw:: html
-
-    <p align="center">
-        <a href="">
-            <img src="https://raw.githubusercontent.com/theislab/campa/master/docs/source/_static/img/Figure1ab.png"
-             width="400px" alt="CAMPA title figure">
-        </a>
-    </p>
+.. image:: https://raw.githubusercontent.com/theislab/campa/master/docs/source/_static/img/Figure1ab.png
+    :alt: CAMPA title figure
+    :width: 400px
+    :align: center
+    :target: .
 
 Visit our `documentation`_ for installation and usage examples.
 
@@ -39,9 +36,10 @@ Setup `data and experiment paths`_ with::
 
 Contributing
 ------------
-We are happy about any contributions! Before you start, check out our `contributing guide <CONTRIBUTING.rst>`_.
+We are happy about any contributions! Before you start, check out our `contributing guide`_.
 
 .. _anndata: https://anndata.readthedocs.io/en/stable/
 .. _documentation: .
 .. _`data and experiment paths`: .
 .. _`Spitzer, Berry et al. (2022)`: .
+.. _contributing guide: https://github.com/theislab/campa/blob/main/CONTRIBUTING.rst

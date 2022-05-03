@@ -140,3 +140,4 @@ docs/source/classes
 # data
 tests/_data
 tests/_experiments
+tests/_test_data.zip
