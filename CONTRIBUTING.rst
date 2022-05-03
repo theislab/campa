@@ -101,7 +101,7 @@ and ensure that for TestPyPi a ``repository-url`` is set.
    needed for this relase are included. Otherwise, include them in `MANIFEST.in <MANIFEST.in>`_
    and try again.
 
-5. Optional: 
+5. Optional:
 
     1. Upload to TestPyPi::
 
@@ -109,7 +109,7 @@ and ensure that for TestPyPi a ``repository-url`` is set.
 
     2. Install and test package from TestPyPi::
 
-        pip install -i https://test.pypi.org/simple/ campa 
+        pip install -i https://test.pypi.org/simple/ campa
 
 6. Release package on PyPi (``pip install twine``)::
 

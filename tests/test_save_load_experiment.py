@@ -1,11 +1,12 @@
 # tests saving and loading weights from experiment
-from .test_workflow import _ensure_test_data, id_generator
 import numpy as np
 import pandas as pd
 
+from .test_workflow import id_generator  # noqa: <I252>
+
+
 def test_save_load_model(_ensure_test_data):
-    from campa.tl import Estimator, Experiment
-    from campa.tl import LossEnum, ModelEnum, Experiment, run_experiments
+    from campa.tl import LossEnum, Estimator, ModelEnum, Experiment
 
     model_name = id_generator(size=6)
     experiment_config = {
@@ -86,4 +87,3 @@ def test_save_load_model(_ensure_test_data):
     # check that history was correctly saved
     history2 = pd.read_csv(est.history_name, index_col=0)
     assert np.isclose(history, history2).all()
-
