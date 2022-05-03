@@ -7,6 +7,8 @@ import tempfile
 from tqdm import tqdm
 import requests
 
+from campa.constants import SCRIPTS_DIR
+
 Path_t = Union[str, Path]
 
 
@@ -32,9 +34,11 @@ def load_example_data(data_dir: Path_t = None) -> Path_t:
     folder_dir = load_dataset(
         dataset_path=data_dir,
         fname=fname,
-        backup_url="https://figshare.com/ndownloader/files/34507349?private_link=f004270cd1eeeffdb340",
+        backup_url="https://figshare.com/ndownloader/files/34987036?private_link=79b062207e500dd31053",
     )
+
     return folder_dir
+
 
 def load_example_experiment(experiment_dir: Path_t = None) -> Path_t:
     """
@@ -51,7 +55,7 @@ def load_example_experiment(experiment_dir: Path_t = None) -> Path_t:
     """
     if experiment_dir is None:
         experiment_dir = Path(__file__).parent.parent.parent / "notebooks" / "example_experiments"
-    url = "https://hmgubox2.helmholtz-muenchen.de/index.php/s/42ZLMskc38ka9SQ/download/test_pre_trained.zip"
+    url = "https://figshare.com/ndownloader/files/34987534?private_link=bf771d5a6c73f807f96e"
 
     uncpacked_dir = Path(os.path.join(experiment_dir, "test_pre_trained"))
     archive_path = Path(os.path.join(experiment_dir, "test_pre_trained.zip"))
@@ -71,25 +75,53 @@ def load_example_experiment(experiment_dir: Path_t = None) -> Path_t:
 
         shutil.unpack_archive(archive_path, uncpacked_dir)
     return uncpacked_dir
-    
+
+
+def load_test_data():
+    """
+    Download test data to ``SCRIPTS_DIR/tests``.
+    """
+    url = "https://figshare.com/ndownloader/files/34988353?private_link=0c3534797222eed8f10d"
+    base_dir = os.path.join(SCRIPTS_DIR, "tests")
+    archive_path = os.path.join(base_dir, "_test_data.zip")
+    # check if is downloaded already
+    if os.path.exists(os.path.join(base_dir, "_data")) and os.path.exists(os.path.join(base_dir, "_experiments")):
+        datacontent = os.listdir(os.path.join(base_dir, "_data"))
+        experimentcontent = os.listdir(os.path.join(base_dir, "_experiments"))
+        if "channels_metadata.csv" in datacontent and "reference_experiment" in experimentcontent:
+            return
+    # have to unpack/redownload
+    if os.path.exists(archive_path):
+        shutil.unpack_archive(archive_path, base_dir)
+    else:
+        print("Path or dataset does not yet exist. Appemting to download...")
+        download(url, output_path=archive_path)
+        shutil.unpack_archive(archive_path, base_dir)
+    return
+
 
 def load_dataset(dataset_path: Path_t, fname: str, backup_url: str) -> Path_t:
     """
-    Generic function to load dataset
+    Load dataset (from URL).
+
     In dataset_path, creates ierarhy of folders "raw", "archive".
     If unpacked files are already stored in "raw" doesn't do anything.
     Otherwise checks for archive file in "archive" folder and unpacks it into "raw" folder.
     If no files are present there, attempts to load the dataset from URL
-        into "archive" folder and then unpacks it into "raw" folder.
+    into "archive" folder and then unpacks it into "raw" folder.
 
-    Args:
-        dataset_path: path where folder for the dataset will be created.
-        fname: desired name of the dataset
-        backup_url: link from which dataset will be loaded
+    Parameters
+    ----------
+    dataset_path
+        Path where folder for the dataset will be created.
+    fname
+        Desired name of the dataset
+    backup_url
+        Link from which dataset will be loaded
 
-    Returns:
-        path to a folder where unpacked dataset is stored
-
+    Returns
+    -------
+    path to a folder where unpacked dataset is stored
     """
     uncpacked_dir = Path(os.path.join(dataset_path, fname, "raw"))
     archive_path = Path(os.path.join(dataset_path, fname, "archive", f"{fname}.zip"))
@@ -124,9 +156,8 @@ def load_dataset(dataset_path: Path_t, fname: str, backup_url: str) -> Path_t:
 
 def getFilename_fromCd(cd):
     """
-    Get filename from content-disposition or url request
+    Get filename from content-disposition or url request.
     """
-
     import re
 
     if not cd:
@@ -146,15 +177,20 @@ def download(
     block_size: int = 1024,
     overwrite: bool = False,
 ) -> None:
-    """Downloads a dataset irrespective of the format.
-
-    Args:
-        url: URL to download
-        output_path: Path to download/extract the files to
-        block_size: Block size for downloads in bytes (default: 1024)
-        overwrite: Whether to overwrite existing files (default: False)
     """
+    Download a dataset irrespective of the format.
 
+    Parameters
+    ----------
+    url
+        URL to download
+    output_path
+        Path to download/extract the files to
+    block_size
+        Block size for downloads in bytes (default: 1024)
+    overwrite
+        Whether to overwrite existing files (default: False)
+    """
     if output_path is None:
         output_path = tempfile.gettempdir()
 

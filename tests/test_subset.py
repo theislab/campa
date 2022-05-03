@@ -65,14 +65,14 @@ class TestSubset:
     def test_frac_1(self, num_ids):
         mpp_data = gen_mppdata(num_obj_ids=num_ids)
         mpp_data_sub = mpp_data.subset(frac=1, copy=True)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_sub)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_sub)
         assert isequal
 
     def test_frac_trueCopy_flag(self):
         mpp_data = gen_mppdata(num_obj_ids=10)
         mpp_data_orig = mpp_data.copy()
         _ = mpp_data.subset(frac=0.5, copy=True)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_orig)
         assert isequal
         assert isequal_dict["channels"]
 
@@ -82,7 +82,7 @@ class TestSubset:
         mpp_data_orig = mpp_data.copy()
         num_objects_orig = len(mpp_data_orig.unique_obj_ids)
         mpp_data.subset(frac=0.5, copy=False)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_orig)
         assert not isequal
         assert num_objects_orig_intended == num_objects_orig == len(mpp_data_orig.unique_obj_ids)
         assert num_objects_orig != len(mpp_data.unique_obj_ids)
@@ -95,7 +95,7 @@ class TestSubset:
         mpp_data_subset_1 = mpp_data.subset(frac=frac, copy=True)
         mpp_data_subset_2 = mpp_data_orig.subset(frac=frac, copy=True)
 
-        isequal, isequal_dict = mpp_data_subset_1.compare(mpp_data_subset_2)
+        isequal, isequal_dict = mpp_data_subset_1._compare(mpp_data_subset_2)
         assert isequal
 
     # @pytest.mark.parametrize("frac", (np.linspace(0.1, 0.9, 10)))
@@ -109,7 +109,7 @@ class TestSubset:
     #     mpp_data.seed=mpp_data.seed+2
     #     mpp_data_subset_2 = mpp_data.subset(frac=frac, copy=True)
     #
-    #     isequal, isequal_dict = mpp_data_subset_1.compare(mpp_data_subset_2)
+    #     isequal, isequal_dict = mpp_data_subset_1._compare(mpp_data_subset_2)
     #     assert isequal==False
 
     def test_subset_by_metadataKey_selectAll(self):
@@ -118,7 +118,7 @@ class TestSubset:
         cell_cycle = list(mpp_data.metadata.cell_cycle.unique())
         mpp_data_subset = mpp_data.subset(cell_cycle=cell_cycle, copy=True)
 
-        isequal, isequal_dict = mpp_data.compare(mpp_data_subset)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_subset)
         assert isequal
 
     @pytest.mark.parametrize("num_keys", np.arange(1, 4))
@@ -127,7 +127,7 @@ class TestSubset:
         mpp_data = gen_mppdata(num_obj_ids=20, possible_cell_cycles=cell_cycle)
         cell_cycle = list(mpp_data.metadata.cell_cycle.unique())[:num_keys]
         mpp_data_subset = mpp_data.subset(cell_cycle=cell_cycle, copy=True)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_subset)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_subset)
         assert not isequal
         assert np.array_equal(mpp_data_subset.metadata.cell_cycle.unique(), cell_cycle)
 
@@ -143,7 +143,7 @@ class TestSubset:
         mpp_data = gen_mppdata(num_obj_ids=20, possible_cell_cycles=cell_cycle, ensure_None=False)
 
         mpp_data_subset = mpp_data.subset(cell_cycle="NO_NAN", copy=True)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_subset)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_subset)
         assert isequal
         assert not mpp_data_subset.metadata.cell_cycle.isnull().values.any()
         assert None not in mpp_data_subset.metadata.cell_cycle.unique()
@@ -152,7 +152,7 @@ class TestSubset:
         mpp_data = gen_mppdata(num_obj_ids=20, ensure_None=True)
 
         mpp_data_subset = mpp_data.subset(cell_cycle="NO_NAN", copy=True)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_subset)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_subset)
         assert not isequal
         assert not mpp_data_subset.metadata.cell_cycle.isnull().values.any()
         assert None not in mpp_data_subset.metadata.cell_cycle.unique()
@@ -172,7 +172,7 @@ class TestSubsetChannels:
         mpp_data = gen_mppdata(num_obj_ids=20, channels=channels)
         mpp_data_orig = mpp_data.copy()
         mpp_data.subset_channels(channels)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_orig)
         assert isequal
         assert np.array_equal(mpp_data.channels["name"].values, channels)
         assert mpp_data.mpp.shape[-1] == len(channels)
@@ -184,7 +184,7 @@ class TestSubsetChannels:
         mpp_data_orig = mpp_data.copy()
         channels_to_subset = np.random.choice(channels, num_channels, replace=False)
         mpp_data.subset_channels(channels_to_subset)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_orig)
         assert not isequal
         assert np.array_equal(np.sort(mpp_data.channels["name"].values), np.sort(channels_to_subset))
         assert mpp_data.mpp.shape[-1] == len(channels_to_subset)
@@ -197,7 +197,7 @@ class TestSubsetChannels:
         overlap_channels = ["3", "4"]
 
         mpp_data.subset_channels(channels_to_subset)
-        isequal, isequal_dict = mpp_data.compare(mpp_data_orig)
+        isequal, isequal_dict = mpp_data._compare(mpp_data_orig)
         assert not isequal
         assert np.array_equal(np.sort(mpp_data.channels["name"].values), ["3", "4"])
         assert mpp_data.mpp.shape[-1] == len(overlap_channels)

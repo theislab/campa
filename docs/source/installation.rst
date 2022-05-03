@@ -7,14 +7,12 @@ Installation with pip
 =====================
 ::
 
-    git clone https://github.com/theislab/campa
-    cd campa
-    pip install .
+    pip install campa
 
 
 Setup
 =====
 
-Create a `config file <installation.rst#CAMPA-config>`_ and set up paths to data an experiment folders::
+Create a config file (see :ref:`campa-config`) and set up paths to data and experiment folders::
 
     campa setup

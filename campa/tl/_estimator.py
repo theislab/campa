@@ -19,6 +19,8 @@ from campa.tl._layers import UpdateSparsityLevel
 
 # --- Callbacks ---
 class LossWarmup(tf.keras.callbacks.Callback):
+    """Callback to warmup loss weights."""
+
     def __init__(self, weight_vars, to_weights, to_epochs):
         super().__init__()
         self.to_weights = to_weights
@@ -26,6 +28,7 @@ class LossWarmup(tf.keras.callbacks.Callback):
         self.weight_vars = weight_vars
 
     def on_epoch_begin(self, epoch, logs=None):
+        """Update loss weights."""
         for key in self.to_epochs.keys():
             to_epoch = self.to_epochs[key]
             to_weight = self.to_weights[key]
@@ -40,6 +43,8 @@ class LossWarmup(tf.keras.callbacks.Callback):
 
 
 class AnnealTemperature(tf.keras.callbacks.Callback):
+    """Callback to anneal learning rate."""
+
     def __init__(self, temperature, initial_temperature, final_temperature, to_epoch):
         super().__init__()
         self.temperature = temperature
@@ -48,7 +53,7 @@ class AnnealTemperature(tf.keras.callbacks.Callback):
         self.to_epoch = to_epoch
 
     def on_epoch_begin(self, epoch, logs=None):
-        """Update temperature"""
+        """Update temperature."""
         if self.to_epoch == 0 or self.to_epoch <= epoch:
             tf.keras.backend.set_value(self.temperature, self.final_temperature)
         else:
@@ -214,7 +219,7 @@ class Estimator:
         if not self.compiled_model:
             self._compile_model()
         # reset epoch when overwriting history
-        if config['overwrite_history']:
+        if config["overwrite_history"]:
             self.epoch = 0
         self.log.info("Training model for {} epochs".format(config["epochs"]))
         history = self.model.model.fit(
@@ -291,56 +296,3 @@ class Estimator:
         self.model.model.reset_metrics()
         scores = self.model.model.evaluate(dataset.batch(self.config["training"]["batch_size"]))
         return scores
-
-
-# TODO Nastassya: convert to unittest
-# def test_save_load_model():
-#     with tempfile.TemporaryDirectory() as dirpath:
-#         dataset_name = '184A1_UNPERTURBED_frac0005_neigh1'
-#         dataset_dir = os.path.join(DATA_DIR, 'datasets', dataset_name)
-#         config = {
-#             'experiment':{
-#                 'experiment_dir': dirpath,
-#                 'name': 'test',
-#                 'save_config': True,
-#             },
-#             'data': {
-#                 'load_dataset': True,
-#                 'dataset_dir': dataset_dir,
-#                 'output_channels': None,
-#             },
-#             'model': {
-#                 'model_cls': ModelEnum.AEModel,
-#                 'model_kwargs': {
-#                     'layers': [16,8,16],
-#                     'num_neighbors': 1,
-#                     'num_channels': 35
-#                 },
-#                 # if true, looks for saved weights in experiment_dir
-#                 # if a path, loads these weights
-#                 'init_with_weights': False,
-#             },
-#             'training': {
-#                 'learning_rate': 0.001,
-#                 'epochs': 1,
-#                 'batch_size': 128,
-#                 'loss': {'decoder': LossEnum.MSE},
-#                 'metrics': {'decoder': LossEnum.MSE},
-#                 # saving models
-#                 'save_model_weights': True,
-#                 'save_history': True,
-#             },
-#         }
-#         est = Estimator(config)
-#         history = est.train_model()
-#         scores = est.evaluate_model(est.val_dataset)
-
-#         # reload estimator and init with saved weights
-#         est2 = Estimator.for_evaluation(est.experiment_dir)
-#         scores2 = est2.evaluate_model(est2.val_dataset)
-#         assert np.isclose(scores, scores2).all()
-
-#         # check that history was correctly saved
-#         history2 = pd.read_csv(est.history_name, index_col=0)
-#         assert np.isclose(history, history2).all()
-#     return True

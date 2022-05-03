@@ -3,11 +3,11 @@ from ._models import VAEModel, ModelEnum, BaseAEModel
 from ._cluster import (
     Cluster,
     create_cluster_data,
+    get_clustered_cells,
+    load_full_data_dict,
     prepare_full_dataset,
     project_cluster_data,
-    load_full_data_dict,
     add_clustering_to_adata,
-    get_clustered_cells,
 )
 from ._evaluate import Predictor, ModelComparator
 from ._features import (

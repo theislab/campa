@@ -1,4 +1,4 @@
-from copy import copy
+from copy import copy, deepcopy
 from typing import (
     Any,
     Dict,
@@ -33,6 +33,10 @@ from campa.data._conditions import (
 
 
 class ImageData:
+    """
+    Stub for future ImageData class.
+    """
+
     def __init__(self, metadata, channels, imgs=None, seg_imgs=None, **kwargs):
         self.metadata = metadata
         self.channels = channels
@@ -44,42 +48,60 @@ class ImageData:
 
     @classmethod
     def from_dir(cls, data_dir):
-        # TODO read metadata and images (lazy) and call constructuor
-        pass
+        """Read metadata and images (lazy) and call constructor."""
 
     def get_obj_img(self, obj_id, kind="data"):
-        # TODO crop and return object images for different kinds: data, mask (object mask)
-        pass
+        """Crop and return object images for different kinds: data, mask (object mask)."""
 
 
 class MPPData:
-    # TODO: in initialisers: make x,y, obj_ids required, but add automatically to keys when not specified
+    """
+    Pixel-level data representation.
+
+    Backed by on-disk numpy and csv files containing intensity information per channel and metadata
+    for each pixel.
+    When possible, the on-disk numpy files are loaded lazily using :func:`np.memmap`.
+
+    Parameters
+    ----------
+    metadata
+        Cell-level metadata. Needs to contain at least an `data_config.OBJ_ID` column, which contains
+        cell identifiers that are used in the `obj_ids` data to map pixels to cells.
+    channels
+        Channel-level metadata.
+        The first column is assumed to be the index, second column the name of the channel.
+    data
+        Dictionary containing pixel-level data, at least containing the required keys: `x`, `y`, `obj_ids`
+        (spatial coordinates for every pixel, and assignment of pixels to objects (cells)).
+        If `mpp` (per-channel pixel intensity information) is not present,
+        is replaced with zero-value array of shape: `#pixels x 1 x 1 x #channels`.
+    data_config
+        Name of the data_config file registered in `campa_config.data_configs`.
+    seed
+        Random seed for subsampling and subsetting.
+    """
+
     def __init__(
         self,
         metadata: pd.DataFrame,
         channels: pd.DataFrame,
         data: Dict[str, np.ndarray],
-        **kwargs: Any,
+        data_config: str,
+        seed: int = 42,
     ):
-        """
-        data: dictionary containing MPPData, at least containing required_keys: x, y, obj_ids.
-
-        If mpp is not present, is replaced with zero-value array of shape: #pixels x 1 x 1 x #channels
-
-        kwargs:
-            data_config (default NascentRNA)
-            seed (default 42)
-        """
         # set up logger
         self.log = getLogger(self.__class__.__name__)
         # set up rng
-        self.seed = kwargs.get("seed", 42)
+        self.seed = seed
         # TODO change to default_rng as soon as have reproduced legacy datasets
         self.rng = np.random.RandomState(seed=self.seed)
         # save attributes
-        self.data_config_name = kwargs.get("data_config", "NascentRNA")
+        self.data_config_name = data_config
         self.data_config = campa_config.get_data_config(self.data_config_name)
-        self.channels = channels
+        self.channels: pd.DataFrame = channels
+        """
+        Intensity channels.
+        """
         self._data = data
         # data dir and base dir
         self.data_dir: Union[str, None] = None
@@ -88,52 +110,64 @@ class MPPData:
         for required_key in ["x", "y", "obj_ids"]:
             assert required_key in data.keys(), f"required key {required_key} missing from data"
         # subset metadata to obj_ids in data
-        self.metadata = metadata[metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))]
+        self.metadata: pd.DataFrame = metadata[metadata[self.data_config.OBJ_ID].isin(np.unique(self.obj_ids))]
+        """
+        Object (cell) level metadata (e.g. perturbation, cell-cycle, etc).
+        """
         # add neighbor dimensions to mpp if not existing
         if len(self.mpp.shape) == 2:
             self._data["mpp"] = self.mpp[:, np.newaxis, np.newaxis, :]
         self.log.info(f"Created new: {self.__str__()}")
 
     @classmethod
-    def from_image_data(self, image_data: ImageData) -> "MPPData":
-        # TODO convert ImageData to MPPData
-        pass
-
-    @classmethod
     def from_data_dir(
         cls,
         data_dir: str,
+        data_config: str,
         mode: str = "r",
         base_dir: Optional[str] = None,
-        keys: Iterable[str] = ("x", "y", "obj_ids"),
+        keys: Iterable[str] = (),
         optional_keys: Iterable[str] = ("mpp", "labels", "latent", "conditions"),
         **kwargs: Any,
     ) -> "MPPData":
         """
-        Read MPPData from directory.
+        Initialise :class:`MPPData` from directory.
 
-        If mpp_params are present, will first load mpp_data from base_data_dir,
-        and add remaining information from data_dir.
+        Read data from `key.npy` for each `key` in `keys`.
+        If present, will also read `key.npy` for each `key` in `optional_keys`.
 
-        Requires metadata.csv and channels.csv.
-        Reads data from key.npy for each key in required_keys.
-        If present, will also read key.npy for each key in optional_keys
+        The information can be spread out over a chain of directories.
+        In this case, a `mpp_params.json` file in `data_dir` indicates that more
+        data can be found in `base_data_dir` (defined in `mpp_params`).
+        First, the data from `base_data_dir` is loaded, and then the
+        remaining information from `data_dir` is added.
 
-        Args:
-            data_dir: Path to the specific directory containing one set of npy and csv files as described above.
-            Note that this path should be relative to the 'base_dir',
-            which is either provided implicitly in the function or set
-            to data_dir path specified in config.ini otherwise.
-            mode: mmap_mode for np.load. Set to None to load data in memory.
-            data_config: Name of the constant in the [data] field of config.ini file,
-            which contains path to the python file
-            with configuration parameters for loading the data.
-            base_dir: look for data in base_dir/data_dir. Default in DATA_DIR
+        Each `data_dir` along this chain has to contain at least
+        `x.npy`, `y.npy`, `obj_ids.npy`, `metadata.csv` and `channels.csv`.
+
+        Parameters
+        ----------
+        data_dir
+            Path to the specific directory containing one set of npy and csv files as described above.
+            Note that this path should be relative to `base_dir`,
+            which is set to `data_config.DATA_DIR` by default.
+        data_config
+            Name of the data_config file registered in `campa_config.data_configs`.
+        mode
+            `mmap_mode` for :func:`np.load`. Set to None to load data in memory.
+        base_dir
+            Look for data in `base_dir/data_dir`. Default in `data_config.DATA_DIR`.
+        keys
+            Read data from `key.npy` for each `key` in `keys`.
+        optional_keys
+            If present, read `key.npy` for each `key` in `optional_keys`.
+        kwargs
+            Passed to :class:`MPPData`.
         """
         # load data_config
-        data_config = campa_config.get_data_config(kwargs.get("data_config", "NascentRNA"))
+        data_config_inst = campa_config.get_data_config(data_config)
         if base_dir is None:
-            base_dir = data_config.DATA_DIR
+            base_dir = data_config_inst.DATA_DIR
 
         # mpp_params present?
         if os.path.isfile(os.path.join(base_dir, data_dir, "mpp_params.json")):
@@ -144,9 +178,10 @@ class MPPData:
 
             self = cls.from_data_dir(
                 mpp_params["base_data_dir"],
+                data_config=data_config,
                 keys=res_keys,
                 optional_keys=res_optional_keys,
-                base_dir=data_config.DATA_DIR,
+                base_dir=data_config_inst.DATA_DIR,
                 mode=mode,
                 **kwargs,
             )
@@ -168,7 +203,10 @@ class MPPData:
         else:
             # have reached true base_dir, load data
             # read all data from data_dir
-            self = cls._from_data_dir(data_dir, mode, base_dir, keys, optional_keys, **kwargs)
+            # NOTE: when normally loading
+            self = cls._from_data_dir(
+                data_dir, data_config, mode=mode, base_dir=base_dir, keys=keys, optional_keys=optional_keys, **kwargs
+            )
             self.log.info(f"Loaded data from {data_dir}.")
         return self
 
@@ -176,19 +214,21 @@ class MPPData:
     def _from_data_dir(
         cls,
         data_dir: str,
+        data_config: str,
         mode: str = "r",
         base_dir: Optional[str] = None,
-        keys: Iterable[str] = ("x", "y", "obj_ids"),
+        keys: Iterable[str] = (),
         optional_keys: Iterable[str] = ("mpp", "labels", "latent", "conditions"),
         **kwargs: Any,
     ) -> "MPPData":
         """
-        Helper function to read MPPData from directory. Ignores mpp_params.json
+        Read MPPData from directory, ignoring mpp_params.json.
         """
+        # ensure that x,y,obj_ids are in keys
+        keys = list(set(["x", "y", "obj_ids"] + list(keys)))
         # get base_dir
         if base_dir is None:
-            data_config = campa_config.get_data_config(kwargs.get("data_config", "NascentRNA"))
-            base_dir = data_config.DATA_DIR
+            base_dir = campa_config.get_data_config(data_config).DATA_DIR
 
         metadata = pd.read_csv(os.path.join(base_dir, data_dir, "metadata.csv"), index_col=0).reset_index(drop=True)
         channels = pd.read_csv(
@@ -210,14 +250,28 @@ class MPPData:
             if d is not None:
                 data[fname] = d
         # init self
-        self = cls(metadata=metadata, channels=channels, data=data, **kwargs)
+        self = cls(metadata=metadata, channels=channels, data=data, data_config=data_config, **kwargs)
         self.data_dir = data_dir
         self.base_dir = base_dir
         return self
 
     @classmethod
     def concat(cls, objs: List["MPPData"]) -> "MPPData":
-        """concatenate the mpp_data objects by concatenating all arrays and return a new one"""
+        """
+        Concatenate multiple MPPData objects.
+
+        All MPPDatas that should be concatenated need to have the same keys,
+        use the same data_config, and same channels.
+
+        Parameters
+        ----------
+        objs
+            List of objects to be concatenated.
+
+        Returns
+        -------
+        Concatenated MPPData objects.
+        """
         # channels, data_config, and _data.keys() need to be the same
         for mpp_data in objs:
             assert (mpp_data.channels.name == objs[0].channels.name).all()
@@ -245,6 +299,9 @@ class MPPData:
     # --- Properties ---
     @property
     def mpp(self) -> np.ndarray:
+        """
+        Multiplexed pixel profiles.
+        """
         if "mpp" not in self._data.keys():
             self.log.info("Setting mpp to empty array")
             self._data["mpp"] = np.zeros((len(self.x), 1, 1, len(self.channels)))
@@ -252,31 +309,44 @@ class MPPData:
 
     @property
     def obj_ids(self) -> np.ndarray:
+        """
+        Object ids mapping pixels to objects (cells).
+        """
         return self._data["obj_ids"]
 
     @property
     def x(self) -> np.ndarray:
+        """
+        Spatial x coordinates for each pixel.
+        """
         return self._data["x"]
 
     @property
     def y(self) -> np.ndarray:
+        """
+        Spatial y coordinates for each pixel.
+        """
         return self._data["y"]
 
     @property
     def latent(self) -> Union[np.ndarray, None]:
+        """
+        Latent space for each pixel.
+        """
         return self.data("latent")
 
     def data(self, key: str) -> Union[np.ndarray, None]:
         """
         Information contained in MPPData.
 
-        Required keys are: x, y, obj_ids.
+        Parameters
+        ----------
+        key
+            Identifier for data that should be returned.
 
-        Args;
-            key: identifier for data that should be returned
-
-        Returns:
-            array-like data, or None if data could not be found
+        Returns
+        -------
+            Array-like data, or None if data could not be found.
         """
         if key in self._data.keys():
             return self._data[key]
@@ -286,19 +356,31 @@ class MPPData:
 
     @property
     def conditions(self) -> Union[np.ndarray, None]:
+        """
+        Condition information for each pixel.
+        """
         return self.data("conditions")
 
     @property
     def has_neighbor_data(self) -> bool:
+        """
+        Flag indicating if neighbor information is contained in this object.
+        """
         return (self.mpp.shape[1] != 1) and (self.mpp.shape[2] != 1)
 
     @property
     def center_mpp(self) -> np.ndarray:
+        """
+        ``#pixels x #channels`` array of center pixel.
+        """
         c = int(self.mpp.shape[1] // 2)
         return self.mpp[:, c, c, :]  # type: ignore[no-any-return]
 
     @property
     def unique_obj_ids(self) -> np.ndarray:
+        """
+        Return ynique objects (cells) contained in this object.
+        """
         return np.unique(self.obj_ids)  # type: ignore[no-any-return]
 
     def __str__(self) -> str:
@@ -312,16 +394,23 @@ class MPPData:
         """
         Write MPPData to disk.
 
-        Save channels, metadata as csv and one npy file per entry in MPPData.data.
+        Save channels, metadata as csv and one npy file per entry in :meth:`MPPData.data`.
 
-        Args:
-            save_dir: full path to directory in which to save MPPData
-            save_keys: only save these MPPData.data entries. "x", "y", "obj_ids" are always saved
-            mpp_params: params to be saved in save_dir. Use if save_keys is not None. Should contain base_data_dir
-            (relative to DATA_DIR), and subset information
-                for correct MPPData initialisation.
-        Returns:
-            Nothing, saves data to disk
+        Parameters
+        ----------
+        save_dir
+            Full path to directory in which to save MPPData.
+        save_keys
+            Only save these MPPData.data entries. "x", "y", "obj_ids" are always saved.
+            If None, all MPPData.data entries are saved.
+        mpp_params
+            Params dict to be saved in ``save_dir/mpp_params.json``. Use if ``save_keys`` is not None.
+            Should contain ``base_data_dir`` (relative to ``data_config.DATA_DIR``), and subset information
+            for correct MPPData initialisation.
+
+        Returns
+        -------
+        Nothing, saves data to disk.
         """
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -350,21 +439,19 @@ class MPPData:
         self.metadata.to_csv(os.path.join(save_dir, "metadata.csv"))
 
     def copy(self) -> "MPPData":
-        import copy
-
-        copy.deepcopy(self._data)
-        copy.deepcopy(self.metadata)
+        """
+        Copy MPPData.
+        """
+        deepcopy(self._data)
+        deepcopy(self.metadata)
         mpp_copy = MPPData(
-            metadata=copy.deepcopy(self.metadata),
-            channels=copy.deepcopy(self.channels),
-            data=copy.deepcopy(self._data),
-            seed=copy.deepcopy(self.seed),
-            data_config=copy.deepcopy(self.data_config_name),
+            metadata=deepcopy(self.metadata),
+            channels=deepcopy(self.channels),
+            data=deepcopy(self._data),
+            seed=deepcopy(self.seed),
+            data_config=deepcopy(self.data_config_name),
         )
-
         return mpp_copy
-        # raise(NotImplementedError)
-        # pass
 
     # TODO Nastassya: ensure that each function logs what its doing with log.info
     # --- Modify / Add data ---
@@ -377,28 +464,37 @@ class MPPData:
         **kwargs: Any,
     ) -> None:
         """
-        Add data to MPPData from data_dir.
+        Add data to MPPData from ``data_dir``.
 
-        Expects x, y, and obj_ids to be present in data_dir.
-        If not subset, and data in data_dir differs from data in mpp_data, raises a ValueError.
+        Expects ``x``, ``y``, and ``obj_ids`` to be present in ``data_dir``.
+        Assumes that the data in ``data_dir`` uses the same ``data_config`` as the present object.
 
-        Assumes that the data in data_dir uses the same data_config as the present object.
+        Parameters
+        ----------
+        data_dir
+            Full path to the dir containing the npy files to be loaded.
+        keys
+            Filenames of data that should be loaded
+        optional_keys
+            Filenames of data that could optionally be loaded if present
+        subset
+            If ``True``, subset :class:`MPPData` to data present in ``data_dir``.
+        kwargs
+            Passed to :func:`MPPData.from_data_dir`, i.e., `seed`.
 
-        Args:
-            data_dir: full path to the dir containing the npy files to be loaded
-            keys: filenames of data that should be loaded
-            optional_keys: filenames of data that could optionally be loaded if present
-            subset: if True, subset MPPData to data present in data_dir.
-            kwargs: passes to MPPData.from_data_dir
+        Returns
+        -------
+        Nothing, modifies :class:`MPPData` in place. Adds ``keys`` to :func:`MPPData.data`.
 
-        Returns:
-            Nothing, modifies MPPData in place. Adds `keys` to `MPPData._data`
-
+        Raises
+        ------
+        ValueError
+            If ``subset`` is False, and data in ``data_dir`` differs from data in ``self``.
         """
         mpp_to_add = MPPData._from_data_dir(
             data_dir,
-            keys=list(set(["x", "y", "obj_ids"] + list(keys))),
-            optional_keys=list(optional_keys),
+            keys=keys,
+            optional_keys=optional_keys,
             data_config=self.data_config_name,
             **kwargs,
         )
@@ -429,7 +525,19 @@ class MPPData:
         self.log.info(f"Updated data to keys {list(self._data.keys())}")
 
     def train_val_test_split(self, train_frac: float = 0.8, val_frac: float = 0.1) -> List["MPPData"]:
-        """split along obj_ids for train/val/test split"""
+        """
+        Split along obj_ids for train/val/test split.
+
+        Parameters
+        -----------
+        train_frac
+            Fraction of objects in train split.
+        val_frac
+            Fraction of objects in val split. Needs to contain at least one object.
+        Returns
+        -------
+        train, val, test
+        """
         # TODO (maybe) adapt and ensure that have even val/test fractions from each well
         ids = self.unique_obj_ids.copy()
         self.rng.shuffle(ids)
@@ -446,11 +554,21 @@ class MPPData:
         return splits
 
     def prepare(self, params: Mapping[str, Any]) -> None:
-        """prepare MPP data according to given params.
+        """
+        Prepare MPP data according to given params (from :func:`campa.data.create_dataset`).
 
-        Ignores data_dirs, split, subsampling, and neighborhood.
-        after self.prepare(), you might want to call self.subsample() and
-        self.add_neighorhood()
+        After calling this function, you might want to call :meth:`MPPData.subsample` and
+        :meth:`MPPData.add_neighorhood`.
+
+        Parameters
+        ----------
+        params
+            Parameter dict describing how to prepare MPPData. See :func:`campa.data.create_dataset`.
+            Ignores parameters `data_dirs`, `split`, `subsampling`, and `neighborhood`.
+
+        Returns
+        -------
+        Nothing, modifies MPPData in place.
         """
         # subset channels - should be done first, as normalise writes params wrt channel ordering
         if params.get("channels", None) is not None:
@@ -467,43 +585,53 @@ class MPPData:
 
     # --- Detailed fns used in prepare() ---
     # TODO: Nastassya write tests for this
-    def add_conditions(self, cond_desc: str, cond_params: MutableMapping[str, Any] = None) -> None:
+    def add_conditions(
+        self, cond_desc: Iterable[Union[List[str], str]], cond_params: MutableMapping[str, Any] = None
+    ) -> None:
         """
-        Add conditions informations by aggregating over channels (per cell) or reading data from cell cycle file.
+        Add conditions using :attr:`MPPData.metadata` columns.
 
-        Withing a framework of conditional VAE training, a conditional vector is passed alongside the input vector.
-        This vector could represent e.g. perturbation or a cell cycle.
-        The vector is constructed for each input sample (here, we refer to an input sample is a pixel or a
-        pixel's neighbourhood)
-        from a metadata table as a concatenation of vectors each representing separate condition.
+        ``cond_desc`` describes the conditions that should be added.
+        It is a list of condition descriptions.
+        Each condition is calculated separately and concatenated to form the resulting
+        :attr:`MPPData.conditions` vector.
+        Condition descriptions have the following format: `"{condition}(_{postprocess})"`.
 
-        In order to create a conditions table, method add_conditions(), which takes the following parameters:
+        Condition values are obtained as follows:
 
-        cond_desc: a list of conditions descriptions, represented as string values. Conditions can be represented in
-        one of the following formats:
-            - columnName - if this column is specified in data_config.CONDITIONS,
-              then a value in that column gets numerically encoded into a class value (1, 2, ...).
-              Note that the class is assigned to the value only if the values is contained in range of values
-              that column could take (as specified in data_config.CONDITIONS[columnName]).
-              Note that one can also provide a special entrie "UNKNOWN" there.
-              In that case, all values with conditions that are not listed are mapped to the additional last class.
-              If the column name is not provided in the data_config.CONDITIONS,
-              values are assumed to be continious and stored as they are in the conditions table.
-            - columnName_postprocess, where postprocess can be set to one of the following values:
-                - lowhigh_bin_2: bins all values in the specified column in 4 quantiles, encodes values in
-                  the lowest quantile as one class and values in the high quantile as teh second class
-                  (one-hot encoded), and all values in-between sets to None
-                - bin_3: bin values in .33 and .66 quantiles and one-hot encodes each of them into 3 classes according
-                  to quantile where the value belongs to
-                - zscore: normalizes a continuous set of values by mean and std of train subset,
-                  supposed to be used only after a train-test split up
-                - one_hot: same as when only ***columnName*** is provided as a condition description,
-                  but additionally one-hot encodes the class values.
+        * look up condition in :attr:`MPPData.metadata`.
+          If `condition` is described in `data_config.CONDITIONS`, map it to numerical values.
+          Note that if there is an entry `UNKNOWN` in `data_config.CONDITIONS`, all unmapped values will be mapped
+          to this class.
+          If `condition` is not described in `data_config.CONDITIONS`, values are assumed to be continuous
+          and stored as they are in the condition vector.
+        * postprocess conditions. `postprocess` can be one of the following values:
 
-        cond_params: Dictionary with parameters needed for some conditions, e.g. for classifying values into bins.
-            If empty, these values are calculated and stored into this dict (where appropriate).
+           - `lowhigh_bin_2`: Only for continuous values. Removes middle values. Bin all values in 4 quantiles,
+              encodes values in
+              the lowest quantile as one class and values in the high quantile as the second class (one-hot encoded),
+              and set all values inbetween set to nan.
+           - `bin_3`: Only for continuous values. Bin values in .33 and .66 quantiles and one-hot encode each value.
+           - `zscore`: Only for continuous values. Normalize values by mean and std.
+           - `one_hot`: Only for categorical values. One-hot encode values.
 
-        NOTE: Operation is performed inplace.
+        For categorical descriptions, it is possible to pass a list of condition descriptions.
+        This will return a unique one-hot encoded vector combining multiple conditions.
+
+        This operation is performed inplace.
+
+        Parameters
+        ----------
+        cond_desc
+            Conditions to be added.
+        cond_params
+            Can optionally contain precomputed quantiles or mean/str values. If no values are provided,
+            this will be filled with computed quantiles or mean/str values.
+            This is useful for using the same values to process conditions on e.g. train and test sets.
+        Returns
+        -------
+        Nothing, adds :attr:`MPPData.conditions`.
+
         """
         self.log.info(f"Adding conditions: {cond_desc}")
         conditions = []
@@ -512,7 +640,6 @@ class MPPData:
             conditions.append(cond)
         self._data["conditions"] = np.concatenate(conditions, axis=-1)
 
-    # TODO: Nastassya: write tests for this
     def subset(
         self,
         frac: Optional[float] = None,
@@ -523,28 +650,42 @@ class MPPData:
         **kwargs: Any,
     ) -> "MPPData":
         """
+        Object-level subsetting of MPPData.
+
+        Several filters for subsetting can be defined:
+
+        - subset to random fraction / number of objects
+        - filtering by object ids
+        - filtering by values in :attr:`MPPData.metadata`
+        - filtering by condition values
+
         Restrict objects to those with specified value(s) for key in the metadata table
 
-        Args:
-            frac (float): fraction of objects to randomly subsample.
-                Applied after the other subsetting
-            num (int): number of objects to randomly subsample. frac takes precedence
-                Applied after the other subsetting.
-            obj_ids (list of str): ids of objects to subset to
-            nona_condition: if set to True,  all values having nan conditions will be filtered out. Note that the way
-                condition's creation
-             is implemented allows one to e.g. leave only entries which values in the specified column were in the low
-                and high quantilies,
-             and filter out everything else.
-            copy: return new MPPData object or modify in place
+        Parameters
+        ----------
+        frac
+            Fraction of objects to randomly subsample.
+            Applied after the other subsetting
+        num
+            Number of objects to randomly subsample. ``frac`` takes precedence.
+            Applied after the other subsetting.
+        obj_ids
+            Object ids to subset to.
+        nona_condition
+            If set to True,  all values having nan conditions will be filtered out.
+            Note that the way conditions are created allows one to
+            e.g. leave only entries which values in the specified column were in the low
+            and high quantilies, and filter out everything else.
+        copy
+            Return new MPPData object or modify in place.
+        kwargs
+            Keys are column names in the metadata table.
+            Values (str or list of str) are allowed entries for that key in the metadata table for selected objects.
+            NO_NAN is special token selecting all values except nan.
 
-            kwargs:
-                key: name of column used to select objects
-                value (str or list of str): allowed entries for selected objects,
-                    NO_NAN is special token selecting all values except nan
-
-        Returns:
-            if copy, subsetted MPPData, otherwise nothing, modifies Data object in place
+        Returns
+        -------
+            Subsetted MPPData
         """
         selected_obj_ids = np.array(self.metadata[self.data_config.OBJ_ID])
         self.log.info(f"Before subsetting: {len(selected_obj_ids)} objects")
@@ -586,13 +727,19 @@ class MPPData:
         # apply mask
         return self.apply_mask(mpp_mask, copy=copy)
 
-    # TODO Nastassya: write tests for this
     def subset_channels(self, channels: Iterable[str]) -> None:
         """
-        Restrict self.mpp to defined channels. Channels are given as string values.
-        Updates self.mpp and self.channels
+        Restrict :attr:`MPPData.mpp` to ``channels``.
+
+        Parameters
+        ----------
+        channels
+            Channels that should be retained in mpp_data. Given as string values.
+
+        Returns
+        -------
+        Nothing, updates :attr:`MPPData.mpp` and :attr:`MPPdata.channels`.
         """
-        # TODO need copy argument?
         self.log.info(f"Subsetting from {len(self.channels)} channels")
         channels_overlap = np.intersect1d(self.channels.name.values, channels)
         assert (
@@ -611,7 +758,6 @@ class MPPData:
         else:
             self.log.info("None of the channels were excluded ")
 
-    # TODO Nastassya: write tests for this
     def subsample(
         self,
         frac: Optional[float] = None,
@@ -622,28 +768,36 @@ class MPPData:
         neighborhood_size: int = 3,
     ) -> "MPPData":
         """
-        Performs MPP-level subsampling by selecting mpps (could be thought of as pixels)
+        Pixel-level subsampling of MPPData.
+
         All other information is updated accordingly (to save RAM/HDD-memory).
         Additionally, can extend mpps' representations by their neighbourhoods before subsampling.
-        Note that several conditions for subsampling can be provided,
-        and the resulting MPP Dataset will be computed as combination of all the provided conditions.
-
-        args:
-            frac: subsample a random number of mpps (pixels) from the whole dataset by a specified fraction.
-            Should be in range [0, 1].
-            num: subsample a random number of mpps (pixels) from the whole dataset by a specified number of mpps
-                to be chosen.
-            frac_per_obj: allows to subsample a fraction of mpps on the object level - that is,
-                for each object (cell) to subsample
-                the same fraction of mpps independently.
-            num_per_obj: same as frac_per_obj, but a number of mpps to be left instead of fraction is provided
-            add_neighborhood: if set to True, extends mpp representation with a square neighbourhood around it
-            neighborhood_size: size of the neighborhood
 
         Note that at least one of four parameters that indicate subsampling (frac, num, frac_per_obj, num_per_obj)
-        size should be provided
+        size should be provided.
 
-        Returns: new subsampled MPPData. Operation cannot be done in place
+        Parameters
+        ----------
+        frac
+            Subsample a random number of mpps (pixels) from the whole dataset by a specified fraction.
+            Should be in range [0, 1].
+        num
+            Subsample a random number of mpps (pixels) from the whole dataset by a specified number of mpps
+            to be chosen.
+        frac_per_obj
+            Allows to subsample a fraction of mpps on the object level - that is,
+            for each object (cell) to subsample
+            the same fraction of mpps independently.
+        num_per_obj
+            Same as ``frac_per_obj``, but a number of mpps to be left instead of fraction is provided.
+        add_neighborhood
+            If set to True, extends mpp representation with a square neighbourhood around it.
+        neighborhood_size
+            Size of the neighborhood.
+
+        Returns
+        -------
+            Subsampled MPPData. Operation cannot be done in place
         """
         assert (
             sum(
@@ -696,14 +850,21 @@ class MPPData:
 
     def add_neighborhood(self, size: int = 3, copy: bool = False) -> "MPPData":
         """
-        Extends mpp representation with a square neighbourhood around it.
+        Add a square neighborhood around each pixels to the mpp_data.
 
-        args:
-            neighborhood_size: size n of the neighborhood. The resulting mpp representation will then be set
-                to a nXn square around each pixel.
-            copy: return new MPPData object or modify in place
+        Parameters
+        ----------
+        neighborhood_size
+            Size n of the neighborhood.
+            The resulting mpp representation will then be set
+            to a `n x n` square around each pixel.
+        copy
+            return new MPPData object or modify in place.
+
+        Returns
+        -------
+            The modified MPPData.
         """
-        # TODO need copy flag?
         self.log.info(f"Adding neighborhood of size {size}")
         mpp = self._get_neighborhood(self.obj_ids, self.x, self.y, size=size)
         assert (mpp[:, size // 2, size // 2, :] == self.center_mpp).all()
@@ -720,7 +881,6 @@ class MPPData:
             )
         else:
             assert not self.has_neighbor_data, "cannot add neighborhood, already has neighbor data"
-            # TODO Nastassya: this should be in a unittest of self.get_neighborhood
             self._data["mpp"] = mpp
             return self
 
@@ -728,46 +888,61 @@ class MPPData:
         self,
         background_value: Optional[Union[float, List[float], str]] = None,
         percentile: Optional[float] = None,
-        rescale_values: Iterable[float] = (),
+        rescale_values: Optional[List[float]] = None,
     ) -> None:
         """
-        To prepare the data, pixel values can be normalized. For that, pixel values can be e.g. shifted and rescaled so
-        that they end up ranging between 0 and 1:
+        Normalise :attr:`MPPData.mpp` values.
 
-        args:
-            background_value: shifts all values (contained in .data field) by that value. Note that all resulting
-            negative values are cut off to zero. Several shift options are possible, depending on a background_value,
+        This operation is performed inplace.
+
+        Parameters
+        ----------
+        background_value
+            Shift all values by that value. All resulting negative values are cut off at zero.
+            Several shift options are possible, depending on a background_value,
             which could be in one of the following formats:
-               - single value (float): then data is shifted by this number in every channels
-               - list of predifined values (floats): data in each channel is shifted separately by a corresponding
-                 value in that list. Note: in that case, number of shifted
-                 values should be the same as number of channels.
-               - string: list of values for shifting are loaded from the channels_metadata table
-                 (should be located in the folder data_config.DATA_DIR in a file self.data_config.CHANNELS_METADATA).
-                 The values are then loaded from the column corresponding to a provided string value.
 
-            percentile: after (optional) shifting data can be rescaled by a specified value separately for each channel.
-            The value could be in one of the following formats:
-                - float: value from 0 to 100, which represents a quantile by which data should be rescaled.
-                  Quantiles are then calculated for each channel separately, and data is rescaled independently in
-                  each channel by the calculated respective quantile value.
-                - list of predifined values (floats): data in each channel is rescaled separately for each channel by a
-                  corresponding value in that list.
+            - single value (float): then data is shifted by this number in every channels
+            - list of predifined values (list of float): data in each channel is shifted separately by a corresponding
+              value in that list. Note: in that case, number of shifted
+              values should be the same as number of channels.
+            - string: list of values for shifting are loaded from the channels_metadata table
+              (should be located in ``data_config.DATA_DIR`` in a file ``data_config.CHANNELS_METADATA)``.
+              The values are then loaded from the column corresponding to a provided string value.
 
-            rescale_values: A dictionary with values used for normalization. If empty, parameters calculated for
-                rescaling would be optionally be stored into this dictionary.
+        percentile
+            Rescale the data using the specified percentile. Modifies ``rescale_values`` as a side effect with
+            the calculated percentiles.
+        rescale_values
+            Can optionally contain previously calculated percentiles that will be used to rescale the data, instead
+            of calculating percentiles again.
+            This is useful for using the same values to scale e.g. train and test sets.
+            If an empty list is passed, this will be filled with the percentiles calculated on this data.
 
-        NOTE: this operation is performed **inplace**.
+        Returns
+        -------
+        Nothing, updates `MPPData.mpp` inplace.
         """
         if background_value is not None:
             self._subtract_background(background_value)
         if percentile is not None:
-            self._rescale_intensities_per_channel(percentile, list(rescale_values))
+            self._rescale_intensities_per_channel(percentile, rescale_values)
 
     # --- Helper functions ---
     def apply_mask(self, mask: np.ndarray, copy: bool = False) -> "MPPData":
         """
-        return new MPPData with masked self._data values
+        Return new MPPData by applying mask to :meth:`MPPData.data`.
+
+        Parameters
+        ----------
+        mask
+            Boolean mask.
+        copy
+            Return new object.
+
+        Returns
+        -------
+        Masked object.
         """
         data = {}
         for key in self._data.keys():
@@ -788,9 +963,14 @@ class MPPData:
 
     def _subtract_background(self, background_value: Union[float, List[float], str]) -> None:
         """
-        background_value: float value to be subtracted, or name of column in CHANNELS_METADATA
-        NOTE: code copied/adapted from Scott Berry's MCU package
-        NOTE: mpp is converted to float
+        Subtract background value.
+
+        Code copied/adapted from Scott Berry's MCU package.
+
+        Parameters
+        ----------
+        background_value
+            Float value to be subtracted, or name of column in CHANNELS_METADATA.
         """
         if isinstance(background_value, float):
             self.log.info(f"Subtracting constant value {background_value} from all channels")
@@ -817,10 +997,14 @@ class MPPData:
         self, percentile: float = 98.0, rescale_values: Optional[List[float]] = None
     ) -> None:
         """
-        TODO add more info
+        Normalise intensity values.
+
+        Calculates percentile and returns values/percentile.
+        Uses percentile in ``rescale_values`` if given.
+        Otherwise modifies ``rescale_values`` as side-effect.
+
         NOTE converts self.mpp to float32
         """
-        # TODO need copy flag?
         if rescale_values is None:
             rescale_values = []
         if len(rescale_values) == 0:
@@ -838,14 +1022,20 @@ class MPPData:
     def _get_per_mpp_value(
         self, per_obj_value: Union[Mapping[str, Iterable[Any]], Iterable[Any]]
     ) -> Union[pd.DataFrame, pd.Series]:
-        """takes list of values corresponding to self.metadata[OBJ_ID]
-        and propagates them to self.obj_id
+        """
+        Propagate per object values to all pixels.
 
-        Args:
-            per_obj_value: list of values, or dict containing multiple value lists
+        Takes list of values corresponding to self.metadata[OBJ_ID]
+        and propagates them to self.obj_id.
 
-        Returns:
-            pd.Series or pd.DataFrame
+        Parameters
+        ----------
+        per_obj_value
+            List of values, or dict containing multiple value lists.
+
+        Returns
+        -------
+        pd.Series or pd.DataFrame.
         """
         # val: Union[List[str], str] = None
         if isinstance(per_obj_value, dict):
@@ -864,13 +1054,31 @@ class MPPData:
         per_mpp_value = df.merge(per_obj_df, left_on="MERGE_KEY", right_on="MERGE_KEY", how="left")[val]
         return per_mpp_value
 
-    def get_condition(self, desc: str, cond_params: Optional[MutableMapping[str, Any]] = None) -> np.ndarray:
+    def get_condition(
+        self, desc: Union[List[str], str], cond_params: Optional[MutableMapping[str, Any]] = None
+    ) -> np.ndarray:
         """
-        return condition based on desc (used by add_conditions).
+        Get condition based on ``desc``.
+
+        For complete description of ``desc``, see :meth:`MPPData.add_conditions`.
+
         If cond is a list of conditions, return unique one-hot encoded vector combining multiple conditions
         (only possible when all sub-conditions are one-hot encoded)
 
-        NOTE: cond_params are modified inplace
+        ``cond_params`` are modified inplace.
+
+        Parameters
+        ----------
+        cond_desc
+            Conditions to be added.
+        cond_params
+            Can optionally contain precomputed quantiles or mean/str values. If no values are provided,
+            this will be filled with computed quantiles or mean/str values.
+            This is useful for using the same values to process conditions on e.g. train and test sets.
+
+        Returns
+        -------
+        condition vector
         """
         if cond_params is None:
             cond_params = {}
@@ -919,14 +1127,22 @@ class MPPData:
         """
         Create adata from information contained in MPPData.
 
-        channels are put in adata.var
-        metadata is put in adata.obs
+        Channels are put in ``adata.var``.
+        Metadata is put in ``adata.obs``.
 
-        Args:
-            X: key in MPPData.data that should be in adata.X
-            obsm: keys in MPPData.data that should be in adata.obsm.
-                Can be dict with keys the desired names in adata, and values the keys in MPPData.data
-            obs: keys from MPPData.data that should be in adata.obs in addition to all information form metadata
+        Parameters
+        ----------
+        X
+            Key in MPPData.data that should be in adata.X.
+        obsm
+            Keys in MPPData.data that should be in adata.obsm.
+            Can be dict with keys the desired names in adata, and values the keys in MPPData.data
+        obs
+            Keys from MPPData.data that should be in adata.obs in addition to all information from metadata.
+
+        Returns
+        -------
+        adata with pixel-level observations.
         """
         import anndata as ad
 
@@ -955,16 +1171,23 @@ class MPPData:
 
     def extract_csv(self, data: str = "mpp", obs: Iterable[str] = ()) -> pd.DataFrame:
         """
-        extract mpp_data.data into csv file.
+        Extract information in :meth:`MPPData.data` into :class:pd.DataFrame.
 
-        Per default, files contain data, x and y coordinates, object_id.
-        Args:
-            obs: name of metadat columns that should be additionally added
+        Per default, files contain ``data``, ``x`` and ``y`` coordinates, and ``obj_id``.
+
+        Parameters
+        ----------
+        obs
+            list of :attr:`MPPData.metadata` columns that should be additionally added.
+
+        Returns
+        -------
+        DataFrame containing mpp data.
         """
         # TODO: column names are tuples
         columns = None
         if data == "mpp":
-            columns = self.channels
+            columns = self.channels["name"]
             X = self.center_mpp
         else:
             X = self._data[data]
@@ -973,10 +1196,10 @@ class MPPData:
         df["x"] = self.x
         df["y"] = self.y
         obs_ = self._get_per_mpp_value({o: self.metadata[o] for o in list(obs) + [self.data_config.OBJ_ID]})
-        df[self.data_config.OBJ_ID] = obs_[self.data_config.OBJ_ID]
+        for key, value in obs_.items():
+            df[key] = value
         return df
 
-    # TODO nastassya: test
     def _get_neighborhood(
         self,
         obj_ids: Union[np.ndarray, List[str]],
@@ -985,7 +1208,7 @@ class MPPData:
         size: int = 3,
         border_mode: str = "center",
     ) -> np.ndarray:
-        """return neighborhood information for given obj_ids + xs + ys"""
+        """Return neighborhood information for given obj_ids + xs + ys."""
         data = np.zeros((len(obj_ids), size, size, len(self.channels)), dtype=self.mpp.dtype)
         for obj_id in np.unique(obj_ids):
             mask = obj_ids == obj_id
@@ -1001,11 +1224,20 @@ class MPPData:
         self, to_channels: List[str], from_channels: Optional[Union[pd.DataFrame, List[str]]] = None
     ) -> List[int]:
         """
-        for a list of channels, return their ids in mpp_data
+        Map channel names to ids.
 
-        Args:
-            from_channels: get channel_ids assuming ordering of from_channels.
-                This is useful for models that are trained with different output than input channels
+        Parameters
+        ----------
+        to_channels
+            Channel names for which would like to know the ids.
+        from_channels
+            Get ``channel_ids`` assuming ordering of ``from_channels``. By default use the ordering
+            of :attr:`MPPData.channels`.
+            This is useful for models that are trained with different output than input channels.
+
+        Returns
+        -------
+        Channel ids that can be used to index :attr:`MPPData.mpp`.
         """
         if from_channels is None:
             from_channels = self.channels.copy()
@@ -1023,6 +1255,7 @@ class MPPData:
     ) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[int, int]]]:
         """
         Create image from x and y coordinates and fill with data.
+
         Args:
             x, y: 1-d array of x and y corrdinates
             data: shape (n_coords,n_channels), data for the image
@@ -1044,7 +1277,7 @@ class MPPData:
             img = bbox.crop(img)
             return img
         else:
-            # padding info is only relevant when not cropping img to shape
+            # offset info is only relevant when not cropping img to shape
             return img, (int(x.min() - pad), int(y.min() - pad))
 
     def get_object_img(
@@ -1057,18 +1290,31 @@ class MPPData:
     ) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[int, int]]]:
         """
         Calculate data image of given object id.
-        args:
-            obj_id: an ID of the object (cell)
-            data: key in self._data that should be plotted on the image
-            channel_ids: only if key == 'mpp'. Channels that the image should have.
-                If None, all channels are returned.
-            annotation_kwargs: arguments for self.annotate_img. (annotation, to_col, color):
-                img_size: size of returned image. If provided, image is padded or cropped to the desired size,
-                    and returns resulting image.
-                    If not provided, returns image and pad parameters from padding (pad set to 0 by default)
-                pad: amount of padding added to returned image (only used when img_size is None). If  provided,
-                 returns image and a list of padding parameters used for image padding.
-            kwargs: arguments for self._get_img_from_data
+
+        Parameters
+        ----------
+        obj_id
+            Object that should be visualised.
+        data
+            Key in :meth:`MPPData.data` that should be plotted on the image.
+        channel_ids
+            Only if key == 'mpp'. Channels that the image should have.
+            If None, all channels are returned.
+        annotation_kwargs
+            Arguments for :func:`campa.pl.annotate_img` (annotation, to_col, color).
+            Use this to plot clusterings on cells with custom colormaps.
+        img_size
+            Size of returned image. If None, images have minimal required size to fit all information.
+            If None, offset information is returned by this function.
+        pad
+            Amount of padding added to returned image (only used when ``img_size`` is None).
+
+        Returns
+        -------
+        If img_size is None, returns: image, (offset_x, offset_y).
+            Offset is that value that needs to be subtracted from MPPData.x and MPPData.y
+            before being able to use them to index the returned image.
+        Otherwise returns: image
 
         """
         mask = self.obj_ids == obj_id
@@ -1101,7 +1347,26 @@ class MPPData:
     ) -> List[np.ndarray]:
         """
         Return images for each obj_id in current data.
-        Args: arguments for get_object_img
+
+        Parameters
+        ----------
+        data
+            Key in :meth:`MPPData.data` that should be plotted on the image.
+        channel_ids
+            Only if key == 'mpp'. Channels that the image should have.
+            If None, all channels are returned.
+        annotation_kwargs
+            Arguments for :func:`campa.pl.annotate_img` (annotation, to_col, color).
+            Use this to plot clusterings on cells with custom colormaps.
+        img_size
+            Size of returned image. If None, images have minimal required size to fit all information.
+            If None, offset information is returned by this function.
+        pad
+            Amount of padding added to returned image (only used when ``img_size`` is None).
+
+        Returns
+        -------
+        list of images.
         """
         imgs = []
         for obj_id in self.metadata[self.data_config.OBJ_ID]:
@@ -1122,11 +1387,27 @@ class MPPData:
         self, data: str = "mpp", channel_ids: Optional[Iterable[str]] = None, **kwargs: Any
     ) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[int, int]]]:
         """
-        Calculate data image of all mpp data.
-        data: key in self._data that should be plotted on the image
-        channel_ids: only if key == 'mpp'. Channels that the image should have.
+        Calculate data image of entire MPPData.
+
+        Parameters
+        ----------
+        data
+            Key in :meth:`MPPData.data` that should be plotted on the image.
+        channel_ids
+            Only if key == 'mpp'. Channels that the image should have.
             If None, all channels are returned.
-        kwargs: arguments for self._get_img_from_data
+        img_size
+            Size of returned image. If None, images have minimal required size to fit all information.
+            If None, offset information is returned by this function.
+        pad
+            Amount of padding added to returned image (only used when ``img_size`` is None).
+
+        Returns
+        -------
+        If img_size is None, returns: image, (offset_x, offset_y).
+            Offset is that value that needs to be subtracted from MPPData.x and MPPData.y
+            before being able to use them to index the returned image.
+        Otherwise returns: image
         """
         if data == "mpp":
             values = self.center_mpp
@@ -1138,8 +1419,12 @@ class MPPData:
             values = values[:, np.newaxis]
         return MPPData._get_img_from_data(self.x, self.y, values, **kwargs)
 
-    def compare(self, obj: "MPPData") -> Tuple[bool, Dict[str, bool]]:
+    def _compare(self, obj: "MPPData") -> Tuple[bool, Dict[str, bool]]:
+        """
+        Compare two MPPDatas and return their differences.
 
+        Used for testing.
+        """
         assert np.array_equal(list(self._data.keys()), list(obj._data.keys()))
         same_data = {}
         for key in self._data.keys():
@@ -1156,7 +1441,9 @@ class MPPData:
 
 def _try_mmap_load(fname, mmap_mode="r", allow_not_existing=False):
     """
-    use np.load to read fname. If mmap loading fails, load with mmap_mode=None.
+    Use np.load to read fname.
+
+    If mmap loading fails, load with mmap_mode=None.
 
     Args:
         allow_not_existing: if fname does not exist, do not raise and exception, just return None
@@ -1183,8 +1470,9 @@ def _try_mmap_load(fname, mmap_mode="r", allow_not_existing=False):
 
 def _get_keys(keys, optional_keys, base_mpp_data=None):
     """
-    keys and optional keys to use for loading base_mpp_data / mpp_data,
-    when reading parts of the data from other dirs
+    Return keys and optional keys to use for loading base_mpp_data / mpp_data.
+
+    Used when reading parts of the data from other dirs.
     """
     if base_mpp_data is None:
         # loading of base_mpp_data

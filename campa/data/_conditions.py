@@ -8,11 +8,17 @@ from campa.constants import campa_config
 
 
 def get_one_hot(targets: np.ndarray, nb_classes: int) -> np.ndarray:
+    """
+    Get one-hot encoded vector.
+    """
     res: np.ndarray = np.eye(nb_classes)[np.array(targets).reshape(-1)]
     return res.reshape(list(targets.shape) + [nb_classes])
 
 
 def get_combined_one_hot(arrs: List[np.ndarray]) -> np.ndarray:
+    """
+    Get combined one-hot encoded vector from several conditions.
+    """
     if len(arrs) != 2:
         raise NotImplementedError(f"combine {len(arrs)} arrs")
     mask = (~np.isnan(arrs[0][:, 0])) & (~np.isnan(arrs[1][:, 0]))
@@ -28,7 +34,9 @@ def get_combined_one_hot(arrs: List[np.ndarray]) -> np.ndarray:
 def convert_condition(
     arr: np.ndarray, desc: str, one_hot: bool = False, data_config: Optional[Any] = None
 ) -> np.ndarray:
-    """Convert condition array according to desc."""
+    """
+    Convert condition array according to desc.
+    """
     log = logging.getLogger("convert_condition")
     if data_config is None:
         log.warning("using default data config")
@@ -59,6 +67,9 @@ def convert_condition(
 
 
 def process_condition_desc(desc: str) -> Tuple[str, Optional[str]]:
+    """
+    Split desc in condition and postprocess.
+    """
     postprocess = None
     for proc in ["_one_hot", "_bin_3", "_lowhigh_bin_2", "_zscore"]:
         if proc in desc:
@@ -71,9 +82,11 @@ def get_bin_3_condition(
     cond: np.ndarray, desc: str, cond_params: MutableMapping[str, Any]
 ) -> Tuple[np.ndarray, List[float]]:
     """
-    look for desc_bin_3_quantile kwarg specifying the quantile.
+    Calculate .33 and .66 quantiles.
+
+    If `desc_bin_3_quantile` is in cond_params, these quantiles are used.
     If not present, calculate the quantiles based on cond.
-    Then bin cond according to quantiles
+    Then bin cond according to quantiles.
     """
     # bin in .33 and .66 quantiles (3 classes)
     if cond_params.get(f"{desc}_bin_3_quantile", None) is not None:
@@ -90,8 +103,11 @@ def get_bin_3_condition(
 def get_lowhigh_bin_2_condition(
     cond: np.ndarray, desc: str, cond_params: MutableMapping[str, Any]
 ) -> Tuple[np.ndarray, List[float]]:
-    # bin in 4 quantiles, take low and high TR cells (2 classes)
-    # remainder of cells has nan values - can be filtered out later
+    """
+    Bin data in 4 quantiles, return low and high quantiles (2 classes).
+
+    Remainder of cells has nan values - can be filtered out later.
+    """
     if cond_params.get(f"{desc}_lowhigh_bin_2_quantile", None) is not None:
         q = cond_params[f"{desc}_lowhigh_bin_2_quantile"]
     else:
@@ -105,9 +121,12 @@ def get_lowhigh_bin_2_condition(
 def get_zscore_condition(
     cond: np.ndarray, desc: str, cond_params: MutableMapping[str, Any]
 ) -> Tuple[np.ndarray, List[float]]:
-    # z-score TR
-    # contiinous nbr, normalizes it
-    # should work only after split up
+    """
+    Z-score cond.
+
+    Cond needs to be continuuous. If `desc_mean_std` in cond_params, uses this mean and std.
+    Otherwise adds calculated mean and std to cond_params.
+    """
     if cond_params.get(f"{desc}_mean_std", None) is not None:
         tr_mean, tr_std = cond_params[f"{desc}_mean_std"]
     else:

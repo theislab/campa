@@ -2,6 +2,8 @@ include requirements.txt
 include LICENSE
 include README.rst
 
+include tox.ini
+
 include campa/config.ini.example
 
 prune tests/_data

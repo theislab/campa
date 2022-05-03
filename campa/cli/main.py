@@ -1,4 +1,3 @@
-from email import parser
 import sys
 import argparse
 
@@ -24,6 +23,7 @@ extract_features    Extract features from clustered dataset
     parser.add_argument("command", help="Subcommand to run.")
     return parser
 
+
 def _get_setup_parser():
     parser = argparse.ArgumentParser(description="Create configuration file campa.ini.")
     parser.add_argument(
@@ -33,10 +33,12 @@ def _get_setup_parser():
     )
     return parser
 
+
 def _get_create_dataset_parser():
     parser = argparse.ArgumentParser(description=("Create NNDataset using parameter file"))
     parser.add_argument("params", help="path to data_params.py")
     return parser
+
 
 def _get_train_parser():
     parser = argparse.ArgumentParser(description=("Train and evaluate models defined by experiment config"))
@@ -57,6 +59,7 @@ def _get_train_parser():
         help="Select names of experiments to run. If not specified, all available experiments are run",
     )
     return parser
+
 
 def _get_cluster_parser():
     parser = argparse.ArgumentParser(description="Cluster data and project clustering.")
@@ -113,10 +116,12 @@ def _get_cluster_parser():
     project.set_defaults(func=campa.tl.project_cluster_data)
     return parser
 
+
 def _get_extract_features_parser():
     parser = argparse.ArgumentParser(description=("Extract features from clustered dataset."))
     parser.add_argument("params", help="path to feature_params.py")
     return parser
+
 
 class CAMPA:
     def __init__(self):

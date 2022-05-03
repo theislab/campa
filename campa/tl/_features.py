@@ -473,11 +473,12 @@ class FeatureExtractor:
             Distance intervals for which to calculate co-occurrence score.
         algorithm
             Co-occurrence function to use:
+
             - `squidpy`: use :func:`sq.gr.co_occurrence`.
             -  `opt`: use custom implementation which is optimised for a large number of pixels.
-                This implementation avoids recalculation of distances, using the fact that coordinates
-                in given images lie on a regular grid.
-                Use opt for very large inputs.
+               This implementation avoids recalculation of distances, using the fact that coordinates
+               in given images lie on a regular grid.
+               Use opt for very large inputs.
 
         num_processes
             only for ``algorithm='opt'``. Number if processes to use to compute scores.
@@ -737,10 +738,9 @@ class FeatureExtractor:
         self, obs: Optional[Iterable[str]] = None, features: Iterable[str] = None, clusters: Iterable[str] = None
     ) -> None:
         """
-        Extract csv files containing obj_id, co_occurrence scores at each distance
-        interval for every cluster-cluster pair.
+        Extract csv files of object stats.
 
-        Saves csv as ``export/co_occurrence_{cluster1}_{cluster2}_{self.fname}.csv``.
+        Saves csv as ``export/object_stats_{self.fname}.csv``.
 
         Parameters
         ----------
@@ -748,10 +748,12 @@ class FeatureExtractor:
             column names from `metadata.csv` that should be additionally stored.
         clusters
             List of cluster names for which pairwise co_occurrence scores should be calculated
-        features: list of features to display. Must be columns of adata.obsm['object_stats_agg'].
-                If None, all features are displayed.
-            clusters: list of clusters to display. Must be columns of adata.obsm['object_stats_agg'].
-                If None, all clusters are displayed.
+        features
+            List of features to display. Must be columns of ``adata.obsm['object_stats_agg']``.
+            If None, all features are displayed.
+        clusters
+            List of clusters to display. Must be columns of ``adata.obsm['object_stats_agg']``.
+            If None, all clusters are displayed.
         """
         if self.adata is None or "object_stats_agg" not in self.adata.obsm:
             self.log.warn(
@@ -791,9 +793,10 @@ class FeatureExtractor:
         self, obs: Optional[Iterable[str]] = None, clusters: Optional[Iterable[str]] = None
     ) -> None:
         """
-        Extract csv files containing obj_id,
-        co_occurrence scores at each distance interval for every cluster-cluster pair.
+        Extract csv files of co_occurrence scores for every cluster-cluster pair.
 
+        Data will contain obj_id, co_occurrence scores at each distance
+        interval for every cluster-cluster pair.
         Saves csv as ``export/co_occurrence_{cluster1}_{cluster2}_{self.fname}.csv``.
 
         Parameters
@@ -857,7 +860,7 @@ class FeatureExtractor:
             obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
             return obj_ids
 
-    def compare(self, obj: "FeatureExtractor") -> Tuple[bool, Dict[str, Any]]:
+    def _compare(self, obj: "FeatureExtractor") -> Tuple[bool, Dict[str, Any]]:
         """
         Compare feature extractors.
 
@@ -930,7 +933,9 @@ def _count_co_occ(clus1: np.ndarray, clus2: np.ndarray, num_clusters: int) -> np
 
 def _co_occ_opt_helper(coords2, coords1, clusters1, img, num_clusters):
     """
-    Helper function for co_occ scores. Counts occurrence of cluster pairs given lists of coords.
+    Calculate co-occurrence scores (helper).
+
+    Count occurrence of cluster pairs given lists of coords.
     """
     # NOTE: order of arguments is important here, because of call to multiprocessing.Pool.map
     # (coords2 is iterated over and therefore needs to be first argument)

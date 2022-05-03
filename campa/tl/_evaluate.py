@@ -218,8 +218,11 @@ class ModelComparator:
     def __init__(self, exps: Iterable[Experiment], save_dir: Optional[str] = None):
 
         self.exps = {exp.name: exp for exp in exps}
-        self.exp_names = list(self.exps.keys())
-        self.save_dir = save_dir
+        self.exp_names: List[str] = list(self.exps.keys())
+        self.save_dir: Optional[str] = save_dir
+        """
+        Directory where plots are saved. If None, no plots are saved.
+        """
 
         # default channels and mpp data
         self.mpps: Dict[str, MPPData] = {}
@@ -234,19 +237,28 @@ class ModelComparator:
         channels = {
             exp_name: self.exps[exp_name].config["data"].get("output_channels", None) for exp_name in self.exp_names
         }
-        self.channels = {
+        self.channels: Dict[str, List[str]] = {
             key: val if val is not None else self.mpps[key].channels["name"] for key, val in channels.items()
         }
 
     @classmethod
-    def from_dir(cls, exp_names, exp_dir):
+    def from_dir(cls, exp_names: Iterable[str], exp_dir: str) -> "ModelComparator":
         """
         Initialise from experiments in experiment dir.
+
+        `save_dir` will be set to `exp_dir`.
+
+        Parameters
+        ----------
+        exp_names
+            Name of experiments to compare.
+        exp_dir
+            Experiment dir in which experiments are stored
         """
         exps = [Experiment.from_dir(os.path.join(exp_dir, exp_name)) for exp_name in exp_names]
         return cls(exps, save_dir=exp_dir)
 
-    def _filter_trainable_exps(self, exp_names):
+    def _filter_trainable_exps(self, exp_names: Iterable[str]) -> List[str]:
         """
         Return exp_names that are trainable.
 
@@ -254,16 +266,26 @@ class ModelComparator:
         """
         return [exp_name for exp_name in exp_names if self.exps[exp_name].is_trainable]
 
-    def plot_history(self, values=("loss",), exp_names=None, save_prefix=""):
+    def plot_history(
+        self, values: Iterable[str] = ("loss",), exp_names: Optional[Iterable[str]] = None, save_prefix: str = ""
+    ) -> None:
         """
         Line plot of values against epochs for different experiments.
+
+        Saves plot in :attr:`ModelComparator.save_dir`.
 
         Parameters
         ----------
         values
             Key in history dict to be plotted.
-        exp_names (optional)
+        exp_names
             Compare only a subset of experiments.
+        save_prefix
+            Plot is saved under `{save_prefix}umap_{exp_name}.png`.
+
+        Returns
+        -------
+        Nothing, plots and saves lineplots
         """
         if exp_names is None:
             exp_names = self.exp_names
@@ -271,8 +293,8 @@ class ModelComparator:
 
         cmap = plt.get_cmap("tab10")
         cnorm = colors.Normalize(vmin=0, vmax=10)
-        fig, axes = plt.subplots(1, len(values), figsize=(len(values) * 5, 5), sharey=True)
-        if len(values) == 1:
+        fig, axes = plt.subplots(1, len(list(values)), figsize=(len(list(values)) * 5, 5), sharey=True)
+        if len(list(values)) == 1:
             # make axes iterable, even if there is only one ax
             axes = [axes]
         for val, ax in zip(values, axes):
@@ -291,7 +313,33 @@ class ModelComparator:
                 dpi=100,
             )
 
-    def plot_final_score(self, score="loss", fallback_score="loss", exp_names=None, save_prefix=""):
+    def plot_final_score(
+        self,
+        score: str = "loss",
+        fallback_score: str = "loss",
+        exp_names: Optional[Iterable[str]] = None,
+        save_prefix: str = "",
+    ) -> None:
+        """
+        Bar plot of scores for different experiments.
+
+        Saves plot in :attr:`ModelComparator.save_dir`.
+
+        Parameters
+        ----------
+        score
+            Key in history dict to be plotted.
+        fallback_score
+            If ``score`` does not exist for an experiment, use ``fallback_score``.
+        exp_names
+            Compare only a subset of experiments.
+        save_prefix
+            Plot is saved under `{save_prefix}final.png`.
+
+        Returns
+        -------
+        Nothing, plots and saves barplot.
+        """
         if exp_names is None:
             exp_names = self.exp_names
         exp_names = self._filter_trainable_exps(exp_names)
@@ -310,7 +358,28 @@ class ModelComparator:
             plt.tight_layout()
             plt.savefig(os.path.join(self.save_dir, f"{save_prefix}final.png"), dpi=100)
 
-    def plot_per_channel_mse(self, exp_names=None, channels=None, save_prefix=""):
+    def plot_per_channel_mse(
+        self, exp_names: Optional[List[str]] = None, channels: Optional[List[str]] = None, save_prefix: str = ""
+    ) -> None:
+        """
+        Bar plot of MSE score per each channel for different experiments.
+
+        Saves plot in :attr:`ModelComparator.save_dir`.
+
+        Parameters
+        ----------
+        exp_names
+            Compare only a subset of experiments.
+        channels
+            Channels that should be visualised. If None, all channels are plotted.
+        save_prefix
+            Plot is saved under `{save_prefix}per_channel_mse.png`.
+
+        Returns
+        -------
+        Nothing, plots and saves barplot.
+        """
+
         def mse(mpp_data):
             return np.mean((mpp_data.center_mpp - mpp_data.data("decoder")) ** 2, axis=0)
 
@@ -318,6 +387,7 @@ class ModelComparator:
         if exp_names is None:
             exp_names = self.exp_names
         exp_names = self._filter_trainable_exps(exp_names)
+
         if channels is None:
             channels = self.channels[exp_names[0]]
 
@@ -346,14 +416,41 @@ class ModelComparator:
                 dpi=100,
             )
 
-    def plot_predicted_images(self, exp_names=None, channels=None, img_ids=None, save_prefix="", **kwargs):
+    def plot_predicted_images(
+        self,
+        exp_names: Optional[List[str]] = None,
+        channels: Optional[List[str]] = None,
+        img_ids: Optional[Iterable[int]] = None,
+        save_prefix: str = "",
+        **kwargs: Any,
+    ) -> None:
         """
-        kwargs passed to mpp_data.get_object_imgs
+        Plot reconstructed cell images.
+
+        Visualises a ``#exp_names x #channels`` grid for each ``img_id``.
+        Saves plot in :attr:`ModelComparator.save_dir`.
+
+        Parameters
+        ----------
+        exp_names
+            Compare only a subset of experiments.
+        channels
+            Channels that should be visualised. If None, all channels are plotted.
+        img_ids
+            Cell images from :attr:`ModelComparator.img_mpps` that should be visualised.
+        save_prefix
+            Plot is saved under `{save_prefix}predicted_images_{img_id}.png`.
+        kwargs
+            Passed to :meth:`MPPData.get_object_imgs`.
+
+        Returns
+        -------
+        Nothing, plots and saves images.
         """
         if exp_names is None:
             exp_names = self.exp_names
-
         exp_names = self._filter_trainable_exps(exp_names)
+
         if channels is None:
             channels = self.channels[exp_names[0]]
         output_channels = self.exps[exp_names[0]].config["data"].get("output_channels", None)
@@ -410,18 +507,50 @@ class ModelComparator:
 
     def plot_cluster_images(
         self,
-        exp_names=None,
-        img_ids=None,
-        img_labels=None,
-        img_channel="00_DAPI",
-        save_prefix="",
-        rep="clustering",
-        **kwargs,
-    ):
+        exp_names: Optional[List[str]] = None,
+        img_ids: Optional[List[int]] = None,
+        img_labels: Optional[List[str]] = None,
+        img_channel: Optional[str] = None,
+        save_prefix: str = "",
+        rep: str = "clustering",
+        **kwargs: Any,
+    ) -> None:
+        """
+        Plot clustering on cell images for all experiments.
+
+        Visualises a ``#exp_names x #img_ids`` grid.
+        Saves plot in :attr:`ModelComparator.save_dir`.
+
+        Parameters
+        ----------
+        exp_names
+            Compare only a subset of experiments.
+        img_ids
+            Cell images from :attr:`ModelComparator.img_mpps` that should be visualised.
+        img_labels
+            Additional information to label plotted images by.
+            If defined, must be a list of same length as ``img_ids``.
+        img_channel
+            First column of the plot is an intensity image of ``img_channel``.
+            Default is the first channel defined in :attr:`MPPData.channels`.
+        save_prefix
+            Plot is saved under `{save_prefix}predicted_images_{img_id}.png`.
+        rep
+            Representation to plot. Must be a key in :meth:`MPPData.data`.
+        kwargs
+            Passed to :meth:`MPPData.get_object_imgs`.
+
+        Returns
+        -------
+        Nothing, plots and saves images.
+        """
         if exp_names is None:
             exp_names = self.exp_names
 
         # get input images
+        if img_channel is None:
+            input_channel_ids = [0]
+            img_channel = str(self.img_mpps[exp_names[0]].channels.loc[0])
         input_channel_ids = self.img_mpps[exp_names[0]].get_channel_ids([img_channel])
         input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(channel_ids=input_channel_ids, **kwargs)
         if img_ids is None:
@@ -473,35 +602,49 @@ class ModelComparator:
                 dpi=100,
             )
 
-    def plot_umap(self, exp_names=None, save_prefix=""):
+    def plot_umap(
+        self, exp_names: Optional[Iterable[str]] = None, channels: Optional[List[str]] = None, save_prefix: str = ""
+    ) -> None:
+        """
+        Plot UMAP representation for every experiment.
+
+        Plots conditions, clustering and optionally defined channels.
+        Saves plot in :attr:`ModelComparator.save_dir`.
+
+        Parameters
+        ----------
+        exp_names
+            Experiments for which to plot a UMAP.
+        channels
+            Channels that should be visualised.
+        save_prefix
+            Plot is saved under `{save_prefix}umap_{exp_name}.png`.
+
+        Returns
+        -------
+        Nothing, plots and saves UMAP
+        """
         from campa.tl._cluster import add_clustering_to_adata
 
-        for exp_name in self.exps.keys():
+        if channels is None:
+            channels = []
+        if exp_names is None:
+            exp_names = self.exps.keys()
+        for exp_name in exp_names:
             # prepare adata, add clustering with correct colors
             adata = self.mpps[exp_name].get_adata(obsm={"X_umap": "umap"})
-            print(self.mpps[exp_name].data_dir)
+            assert self.mpps[exp_name].data_dir is not None, "need to have data_dir defined to add clustering"
             cluster_name = self.exps[exp_name].config["cluster"]["cluster_name"]
             cluster_annotation = self.exps[exp_name].get_split_cluster_annotation(cluster_name)
-            add_clustering_to_adata(self.mpps[exp_name].data_dir, cluster_name, adata, cluster_annotation)
+            add_clustering_to_adata(
+                self.mpps[exp_name].data_dir, cluster_name, adata, cluster_annotation  # type: ignore[arg-type]
+            )
 
             # plot umap
             conditions = [process_condition_desc(c)[0] for c in self.exps[exp_name].data_params["condition"]]
-            print(conditions)
             sc.pl.umap(
                 adata,
-                color=conditions
-                + [
-                    cluster_name,
-                    "15_SON",
-                    "18_NONO",
-                    "11_PML",
-                    "21_NCL",
-                    "16_H3",
-                    "21_COIL",
-                    "02_CDK7",
-                    "01_PABPC1",
-                    "00_DAPI",
-                ],
+                color=conditions + [cluster_name] + channels,
                 vmax="p99",
                 show=False,
             )

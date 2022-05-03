@@ -30,18 +30,18 @@ Tools
     tl.prepare_full_dataset
     tl.project_cluster_data
     tl.load_full_data_dict
+    tl.get_clustered_cells
     tl.project_cluster_data
     tl.add_clustering_to_adata
     tl.extract_features
     tl.thresholded_count
-    tl.thresholded_median    
+    tl.thresholded_median
 
 Plotting
 ~~~~~~~~
 
 .. module:: campa.pl
 .. currentmodule:: campa
-
 .. autosummary::
     :toctree: api
 
@@ -59,6 +59,7 @@ Other
 ~~~~~
 
 .. module:: campa
+   :noindex:
 .. currentmodule:: campa
 .. autosummary::
     :toctree: api

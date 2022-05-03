@@ -26,6 +26,9 @@ class ModelEnum(str, Enum):
     CondCatVAEModel = "CondCatVAEModel"
 
     def get_cls(self):
+        """
+        Get model class from enum string.
+        """
         cls = self.__class__
         if self == cls.BaseAEModel:
             return BaseAEModel
@@ -43,17 +46,17 @@ class ModelEnum(str, Enum):
 
 # --- tf functions needed for model definition ---
 def expand_and_broadcast(x, s=1):
-    """expand tensor x with shape (batches,n) to shape (batches,s,s,n)"""
+    """Expand tensor x with shape (batches,n) to shape (batches,s,s,n)."""
     C = tf.expand_dims(tf.expand_dims(x, 1), 1)
     C = tf.broadcast_to(C, [tf.shape(C)[0], s, s, tf.shape(C)[-1]])
     return C
 
 
 def reparameterize_gumbel_softmax(latent, temperature=0.1):
-    """Draw a sample from the Gumbel-Softmax distribution"""
+    """Draw a sample from the Gumbel-Softmax distribution."""
 
     def sample_gumbel(shape, eps=1e-20):
-        """Sample from Gumbel(0, 1)"""
+        """Sample from Gumbel(0, 1)."""
         U = tf.random.uniform(shape, minval=0, maxval=1)
         return -tf.math.log(-tf.math.log(U + eps) + eps)
 
@@ -62,14 +65,15 @@ def reparameterize_gumbel_softmax(latent, temperature=0.1):
 
 
 def reparameterize_gaussian(latent):
+    """Draw a sample from Gaussian distribution."""
     z_mean, z_log_var = tf.split(latent, 2, axis=-1)
     eps = tf.random.normal(shape=tf.shape(z_mean))
     return eps * tf.exp(z_log_var * 0.5) + z_mean
 
 
-# for gradient reversal for adversarial loss
 @tf.custom_gradient
 def grad_reverse(x):
+    """Reverse gradients for adversarial loss."""
     y = tf.identity(x)
 
     def custom_grad(dy):
@@ -79,10 +83,13 @@ def grad_reverse(x):
 
 
 class GradReverse(tf.keras.layers.Layer):
+    """Reverse gradients class."""
+
     def __init__(self):
         super().__init__()
 
     def call(self, x):
+        """Apply gradient reversal."""
         return grad_reverse(x)
 
 
@@ -325,8 +332,9 @@ class BaseAEModel:
 
     def _create_base_encoder(self):
         """
-        create base encoder structure with conv layers and fcl.
-        does not apply the last (linear) layer to latent_dim - useful for VAE which does this differently
+        Create base encoder structure with conv layers and fcl.
+
+        Does not apply the last (linear) layer to latent_dim - useful for VAE which does this differently.
         """
         if self.is_conditional:
             X, C = self.encoder_input
@@ -476,6 +484,7 @@ class VAEModel(BaseAEModel):
     Inherits from :class:`BaseAEModel`.
 
     Model architecture:
+
     - Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim * 2
     - Latent: split latent_dim in half, resample using gaussian prior
     - Decoder: fc_layers - linear (regularized) layer to num_output_channels
@@ -484,6 +493,17 @@ class VAEModel(BaseAEModel):
     default_config = {"name": "VAEModel"}
 
     def create_encoder(self):
+        """
+        Create encoder.
+
+        Encoder outputs reparameterized latent.
+        Latent is potentially returned by overall model for loss calculation, e.g. for VAE.
+
+        Returns
+        -------
+        tf.keras.model, tf.Tensor
+            Encoder and latent (None for BaseAEModel).
+        """
         X = self._create_base_encoder()
         # linear layer to latent
         latent = tf.keras.layers.Dense(self.config["latent_dim"] * 2, activation=None, name="latent")(X)
@@ -496,6 +516,8 @@ class VAEModel(BaseAEModel):
 
 class CatVAEModel(BaseAEModel):
     """
+    Categorical VAE Model.
+
     VAE with categorical prior (softmax gumbel) (trainable with categorical loss)
     Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim * 2
     Latent: split latent_dim in half, resample using gaussian prior
@@ -520,9 +542,15 @@ class CatVAEModel(BaseAEModel):
 
     def create_encoder(self):
         """
-        returns encoder and latent
-        Encoder outputs reparameterized latent
-        Latent is returned by overall model for loss calculation
+        Create encoder.
+
+        Encoder outputs reparameterized latent.
+        Latent is potentially returned by overall model for loss calculation, e.g. for VAE.
+
+        Returns
+        -------
+        tf.keras.model, tf.Tensor
+            Encoder and latent (None for BaseAEModel).
         """
         X = self._create_base_encoder()
         # linear layer to latent
@@ -536,6 +564,8 @@ class CatVAEModel(BaseAEModel):
 
 class CondCatVAEModel(CatVAEModel):
     """
+    Conditional Categorical VAE model.
+
     Conditional Categorical VAE using another concatenation scheme when adding the condition
     to the latent space. This model first calculates a fully connected layer to a vector
     with length #output_channels x #conditions
@@ -545,9 +575,8 @@ class CondCatVAEModel(CatVAEModel):
 
     def create_decoder(self):
         """
-        returns decoder
+        Create decoder.
         """
-
         X, C = self.decoder_input
 
         # dense layer to num_output_channels x num_conditions
@@ -568,6 +597,8 @@ class CondCatVAEModel(CatVAEModel):
 
 class GMMVAEModel(BaseAEModel):
     """
+    Gaussian Mixture Model VAE.
+
     VAE with gmm prior (trainable with categorical loss for y and weighted kl loss for z)
     Encoder y: (noise) - conv layers y - fc layers y - linear layer to latent_dim
     Encoder: (noise) + y - conv layers - fc layers - linear layer to latent_dim * 2
@@ -609,7 +640,7 @@ class GMMVAEModel(BaseAEModel):
 
     def qy_graph(self, input_shape):
         """
-        returns Y calculated from X (conv layers + fcl layers)
+        Return Y calculated from X (conv layers + fcl layers).
         """
         X_input = tf.keras.layers.Input(input_shape)
         X = X_input
@@ -628,7 +659,7 @@ class GMMVAEModel(BaseAEModel):
 
     def create_y_encoder(self, X):
         """
-        returns Y calculated from X (conv layers + fcl layers)
+        Return Y calculated from X (conv layers + fcl layers).
         """
         # conv layers
         for i, l in enumerate(self.config["y_conv_layers"]):
@@ -644,7 +675,7 @@ class GMMVAEModel(BaseAEModel):
 
     def qz_graph(self, X_input_shape):
         """
-        returns Z calculated from X and Y
+        Return Z calculated from X and Y.
         """
         X_input = tf.keras.layers.Input(X_input_shape)
         Y_input = tf.keras.layers.Input((self.config["k"],))
@@ -669,7 +700,7 @@ class GMMVAEModel(BaseAEModel):
         return model
 
     def pz_graph(self):
-        """prior distibution of Z for different categories (Y should be 1-hot encoded vector)"""
+        """Prior distibution of Z for different categories (Y should be 1-hot encoded vector)."""
         Y_input = tf.keras.layers.Input((self.config["k"],))
         X = Y_input
         # fully connected layers
@@ -681,9 +712,15 @@ class GMMVAEModel(BaseAEModel):
 
     def create_encoder(self):
         """
-        returns encoder and latent
-        Encoder outputs reparameterized latent
-        Latent is returned by overall model for loss calculation
+        Create encoder.
+
+        Encoder outputs reparameterized latent.
+        Latent is potentially returned by overall model for loss calculation, e.g. for VAE.
+
+        Returns
+        -------
+        tf.keras.model, tf.Tensor
+            Encoder and latent (None for BaseAEModel).
         """
         if self.is_conditional:
             X, C = self.encoder_input
@@ -748,8 +785,9 @@ class GMMVAEModel(BaseAEModel):
 
     def create_model(self):
         """
-        creates keras model using create_encoder and create_decoder functions.
-        sets self.encoder, self.latent, self.decoder, self.model_output attributes
+        Create keras model using create_encoder and create_decoder functions.
+
+        Set self.encoder, self.latent, self.decoder, self.model_output attributes.
         """
         # encoder and decoder
         self.encoder, self.latent_y, self.latent_zy = self.create_encoder()

@@ -3,11 +3,11 @@ CLI
 
 Command line interface for CAMPA.
 
-Use this to execute long-running steps of the CAMPA workflow 
+Use this to execute long-running steps of the CAMPA workflow
 (e.g. clustering large data or calculating co-ocurrence features) in a script on e.g. a HPC system.
 
-See the :ref:`workflow` documentation for a short introduction to the CLI commands and the :ref:`tutorials` for the 
-CLI commands needed to reproduce the example workflow.
+See the :ref:`workflow` documentation for a short introduction to the CLI commands
+and the :ref:`campatutorials` for the CLI commands needed to reproduce the example workflow.
 
 Basic usage
 -----------
@@ -26,7 +26,7 @@ campa setup
     :prog: campa setup
 
 campa create_dataset
--------------------
+--------------------
 
 .. argparse::
     :module: campa.cli.main
@@ -56,4 +56,3 @@ campa extract_features
     :module: campa.cli.main
     :func: _get_extract_features_parser
     :prog: campa extract_features
-

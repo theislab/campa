@@ -54,6 +54,7 @@ class Experiment:
         - `overwrite_history`: overwrite existing history csv file. Otherwise concatenate to it.
 
     - `evaluation`: evaluation on val/test split
+
         - `split`: `train`, `val`, or `test`
         - `predict_reps`: (list) model output that should be predicted.
           Possible values: `decoder`, `latent`.
@@ -68,7 +69,8 @@ class Experiment:
         - `cluster_method`: leiden or kmeans.
         - `leiden_resolution`: resolution parameter for leiden clustering.
         - `subsample`: None or "subsample", whether or not to subsample data before clustering.
-        - `subsample_kwargs`: passed to :meth:`MPPData.subsample` for creating the subsample data for clustering.
+        - `subsample_kwargs`: passed to :meth:`campa.data.MPPData.subsample`
+          for creating the subsample data for clustering.
         - `umap`: (bool) predict UMAP of cluster_rep.
 
     Parameters

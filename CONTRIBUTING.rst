@@ -75,20 +75,23 @@ Creating a relase
 
 Before creating a new relase, ensure that all tests pass and that the documentation
 is build successfully.
+For easy uploading to pypi set up a `token <https://test.pypi.org/help/#apitoken>`_ in
+`~/.pypirc <https://truveris.github.io/articles/configuring-pypirc/>`_
+and ensure that for TestPyPi a ``repository-url`` is set.
 
-1. create a new branch for this release::
+1. Create a new branch for this release::
 
     git checkout -b release/VERSION
 
-2. check that `README_pypi.rst <README_pypi.rst>`_ renders correctly on pypi::
+2. Check that `README_pypi.rst <README_pypi.rst>`_ renders correctly on pypi::
 
     tox -e readme
 
-3. create a new version using ``bump2version`` (``pip install bump2version``)::
+3. Create a new version using ``bump2version`` (``pip install bump2version``)::
 
     bump2version {major,minor,patch}
 
-4. build and test the package::
+4. Build and test the package::
 
     rm -r dist
     python setup.py sdist
@@ -98,21 +101,30 @@ is build successfully.
    needed for this relase are included. Otherwise, include them in `MANIFEST.in <MANIFEST.in>`_
    and try again.
 
-5. upload to TestPyPi. For this it is useful to set up a
-   `token <https://test.pypi.org/help/#apitoken>`_ in
-   `~/.pypirc <https://truveris.github.io/articles/configuring-pypirc/>`_::
+5. Optional: 
 
-    twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+    1. Upload to TestPyPi::
 
-4. download and test
-5. merge release branch to main::
+        twine upload --repository pypi dist/*
+
+    2. Install and test package from TestPyPi::
+
+        pip install -i https://test.pypi.org/simple/ campa 
+
+6. Release package on PyPi (``pip install twine``)::
+
+    twine upload dist/*
+
+7. Merge release branch to main::
 
     git co main
     git merge release/VERSION
 
-3. create relase on github by adding a tag::
+8. Create relase on github by adding a tag::
 
     git tag VERSION
     git push --tags
 
    Edit and publish the relase on github and add release notes.
+
+9. Readthedocs should be updated automatically once the new tag is pushed.

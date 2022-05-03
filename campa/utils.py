@@ -5,35 +5,65 @@ import logging
 import collections.abc
 
 
-def init_logging(level=logging.INFO):
+def init_logging(level: int = logging.INFO) -> None:
+    """
+    Set up logging for CAMPA.
+
+    Filters warnings raised by tensorflow, scanpy and anndata for clean logging outputs.
+
+    Parameters
+    ----------
+    level
+        logging level.
+        See `logging levels <https://docs.python.org/3/library/logging.html#logging-levels>`_
+        for a list of levels.
+    """
     import warnings
 
-    # from numba.errors import NumbaPerformanceWarning
     from anndata import ImplicitModificationWarning
 
     logging.basicConfig(level=level)  # need one of this?
     logging.getLogger().setLevel(level)  # need one of this?
     # ignore tensorflow warnings
-    logging.getLogger('tensorflow').setLevel(logging.ERROR)
+    logging.getLogger("tensorflow").setLevel(logging.ERROR)
     # ignore scanpy / anndata warnings
     logging.getLogger("scanpy").setLevel(logging.WARNING)
     logging.getLogger("anndata").setLevel(logging.ERROR)
     # logging.getLogger('get_version').setLevel(logging.WARNING)
     # logging.getLogger('numexpr.utils').setLevel(logging.WARNING)
-    # ignore numba warnings
-    # warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
     # filter irrelevant / non-fixeable anndata warnings
     # anndata uses inplace from pandas, which is depreciated
-    warnings.filterwarnings("ignore", category=FutureWarning, 
-        message='.*The `inplace` parameter in pandas.Categorical.reorder_categories \
+    warnings.filterwarnings(
+        "ignore",
+        category=FutureWarning,
+        message=".*The `inplace` parameter in pandas.Categorical.reorder_categories \
 is deprecated and will be removed in a future version. \
-Removing unused categories will always return a new Categorical object.*')
+Removing unused categories will always return a new Categorical object.*",
+    )
     # implicit modification warnings from anndata
     warnings.filterwarnings("ignore", category=ImplicitModificationWarning)
+    # divide by zero in object stats calculation (circularity for small objects)
+    warnings.filterwarnings(
+        "ignore",
+        module="campa.tl._features",
+        category=RuntimeWarning,
+        message=".*divide by zero encountered in double_scalars.*",
+    )
 
 
-def load_config(config_file):
-    """load config file and return config object"""
+def load_config(config_file: str) -> Any:
+    """
+    Load config file and return config object.
+
+    Parameters
+    ----------
+    config_file
+        Full path to config.py file.
+
+    Returns
+    -------
+    Python module.
+    """
     import importlib.util
     import importlib.machinery
 
@@ -47,7 +77,21 @@ def load_config(config_file):
 
 
 def merged_config(config1: MutableMapping[str, Any], config2: Mapping[str, Any]) -> MutableMapping[str, Any]:
-    """update config1 with config2. Should work arbitary nested levels"""
+    """
+    Update config1 with config2.
+
+    Work with arbitary nested levels.
+
+    Parameters
+    ----------
+    config1
+        Base config dict.
+    config2
+        Config dict containing values that should be updated.
+    Returns
+    -------
+    Updated config (copy).
+    """
     res_config = deepcopy(config1)
     for k, v in config2.items():
         if isinstance(v, collections.abc.Mapping):

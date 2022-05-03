@@ -60,7 +60,7 @@ class TestSubset:
         mpp_data_subset_1 = mpp_data.subsample(frac=frac)
         mpp_data_subset_2 = mpp_data_orig.subsample(frac=frac)
 
-        isequal, isequal_dict = mpp_data_subset_1.compare(mpp_data_subset_2)
+        isequal, isequal_dict = mpp_data_subset_1._compare(mpp_data_subset_2)
         assert isequal
 
     @pytest.mark.parametrize("frac", (np.linspace(0.1, 0.9, 3)))
@@ -70,5 +70,5 @@ class TestSubset:
         mpp_data_subset_1 = mpp_data.subsample(frac_per_obj=frac)
         mpp_data_subset_2 = mpp_data_orig.subsample(frac_per_obj=frac)
 
-        isequal, isequal_dict = mpp_data_subset_1.compare(mpp_data_subset_2)
+        isequal, isequal_dict = mpp_data_subset_1._compare(mpp_data_subset_2)
         assert isequal

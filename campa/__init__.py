@@ -1,4 +1,4 @@
-from campa import data, pl, tl
+from campa import pl, tl, data
 
 __author__ = __maintainer__ = "Theislab & Pelkmanslab"
 __email__ = ", ".join(

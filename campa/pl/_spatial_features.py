@@ -35,7 +35,28 @@ def plot_co_occurrence(
     **kwargs: Any,
 ) -> None:
     """
-    kwargs: additional arguments to sns.lineplot
+    Plot co-occurrence for one cluster-cluster pairs.
+
+    Parameters
+    ----------
+    adata
+        Adata containing co-occurrence scores in ``adata.obsm['co_occurrence_{cluster1}_{cluster2}']``.
+    cluster1
+        Cluster name.
+    cluster2
+        Cluster name.
+    condition
+        Categorical condition to group obs in adata by. Must be a column in ``adata.obs``.
+    condition_values
+        Limit condition groups to specified values. Default are all condition groups.
+    ax
+        Axis to plot on. If None, a new axis is created.
+    kwargs
+        Passed to :func:`seaborn.lineplot`.
+
+    Returns
+    -------
+    Nothing, just plots co-occurrence score.
     """
     adata.obs[condition] = adata.obs[condition].astype("category")
     if condition_values is None:
@@ -70,6 +91,15 @@ def plot_co_occurrence_grid(
     condition
         Categorical condition to group obs in adata by. Must be a column in ``adata.obs``.
     condition_values
+        Limit condition groups to specified values. Default are all condition groups.
+    figsize
+        Passed to :func:`matplotlib.pyplot.subplots`.
+    kwargs
+        Passed to :func:`seaborn.lineplot`.
+
+    Returns
+    -------
+    fig, axes: matplotlib figure.
 
     """
     fig, axes = plt.subplots(

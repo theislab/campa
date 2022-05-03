@@ -8,6 +8,7 @@
 
 # sys.path.insert(0, os.path.abspath('.'))
 from pathlib import Path
+from datetime import datetime
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -16,16 +17,17 @@ from pathlib import Path
 import sys
 
 HERE = Path(__file__).parent
-sys.path.insert(0, str(HERE.parent.parent))  # this way, we don't have to install squidpy
+sys.path.insert(0, str(HERE.parent.parent))  # this way, we don't have to install campa
+import campa  # noqa: E402
 
 # -- Project information -----------------------------------------------------
 
 project = "campa"
-copyright = "2022, Hannah Spitzer"  # noqa: A001
-author = "Hannah Spitzer"
+author = campa.__author__
+copyright = f"{datetime.now():%Y}, {author}"  # noqa: A001
 
 # The full version, including alpha/beta/rc tags
-release = "0.1"
+release = campa.__version__
 
 
 # -- General configuration ---------------------------------------------------
@@ -87,3 +89,9 @@ add_module_names = False
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+
+# These paths are either relative to html_static_path
+# or fully qualified paths (eg. https://...)
+html_css_files = [
+    "css/custom.css",
+]

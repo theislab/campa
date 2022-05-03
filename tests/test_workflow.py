@@ -286,9 +286,11 @@ def test_nn_dataset(_ensure_test_data):
 
     # compare test and reference ds
     for split in ["train", "val", "test"]:
-        assert test_ds.data[split].compare(reference_ds.data[split])[0]
+        print(split)
+        print(test_ds.data[split]._compare(reference_ds.data[split]))
+        assert test_ds.data[split]._compare(reference_ds.data[split])[0]
     for split in ["val", "test"]:
-        assert test_ds.imgs[split].compare(reference_ds.imgs[split])[0]
+        assert test_ds.imgs[split]._compare(reference_ds.imgs[split])[0]
 
 
 def test_model_training(_ensure_test_data):
@@ -313,7 +315,7 @@ def test_cluster_subset(test_experiment):
     test_cl = Cluster.from_cluster_data_dir(test_experiment + "/aggregated/sub-0.1")
     reference_cl = Cluster.from_cluster_data_dir("reference_experiment/cVAE/aggregated/sub-0.1")
 
-    comp = test_cl.cluster_mpp.compare(reference_cl.cluster_mpp)[1]
+    comp = test_cl.cluster_mpp._compare(reference_cl.cluster_mpp)[1]
     assert comp["x"]
     assert comp["y"]
     assert comp["obj_ids"]
@@ -354,7 +356,7 @@ def test_predict_full_data(test_experiment_clustered):
             data_config="TestData",
         )
 
-        comp = test_mpp_data.compare(reference_mpp_data)[1]
+        comp = test_mpp_data._compare(reference_mpp_data)[1]
         assert comp["x"]
         assert comp["y"]
         assert comp["obj_ids"]
@@ -392,7 +394,7 @@ def test_cluster_full_data(test_experiment_full_data):
             data_config="TestData",
         )
 
-        assert test_mpp_data.compare(reference_mpp_data)[0]
+        assert test_mpp_data._compare(reference_mpp_data)[0]
 
 
 def test_extract_features(test_experiment_full_data_clustered):
@@ -414,7 +416,7 @@ def test_extract_features(test_experiment_full_data_clustered):
                 campa_config.EXPERIMENT_DIR, "reference_experiment/cVAE/aggregated/full_data", data_dir, "features.h5ad"
             )
         )
-        assert test_extr.compare(reference_extr)[0]
+        assert test_extr._compare(reference_extr)[0]
 
 
 def test_plot_intensity_features(_ensure_test_data):

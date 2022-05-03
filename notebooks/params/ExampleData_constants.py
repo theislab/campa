@@ -1,5 +1,6 @@
 # Constants for ExampleData dataset
 import os
+
 from campa.constants import campa_config
 
 # --- dataset specific constants ---

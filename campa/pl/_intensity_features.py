@@ -2,6 +2,7 @@ from typing import Any, List, Tuple, Union, Mapping, Iterable, Optional
 import warnings
 
 from scipy.stats import zscore
+from numpy.linalg import LinAlgError
 from matplotlib.axes import Axes as MplAxes
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 import numpy as np
@@ -12,6 +13,7 @@ import anndata as ad
 import matplotlib
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
+import statsmodels.formula.api as smf
 
 
 def _adjust_plotheight(scplot):
@@ -219,7 +221,7 @@ def plot_mean_size(
         c: adata[adata.obs[groupby_col] == c].obs.groupby(groupby_row).mean()["size"]
         for c in adata.obs[groupby_col].cat.categories
     }
-    sizes_adata = ad.AnnData(pd.DataFrame(sizes))
+    sizes_adata = ad.AnnData(pd.DataFrame(sizes), dtype=np.float32)
     sizes_adata.obs["group"] = sizes_adata.obs.index.astype("category")
 
     # get values to show
@@ -253,17 +255,17 @@ def plot_mean_size(
         plt.savefig(save, dpi=100)
 
 
-from numpy.linalg import LinAlgError
-import statsmodels.formula.api as smf
-
 def mixed_model(ref_expr, g_expr, ref_well_name, g_well_name):
+    """
+    Calcuate mixed model for dotplots.
+    """
     # res_data = {'resid'}
     res_data: Mapping[str, List[Any]] = {"df": [], "resid": []}
     # if True:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-        warnings.filterwarnings('ignore', category=UserWarning, message='.*Random effects covariance is singular.*')
+        warnings.filterwarnings("ignore", category=UserWarning, message=".*Random effects covariance is singular.*")
         # iterate over all channels in the data
         pvals = []
         for i in range(ref_expr.shape[-1]):
@@ -282,12 +284,12 @@ def mixed_model(ref_expr, g_expr, ref_well_name, g_well_name):
             model = sm.MixedLM.from_formula("mean_expr ~ group", re_formula="~1", groups="well", data=df)
             try:
                 result = model.fit()
-            except LinAlgError as e:
-                print(f'Singular fit with mixed model for column {i}, replacing with OLS.')
+            except LinAlgError:
+                print(f"Singular fit with mixed model for column {i}, replacing with OLS.")
                 model = smf.ols(formula="mean_expr ~ group", data=df)
                 result = model.fit()
 
-            pvals.append(result.pvalues['group']) 
+            pvals.append(result.pvalues["group"])
             res_data["df"].append(df)
     return np.array(pvals).astype("float"), res_data
 
@@ -435,7 +437,7 @@ def get_intensity_change(
         elif group_sizes_barplot == "foldchange":
             group_size[g] = g_size.mean() / cur_ref_size.mean()
         else:
-            group_size[g] = 0
+            group_size[g] = 0  # type: ignore[assignment]
 
         # set p values by testing if distribution of intensities is the same (without adjusting for size!)
         if pval == "mixed_model":

@@ -1,33 +1,35 @@
 # --- Plotting functions for evaluating experiments ---
+from typing import Optional
+
 import numpy as np
-
-# TODO remove? TODO don't think its needed anymore
-# def map_img(imgs, value_map=None):
-#    """
-#    maps list of images containing map keys to map values.
-#    Used for displaying cluster images. If map is None, create and return a default one
-#    """
-#    if value_map is None:
-#        vals = sorted(set(np.concatenate([np.unique(i) for i in imgs])))
-#        value_map = {val: i for i, val in enumerate(vals)}
-#    outs = []
-#    for img in imgs:
-#        out = np.zeros(img.shape)
-#        for key, val in value_map.items():
-#            out[img == key] = val
-#        outs.append(out)
-#    return outs, value_map
+import pandas as pd
 
 
-def annotate_img(img, annotation=None, from_col="clustering", to_col=None, color=False):
+def annotate_img(
+    img: np.ndarray,
+    annotation: Optional[pd.DataFrame] = None,
+    from_col: str = "clustering",
+    to_col: Optional[str] = None,
+    color: bool = False,
+) -> np.ndarray:
     """
+    Annotate cluster image.
 
-    Args:
-        img: image to annotate
-        annotation: pd.DataFrame containing annotation (from Cluster)
-        from_col: column containing current values in image
-        to_col: column containing desired mapping. If None, use from_col.
-        color: if True, use column to_col+"_colors" to get colormap and color image
+    Parameters
+    ----------
+    img
+        Image to annotate.
+    annotation
+        :attr:`Cluster.cluster_annotation` containing mapping of classes to cluster names and colors.
+    from_col
+        Annotation column containing current values in image.
+    to_col
+        Annotation column containing desired mapping. If None, use ``from_col``.
+    color
+        If True, use annotation column ``to_col+"_colors"`` to get colormap and color image.
+    Returns
+    -------
+    Annotated image.
     """
     if to_col is None:
         to_col = from_col
@@ -38,7 +40,9 @@ def annotate_img(img, annotation=None, from_col="clustering", to_col=None, color
         if from_col == to_col:
             # no need to change anything
             return img
+        assert annotation is not None
         res = np.zeros_like(img, dtype=annotation[to_col].dtype)
+    assert annotation is not None
     for _, row in annotation.iterrows():
         to_value = row[to_col]
         if color:

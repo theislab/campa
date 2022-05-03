@@ -30,6 +30,7 @@ class LossEnum(str, Enum):
     ACC_metric = "accuracy_metric"
 
     def get_fn(self):
+        """Return loss function."""
         cls = self.__class__
         if self == cls.MSE:
             return tf.losses.mean_squared_error
@@ -55,6 +56,7 @@ class LossEnum(str, Enum):
 
 @tf.function
 def kl_loss(y_true, y_pred, logs=None):
+    """KL divergence."""
     mean, var = tf.split(y_pred, 2, axis=-1)
     l_kl = -0.5 * tf.reduce_mean(1 + var - tf.square(mean) - tf.exp(var))
     return l_kl
@@ -62,7 +64,7 @@ def kl_loss(y_true, y_pred, logs=None):
 
 @tf.function
 def categorical_kl_loss(y_true, y_pred):
-    """kl loss for categorical VAE"""
+    """KL loss for categorical VAE."""
     # kl divergence between y_pred and bernulli distribution with p=0.5
     logits_y = y_pred
     q_y = tf.nn.softmax(logits_y)
@@ -73,7 +75,10 @@ def categorical_kl_loss(y_true, y_pred):
 
 
 def gmm_kl_loss(y_true, y_pred):
-    # https://stats.stackexchange.com/questions/7440/kl-divergence-between-two-univariate-gaussians
+    """KL loss for GMM.
+
+    From: https://stats.stackexchange.com/questions/7440/kl-divergence-between-two-univariate-gaussians
+    """
     p, q, latent_y = tf.unstack(y_pred, axis=1)
     p_mu, p_log_var = tf.split(p, 2, axis=-1)
     q_mu, q_log_var = tf.split(q, 2, axis=-1)
@@ -88,24 +93,29 @@ def gmm_kl_loss(y_true, y_pred):
     # sum over k
     kl = tf.math.reduce_sum(kl)
     return kl
-    # kl = tf.keras.losses.KLDivergence()
-
-    # loss = kl(pZ, qZ, sample_weight=[0.8,0.2])
 
 
-# from https://github.com/orybkin/sigma-vae-tensorflow/blob/master/model.py
 def gaussian_nll(mu, log_sigma, x):
+    """Gaussian negative log-likelihood.
+
+    From: https://github.com/orybkin/sigma-vae-tensorflow/blob/master/model.py
+    """
     return 0.5 * ((x - mu) / tf.math.exp(log_sigma)) ** 2 + log_sigma + 0.5 * np.log(2 * np.pi)
 
 
 @tf.function
 def sigma_vae_mse(y_true, y_pred):
-
+    """
+    MSE loss for sigma-VAE (calibrated decoder).
+    """
     log_sigma = tf.math.log(tf.math.sqrt(tf.reduce_mean((y_true - y_pred) ** 2, [0, 1], keepdims=True)))
     return tf.reduce_sum(gaussian_nll(y_pred, log_sigma, y_true))
 
 
 @tf.function
 def min_entropy(y_true, y_pred):
+    """
+    Entropy.
+    """
     l_ent = -1 * tf.reduce_mean(tf.math.log(y_pred + tf.keras.backend.epsilon()) * y_pred)
     return l_ent

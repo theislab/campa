@@ -1,4 +1,4 @@
-from typing import Any, List, Tuple, Union, Mapping, Iterable, Optional
+from typing import Any, Dict, List, Tuple, Union, Mapping, Iterable, Optional
 import os
 import json
 import logging
@@ -137,7 +137,7 @@ class NNDataset:
         self.dataset_folder = os.path.join(self.data_config.DATASET_DIR, dataset_name)
 
         # data
-        self.data = {
+        self.data: Dict[str, MPPData] = {
             "train": MPPData.from_data_dir(
                 os.path.join(self.dataset_folder, "train"), base_dir="", data_config=self.data_config_name
             ),
@@ -148,7 +148,10 @@ class NNDataset:
                 os.path.join(self.dataset_folder, "test"), base_dir="", data_config=self.data_config_name
             ),
         }
-        self.imgs = {
+        """
+        Train, val, and test MPPDatas.
+        """
+        self.imgs: Dict[str, MPPData] = {
             "val": MPPData.from_data_dir(
                 os.path.join(self.dataset_folder, "val_imgs"), base_dir="", data_config=self.data_config_name
             ),
@@ -156,6 +159,9 @@ class NNDataset:
                 os.path.join(self.dataset_folder, "test_imgs"), base_dir="", data_config=self.data_config_name
             ),
         }
+        """
+        Val and test MPPDatas containing entire images for visualisation.
+        """
         self.channels = self.data["train"].channels.reset_index().set_index("name")
         self.params = json.load(open(os.path.join(self.dataset_folder, "params.json")))
 
@@ -167,7 +173,7 @@ class NNDataset:
 
     def x(self, split: str, is_conditional: bool = False) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """
-        Inputs to neural network.
+        Neural network inputs.
 
         Parameters
         ----------
@@ -184,7 +190,7 @@ class NNDataset:
 
     def y(self, split: str, output_channels: Optional[Iterable[str]] = None) -> np.ndarray:
         """
-        Groundtruth outputs of neural network.
+        Groundtruth outputs.
 
         Parameters
         ----------
@@ -233,9 +239,8 @@ class NNDataset:
         Returns
         -------
         :class:`tf.data.Dataset`
-            the dataset.
+            The dataset.
         """
-
         output_types = []
         output_shapes = []
 

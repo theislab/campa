@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Iterable, TYPE_CHECKING, MutableMapping, Optional
+from typing import Any, Mapping, Iterable, TYPE_CHECKING, MutableMapping
 
 if TYPE_CHECKING:
     from campa.tl import Experiment
@@ -18,7 +18,6 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import matplotlib.pyplot as plt
-
 
 from campa.data import MPPData
 from campa.utils import merged_config
@@ -59,8 +58,14 @@ def annotate_clustering(
     return np.array(annotation.set_index(cluster_name)[annotation_col].loc[clustering])
 
 
-def add_clustering_to_adata(data_dir: str, cluster_name:str, adata: ad.AnnData, annotation: pd.DataFrame, 
-    added_name:str=None, annotation_col: str=None)-> None:
+def add_clustering_to_adata(
+    data_dir: str,
+    cluster_name: str,
+    adata: ad.AnnData,
+    annotation: pd.DataFrame,
+    added_name: str = None,
+    annotation_col: str = None,
+) -> None:
     """
     Add clustering to adata.
 
@@ -873,12 +878,18 @@ def project_cluster_data(
     data_dirs: Iterable[str] = exp.data_params["data_dirs"] if data_dir is None else [data_dir]
     for cur_data_dir in data_dirs:
         # load mpp_data with cluster_rep
-        mpp_data = load_full_data_dict(exp, keys=["x", "y", "obj_ids", cl.config["cluster_rep"]], data_dirs=[cur_data_dir], save_dir=save_dir)[cur_data_dir]
+        mpp_data = load_full_data_dict(
+            exp, keys=["x", "y", "obj_ids", cl.config["cluster_rep"]], data_dirs=[cur_data_dir], save_dir=save_dir
+        )[cur_data_dir]
         cl.project_clustering(mpp_data, save_dir=os.path.join(exp.full_path, save_dir, cur_data_dir))
 
 
-def load_full_data_dict(exp: Experiment, keys: Iterable[str]=("x", "y", "obj_ids", "latent"), 
-    data_dirs: Optional[Iterable[str]]=None, save_dir: str= 'aggregated/full_data') -> Mapping[str, MPPData]:
+def load_full_data_dict(
+    exp: Experiment,
+    keys: Iterable[str] = ("x", "y", "obj_ids", "latent"),
+    data_dirs: Iterable[str] | None = None,
+    save_dir: str = "aggregated/full_data",
+) -> Mapping[str, MPPData]:
     """
     Load mpp_datas used in experiment in a dict.
 
@@ -889,7 +900,7 @@ def load_full_data_dict(exp: Experiment, keys: Iterable[str]=("x", "y", "obj_ids
     exp
         Experiment from which to load the mpp_datas.
     keys
-        Controls which np data matrices are being loaded. Passed to :meth:`MPPData.from_data_dir`, 
+        Controls which np data matrices are being loaded. Passed to :meth:`MPPData.from_data_dir`,
         with `optional_keys` set to empty list. Excluding mpp here speeds up loading.
     data_dirs
         Dirs that should be loaded, if None, all data_dirs are loaded.
@@ -902,18 +913,22 @@ def load_full_data_dict(exp: Experiment, keys: Iterable[str]=("x", "y", "obj_ids
     Dictonary with `data_dirs` as keys and :class:`MPPData` as values.
     """
     if data_dirs is None:
-        data_dirs = exp.data_params['data_dirs']
+        data_dirs = exp.data_params["data_dirs"]
     mpp_datas = {}
     for data_dir in data_dirs:
         mpp_datas[data_dir] = MPPData.from_data_dir(
-            data_dir, base_dir=os.path.join(exp.full_path, save_dir), keys=keys, optional_keys=[],
-            data_config = exp.config["data"]["data_config"],
+            data_dir,
+            base_dir=os.path.join(exp.full_path, save_dir),
+            keys=keys,
+            optional_keys=[],
+            data_config=exp.config["data"]["data_config"],
         )
     return mpp_datas
 
 
-def get_clustered_cells(mpp_datas: Mapping[str, MPPData], cl: Cluster, cluster_name: str, num_objs: int=5
-    ) ->  Mapping[str, Mapping[str, MPPData]]:
+def get_clustered_cells(
+    mpp_datas: Mapping[str, MPPData], cl: Cluster, cluster_name: str, num_objs: int = 5
+) -> Mapping[str, Mapping[str, MPPData]]:
     """
     Get `num_objs` example cells for each `mpp_data`.
 
@@ -935,7 +950,7 @@ def get_clustered_cells(mpp_datas: Mapping[str, MPPData], cl: Cluster, cluster_n
     from campa.pl import annotate_img
 
     cl.set_cluster_name(cluster_name)
-    res = {cluster_name: {}, cluster_name + "_colored": {}}
+    res: dict[str, dict[str, Any]] = {cluster_name: {}, cluster_name + "_colored": {}}
     for data_dir, mpp_data in mpp_datas.items():
         print(data_dir)
         # get random obj_ids for this mpp_data
@@ -945,7 +960,7 @@ def get_clustered_cells(mpp_datas: Mapping[str, MPPData], cl: Cluster, cluster_n
         sub_mpp_data = mpp_data.subset(obj_ids=obj_ids, copy=True)
         # project_clustering
         sub_mpp_data = cl.project_clustering(sub_mpp_data)
-        
+
         # if only need colored cells, can pass annotation_kwargs to get_object_imgs
         res[cluster_name][data_dir] = sub_mpp_data.get_object_imgs(
             data=cluster_name
