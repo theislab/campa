@@ -105,7 +105,7 @@ and ensure that for TestPyPi a ``repository-url`` is set.
 
     1. Upload to TestPyPi::
 
-        twine upload --repository pypi dist/*
+        twine upload --repository testpypi dist/*
 
     2. Install and test package from TestPyPi::
 
