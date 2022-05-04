@@ -12,7 +12,7 @@ except ImportError:
             "scott.berry@unsw.edu.au"
         ]
     )
-    __version__ = "0.0.4"
+    __version__ = "0.0.5"
 
 setup(
     name="campa",
