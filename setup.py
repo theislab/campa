@@ -5,11 +5,11 @@ from setuptools import setup, find_packages
 try:
     from campa import __email__, __author__, __version__, __maintainer__
 except ImportError:
-    __author__ = __maintainer__ = "Theislab & Pelkmanslab"
+    __author__ = __maintainer__ = "Hannah Spitzer, Scott Berry"
     __email__ = ", ".join(
         [
             "hannah.spitzer@helmholtz-muenchen.de",
-            # TODO add scott here
+            "scott.berry@unsw.edu.au"
         ]
     )
     __version__ = "0.0.3"

@@ -43,11 +43,9 @@ def thresholded_count(df, threshold=0.9):
     -------
     count
     """
-    total = df.sum()
-    cumsum = (df / total).sort_values(ascending=False).cumsum()
-    count = (cumsum < threshold).sum() + 1
+    df = df[_thresholded_mask(df, threshold)]
+    count = df.count()
     return count
-
 
 def thresholded_median(df, threshold=0.9):
     """
@@ -67,14 +65,30 @@ def thresholded_median(df, threshold=0.9):
     -------
     median
     """
+    df = df[_thresholded_mask(df, threshold)]
+    median = df.median()
+    return median
+
+def _thresholded_mask(df, threshold):
+    """
+    Mask small objects in df.
+
+    Sort objects by area (largest areas first)
+    and mask all objects that are below cumsum of threshold.
+    This is used by thresholded_median and thresholded_count.
+
+    This is essentially a small object invariant way of computing median.
+    Can be used as aggregation function in :meth:`FeatureExtractor.get_object_stats`.
+    """
     total = df.sum()
     cumsum = (df / total).sort_values(ascending=False).cumsum()
     mask = cumsum < threshold
     # object that will finally exceed threshold (would like to include in median calc, as is also included in count)
     idx = (cumsum >= threshold).idxmax()
     mask[idx] = True
-    median = df[cumsum[mask].index].median()
-    return median
+    res = pd.Series(index=df.index, data=False)
+    res[cumsum[mask].index] = True
+    return res
 
 
 def extract_features(params: Mapping[str, Any]) -> None:
