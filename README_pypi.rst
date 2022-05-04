@@ -19,7 +19,9 @@ Visit our `documentation`_ for installation and usage examples.
 
 Manuscript
 ----------
-Please see our preprint `Spitzer, Berry et al. (2022)`_ to learn more.
+Please see our preprint 
+*"Quantifying condition-dependent changes in subcellular organisation using multiplexed protein maps"* 
+(`Spitzer, Berry et al. (2022)`_) to learn more.
 
 
 Installation

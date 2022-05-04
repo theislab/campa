@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 
-from .test_workflow import id_generator  # noqa: <I252>
+from .test_workflow import id_generator, _ensure_test_data  # noqa: <I252>
 
 
 def test_save_load_model(_ensure_test_data):
