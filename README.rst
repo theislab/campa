@@ -12,8 +12,8 @@ and spatial arrangement of CSLs inside each cell.
 
     <p align="center">
         <a href="">
-            <img src="https://raw.githubusercontent.com/theislab/campa/master/docs/source/_static/img/Figure1ab.jpg"
-             width="400px" alt="CAMPA title figure">
+            <img src="_static/img/Figure1ab.jpg"
+             width="600px" alt="CAMPA title figure">
         </a>
     </p>
 
