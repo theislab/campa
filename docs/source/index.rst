@@ -9,9 +9,9 @@ per-cell features summarizing the molecular composition
 and spatial arrangement of CSLs inside each cell.
 
 
-.. image:: https://raw.githubusercontent.com/theislab/campa/master/docs/source/_static/img/Figure1ab.jpg
+.. image:: _static/img/Figure1ab.jpg
     :alt: Campa title figure
-    :width: 400px
+    :width: 800px
     :align: center
     :target: .
 

@@ -10,7 +10,7 @@ and spatial arrangement of CSLs inside each cell.
 
 .. image:: https://raw.githubusercontent.com/theislab/campa/master/docs/source/_static/img/Figure1ab.jpg
     :alt: CAMPA title figure
-    :width: 400px
+    :width: 600px
     :align: center
     :target: .
 

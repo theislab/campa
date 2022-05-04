@@ -87,44 +87,46 @@ and ensure that for TestPyPi a ``repository-url`` is set.
 
     tox -e readme
 
-3. Create a new version using ``bump2version`` (``pip install bump2version``)::
-
-    bump2version {major,minor,patch}
-
-4. Build and test the package::
+3. Optional: Build and test the package using ``build`` (``pip install build``)::
 
     rm -r dist
-    python setup.py sdist
+    python -m build --outdir dist/
     twine check dist/*
 
    Check out the created ``*.tar`` file in ``dist`` and ensure that all new auxiliary files
    needed for this relase are included. Otherwise, include them in `MANIFEST.in <MANIFEST.in>`_
    and try again.
 
-5. Optional:
+4. Optional: 
+   Try to install the generated source dist and wheel::
 
-    1. Upload to TestPyPi::
+    pip install dist/<name>.tar.gz
+    pip install dist/<name>.whl
 
-        twine upload --repository testpypi dist/*
+   And from TestPyPi upload::
+    
+     twine upload --repository testpypi dist/*
+     pip install -i https://test.pypi.org/simple/ campa
 
-    2. Install and test package from TestPyPi::
-
-        pip install -i https://test.pypi.org/simple/ campa
-
-6. Release package on PyPi (``pip install twine``)::
-
-    twine upload dist/*
-
-7. Merge release branch to main::
+5. Merge release branch to main::
 
     git co main
     git merge release/VERSION
 
-8. Create relase on github by adding a tag::
+6. Create a new version using ``bump2version`` and github tag (``pip install bump2version``)::
 
-    git tag VERSION
+    bump2version {major,minor,patch}
     git push --tags
 
    Edit and publish the relase on github and add release notes.
 
-9. Readthedocs should be updated automatically once the new tag is pushed.
+7. Readthedocs should be updated automatically once the new tag is pushed.
+
+8. Build release wheels and sdist using ``build`` (``pip install build``)::
+
+    rm -r dist
+    python -m build --outdir dist/
+    
+   Upload to PyPi using ``twine`` (``pip install twine``)::
+
+    twine upload dist/*
