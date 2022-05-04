@@ -129,4 +129,4 @@ and ensure that for TestPyPi a ``repository-url`` is set.
     
    Upload to PyPi using ``twine`` (``pip install twine``)::
 
-    twine upload dist/*
+    twine upload dist/<name>.whl

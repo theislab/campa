@@ -32,6 +32,7 @@ setup(
         "Documentation": "https://campa.readthedocs.io/en/stable",
         "Source Code": "https://github.com/theislab/campa",
     },
+    zip_safe=False,
     license="BSD",
     platforms=["Linux", "MacOSX"],
     packages=find_packages(),
