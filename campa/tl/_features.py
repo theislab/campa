@@ -619,6 +619,9 @@ class FeatureExtractor:
                         df = df.fillna(0)
                         # add to adata.obsm
                         if f"co_occurrence_{c1}_{c2}" in self.adata.obsm:
+                            # ensure that filled na values with 0 before trying to add some value on top of it.
+                            # NOTE: this will convert all na values to 0 (so co occ for coords outside of the cell will be 0)
+                            self.adata.obsm[f"co_occurrence_{c1}_{c2}"] = self.adata.obsm[f"co_occurrence_{c1}_{c2}"].fillna(0)
                             self.adata.obsm[f"co_occurrence_{c1}_{c2}"] += df
                         else:
                             self.adata.obsm[f"co_occurrence_{c1}_{c2}"] = df
