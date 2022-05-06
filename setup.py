@@ -51,4 +51,29 @@ setup(
     entry_points={
         "console_scripts": ["campa=campa.cli.main:CAMPA"],
     },
+    classifiers=[
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Science/Research",
+        "Natural Language :: English",
+        "License :: OSI Approved :: BSD License",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: MacOS :: MacOS X",
+        "Typing :: Typed",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Environment :: Console",
+        "Framework :: Jupyter",
+        "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Bio-Informatics"
+    ],
+    keywords=sorted(
+        [
+            "single-cell",
+            "bio-informatics",
+            "multiplexed imaging",
+            "subcellular landmarks",
+            "image analysis",
+            "spatial data analysis",
+        ]
+    ),
 )

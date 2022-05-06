@@ -8,7 +8,7 @@ The output of the CAMPA workflow is an `anndata`_ object that contains interpret
 per-cell features summarizing the molecular composition
 and spatial arrangement of CSLs inside each cell.
 
-.. image:: https://raw.githubusercontent.com/theislab/campa/master/docs/source/_static/img/Figure1ab.jpg
+.. image:: https://raw.githubusercontent.com/theislab/campa/main/docs/source/_static/img/Figure1ab.jpg
     :alt: CAMPA title figure
     :width: 600px
     :align: center
