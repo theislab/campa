@@ -12,7 +12,7 @@ and spatial arrangement of CSLs inside each cell.
 
     <p align="center">
         <a href="">
-            <img src="_static/img/Figure1ab.jpg"
+            <img src="docs/_static/img/Figure1ab.jpg"
              width="600px" alt="CAMPA title figure">
         </a>
     </p>
@@ -22,8 +22,8 @@ Visit our `documentation`_ for installation and usage examples.
 
 Manuscript
 ----------
-Please see our preprint 
-*"Quantifying condition-dependent changes in subcellular organisation using multiplexed protein maps"* 
+Please see our preprint
+*"Learning consistent subcellular landmarks to quantify changes in multiplexed protein maps"*
 (`Spitzer, Berry et al. (2022)`_) to learn more.
 
 
