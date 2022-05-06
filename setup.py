@@ -64,7 +64,7 @@ setup(
         "Environment :: Console",
         "Framework :: Jupyter",
         "Intended Audience :: Science/Research",
-        "Topic :: Scientific/Engineering :: Bio-Informatics"
+        "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
     keywords=sorted(
         [

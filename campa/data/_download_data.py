@@ -34,7 +34,7 @@ def load_example_data(data_dir: Path_t = None) -> Path_t:
     folder_dir = load_dataset(
         dataset_path=data_dir,
         fname=fname,
-        backup_url="https://figshare.com/ndownloader/files/34987036?private_link=79b062207e500dd31053",
+        backup_url="https://figshare.com/ndownloader/files/34987036",
     )
 
     return folder_dir
@@ -55,7 +55,7 @@ def load_example_experiment(experiment_dir: Path_t = None) -> Path_t:
     """
     if experiment_dir is None:
         experiment_dir = Path(__file__).parent.parent.parent / "notebooks" / "example_experiments"
-    url = "https://figshare.com/ndownloader/files/34987534?private_link=bf771d5a6c73f807f96e"
+    url = "https://figshare.com/ndownloader/files/34987534"
 
     uncpacked_dir = Path(os.path.join(experiment_dir, "test_pre_trained"))
     archive_path = Path(os.path.join(experiment_dir, "test_pre_trained.zip"))
@@ -81,7 +81,7 @@ def load_test_data():
     """
     Download test data to ``SCRIPTS_DIR/tests``.
     """
-    url = "https://figshare.com/ndownloader/files/34988353?private_link=0c3534797222eed8f10d"
+    url = "https://figshare.com/ndownloader/files/34988353"
     base_dir = os.path.join(SCRIPTS_DIR, "tests")
     archive_path = os.path.join(base_dir, "_test_data.zip")
     # check if is downloaded already
@@ -160,6 +160,7 @@ def getFilename_fromCd(cd):
     """
     import re
 
+    print(cd)
     if not cd:
         return None
     fname = re.findall("filename=(.+)", cd)
@@ -195,7 +196,12 @@ def download(
         output_path = tempfile.gettempdir()
 
     response = requests.get(url, stream=True)
+    print(response.headers)
     filename = getFilename_fromCd(response.headers.get("content-disposition"))
+    if filename is None:
+        # use content-disposition is empty, try to guess filename
+        filename = os.path.basename(output_path)
+    print(f"Guessed filename: {filename}")
 
     # currently supports zip, tar, gztar, bztar, xztar
     download_to_folder = Path(output_path).parent
