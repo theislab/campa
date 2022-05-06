@@ -1,12 +1,7 @@
 from campa import pl, tl, data
 
 __author__ = __maintainer__ = "Hannah Spitzer, Scott Berry"
-__email__ = ", ".join(
-    [
-        "hannah.spitzer@helmholtz-muenchen.de",
-        "scott.berry@unsw.edu.au"
-    ]
-)
+__email__ = ", ".join(["hannah.spitzer@helmholtz-muenchen.de", "scott.berry@unsw.edu.au"])
 __version__ = "0.0.5"
 
 

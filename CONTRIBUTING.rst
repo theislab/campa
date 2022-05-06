@@ -97,14 +97,14 @@ and ensure that for TestPyPi a ``repository-url`` is set.
    needed for this relase are included. Otherwise, include them in `MANIFEST.in <MANIFEST.in>`_
    and try again.
 
-4. Optional: 
+4. Optional:
    Try to install the generated source dist and wheel::
 
     pip install dist/<name>.tar.gz
     pip install dist/<name>.whl
 
    And from TestPyPi upload::
-    
+
      twine upload --repository testpypi dist/*
      pip install -i https://test.pypi.org/simple/ campa
 
@@ -126,7 +126,7 @@ and ensure that for TestPyPi a ``repository-url`` is set.
 
     rm -r dist
     python -m build --outdir dist/
-    
+
    Upload to PyPi using ``twine`` (``pip install twine``)::
 
     twine upload dist/<name>.whl
