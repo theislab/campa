@@ -47,6 +47,7 @@ def thresholded_count(df, threshold=0.9):
     count = df.count()
     return count
 
+
 def thresholded_median(df, threshold=0.9):
     """
     Calculate median area of large CSL objects per cell.
@@ -68,6 +69,7 @@ def thresholded_median(df, threshold=0.9):
     df = df[_thresholded_mask(df, threshold)]
     median = df.median()
     return median
+
 
 def _thresholded_mask(df, threshold):
     """
@@ -870,7 +872,9 @@ class FeatureExtractor:
             for c1 in self.clusters:
                 for c2 in self.clusters:
                     self.adata.obsm[f"co_occurrence_{c1}_{c2}"]
-                    masks.append((self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1))
+                    mask1 = (self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1)
+                    mask2 = pd.isna(self.adata.obsm["co_occurrence_Cajal bodies_Cajal bodies"]).all(axis=1)
+                    masks.append(mask1 | mask2)
             obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
             return obj_ids
 
