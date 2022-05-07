@@ -40,5 +40,5 @@ We are happy about any contributions! Before you start, check out our `contribut
    tutorials
 
 .. _anndata: https://anndata.readthedocs.io/en/stable/
-.. _contributing guide: https://github.com/theislab/campa/blob/master/CONTRIBUTING.rst
+.. _contributing guide: https://github.com/theislab/campa/blob/main/CONTRIBUTING.rst
 .. _`Spitzer, Berry et al. (2022)`: .
