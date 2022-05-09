@@ -13,7 +13,7 @@ and spatial arrangement of CSLs inside each cell.
     :alt: Campa title figure
     :width: 800px
     :align: center
-    :target: .
+    :target: https://www.biorxiv.org/content/10.1101/2022.05.07.490900v1
 
 
 Manuscript
