@@ -12,7 +12,7 @@ and spatial arrangement of CSLs inside each cell.
     :alt: CAMPA title figure
     :width: 600px
     :align: center
-    :target: .
+    :target: https://www.biorxiv.org/content/10.1101/2022.05.07.490900v1
 
 Visit our `documentation`_ for installation and usage examples.
 
@@ -43,5 +43,5 @@ We are happy about any contributions! Before you start, check out our `contribut
 .. _anndata: https://anndata.readthedocs.io/en/stable/
 .. _documentation: https://campa.readthedocs.io/en/stable/
 .. _`data and experiment paths`: https://campa.readthedocs.io/en/stable/overview.html#campa-config
-.. _`Spitzer, Berry et al. (2022)`: .
+.. _`Spitzer, Berry et al. (2022)`: https://www.biorxiv.org/content/10.1101/2022.05.07.490900v1
 .. _contributing guide: https://github.com/theislab/campa/blob/main/CONTRIBUTING.rst
