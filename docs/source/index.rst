@@ -41,4 +41,4 @@ We are happy about any contributions! Before you start, check out our `contribut
 
 .. _anndata: https://anndata.readthedocs.io/en/stable/
 .. _contributing guide: https://github.com/theislab/campa/blob/main/CONTRIBUTING.rst
-.. _`Spitzer, Berry et al. (2022)`: .
+.. _`Spitzer, Berry et al. (2022)`: https://www.biorxiv.org/content/10.1101/2022.05.07.490900v1
