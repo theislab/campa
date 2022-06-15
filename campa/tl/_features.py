@@ -37,7 +37,7 @@ def thresholded_count(df, threshold=0.9):
     Parameters
     ----------
     threshold
-        Only consider large objects up to cumsum of 90% of the total area.
+        Only consider large objects up to the cumulative sum of 90% of the total area.
 
     Returns
     -------
@@ -53,14 +53,14 @@ def thresholded_median(df, threshold=0.9):
     Calculate median area of large CSL objects per cell.
 
     Sort objects by area (largest areas first)
-    and compute the median area of all objects that are below cumsum of threshold.
+    and compute the median area of all objects that are below cumulative sum of threshold.
     This is essentially a small object invariant way of computing median.
     Can be used as aggregation function in :meth:`FeatureExtractor.get_object_stats`.
 
     Parameters
     ----------
     threshold
-        Only consider large objects up to cumsum of 90% of the total area.
+        Only consider large objects up to the cumulative sum of 90% of the total area.
 
     Returns
     -------
@@ -76,7 +76,7 @@ def _thresholded_mask(df, threshold):
     Mask small objects in df.
 
     Sort objects by area (largest areas first)
-    and mask all objects that are below cumsum of threshold.
+    and mask all objects that are below cumulative sum of threshold.
     This is used by thresholded_median and thresholded_count.
 
     This is essentially a small object invariant way of computing median.
@@ -99,8 +99,8 @@ def extract_features(params: Mapping[str, Any]) -> None:
 
     Creates features :class:`anndata.AnnData` object.
 
-    Params determine what features are extracted from a given clustering.
-    The following keys in params are expected:
+    Parameters determine what features are extracted from a given clustering.
+    The following keys in ``params`` are expected:
 
     - ``experiment_dir``: path to experiment directory relative to campa_config.EXPERIMENT_DIR.
     - ``cluster_name``: name of clustering to use.
@@ -108,7 +108,7 @@ def extract_features(params: Mapping[str, Any]) -> None:
       Relative to experiment_dir.
       Default is taking first of ``experiment_dir/aggregated/sub-*``.
     - ``cluster_col``: cluster annotation to use. Defaults to ``cluster_name``.
-    - ``data_dirs``: data dirs to be processed.
+    - ``data_dirs``: data directories to be processed.
       Relative to ``experiment_dir/aggregated/full_data``.
       If None, all available data_dirs will be processed.
     - ``save_name``: filename to use for saving extracted features.
@@ -479,9 +479,10 @@ class FeatureExtractor:
         num_processes: Optional[int] = None,
     ) -> None:
         """
-        Extract co_occurrence for each cell invididually.
+        Extract co-occurrence for each cell individually.
 
-        TODO: add reset flag, that sets existing co-occ matrices to 0 before running co_occ algo.
+        TODO: add reset flag, that sets existing co-occurrence matrices to 0 before running
+        co-occurrence algorithm.
 
         Parameters
         ----------

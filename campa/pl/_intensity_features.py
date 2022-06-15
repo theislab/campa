@@ -64,7 +64,8 @@ def plot_mean_intensity(
     """
     Show per cluster intensity of each channel.
 
-    Intensity is either shown as mean or z-scored intensity, depending on the ``standard_scale`` kwarg.
+    Intensity is either shown as mean or z-scored intensity,
+    depending on the ``standard_scale`` keyword argument.
 
     Parameters
     ----------
@@ -313,8 +314,8 @@ def get_intensity_change(
 
     Calculate mean intensity differences between perturbations or clusters.
     If no reference is given, use all other groups (except the current one) as reference.
-    Colors show log2fc / mean intensity changes / zscore changes, depending on the ``color`` argument.
-    Dot size shows mean intensity of reference group that is compared to, or indicates the pvalue,
+    Colours show log2-foldchange / mean intensity changes / z-score changes, depending on the ``color`` argument.
+    Dot size shows mean intensity of reference group that is compared to, or indicates the p-value,
     depending on the ``size`` argument.
 
     Parameters
@@ -330,11 +331,11 @@ def get_intensity_change(
         Dict with obs as keys and groups from obs as values, to subset adata before plotting.
     reference
         Reference cluster/perturbation to compare to.
-        If not defined, will compare each value in groupby against the rest.
+        If not defined, will compare each value in ``groupby`` against the rest.
     reference_group
         Obs entry that contains reference grouping (by default, ``groupby`` is used).
     color
-        Color of dots, either `logfoldchange` or `meanchange`.
+        Colour of dots, either `logfoldchange` or `meanchange`.
     size
         sizes of dots, either `mean_reference` or `pval` (distinguish significant and non-significant dots).
     group_sizes_barplot
@@ -342,7 +343,7 @@ def get_intensity_change(
         Either None (do not show), `mean` (mean size of groups),
         `meanchange` (mean difference of group size from reference), `foldchange`.
     pval
-        Type of test done to determine pvalues. Either `ttest` or `mixed_model`.
+        Type of test done to determine p-values. Either `ttest` or `mixed_model`.
         `mixed_model` calculates a mixed model using wells as random effects and should be preferred.
         Note that when using `norm_by_group`, the mixed model will be calculated on the normalised values,
         which differs from the model used in the original publication.

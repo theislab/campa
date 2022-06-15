@@ -8,7 +8,7 @@ that contains per-cell features about the molecular composition and spatial arra
 of CSLs inside each cell.
 
 CAMPA both contains a high-level API for easy access to the workflow, a low-level class-based access
-to all functions for more detailled control, and a CLI for all steps except the manual cluster annotation step.
+to all functions for more detailed control, and a CLI for all steps except the manual cluster annotation step.
 Depending on your data size, you might want to run long-running steps of the CAMPA workflow on a HPC cluster.
 
 .. _campa-config:
@@ -56,13 +56,13 @@ Let :math:`n_o` the the number of objects (cells) in the data,
 - ``channels.csv``: :math:`m`, protein channel names
 - ``metadata.csv``: :math:`n_o`, metadata information (perturbation, cell cycle, etc) for each object (cell)
 
-During processing of the data, additional npy files might be created.
+During processing of the data, additional numpy files might be created.
 For example, after training a cVAE with :math:`c` conditions and clustering its latent space
-of dimensionality :math:`l` into :math:`k` CSLs, the results directory will also contain:
+of dimension :math:`l` into :math:`k` CSLs, the results directory will also contain:
 
 - ``conditions.npy``: :math:`n_p \times c`, conditions used to train the cVAE
 - ``latent.npy``: :math:`n_p \times l`, latent space of the cVAE used for clustering of ICLs
-- ``clustering.npy``: :math:`n_p \times k`, clustering of latent.npy
+- ``clustering.npy``: :math:`n_p \times k`, clustering of ``latent.npy``
 - ``cluster_annotation.csv``: :math:`k`, mapping of clusters to cluster names
 
 For more information on the data representation, see also the `Data representation tutorial`_.
@@ -82,8 +82,8 @@ The data config file is specific per dataset but has to contain the following va
 - ``DATA_DIR``: path to the folder containing the data, can use
   :attr:`campa.constants.CAMPAConfig.BASE_DATA_DIR` to be device-agnostic.
 - ``DATASET_DIR``: path to the folder where training/testing datasets derived from this data should be stored;
-- ``OBJ_ID``: name of column in metadata.csv that contains a unique object identifier.
-- ``CHANNELS_METADATA``: name of csv file containing channels metadata (relative to ``DATA_DIR``).
+- ``OBJ_ID``: name of column in ``metadata.csv`` that contains a unique object identifier.
+- ``CHANNELS_METADATA``: name of CSV file containing channels metadata (relative to ``DATA_DIR``).
   Is expected to contain channel names in column "name".
 - ``CONDITIONS``: dictionary of conditions to be used for cVAE models.
   Keys are column names in ``metadata.csv``, and values are all possible values for this condition.
@@ -129,7 +129,7 @@ The workflow consists of the following steps:
 
         campa cluster <EXPERIMENT> create ...
 
-      Optionally, after this step a manual reclustering or annotation of clusters can be done.
+      Optionally, after this step a manual re-clustering or annotation of clusters can be done.
       See the `Cluster data into CSLs tutorial`_ for more details
 
     - To project the clustering to the entire dataset, the model needs to be used to predict the
@@ -147,7 +147,7 @@ The workflow consists of the following steps:
   For more information, see the `Cluster data into CSLs tutorial`_.
 
 - Extract features from CSLs to quantitatively compare molecular intensity differences and
-  spatial relocalisation of proteins in different conditions.
+  spatial re-localisation of proteins in different conditions.
   Use the API function :func:`campa.tl.extract_features` or the CLI::
 
     campa extract_features ...

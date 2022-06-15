@@ -76,6 +76,23 @@ templates_path = ["_templates"]
 exclude_patterns = []  # type: ignore[var-annotated]
 
 
+# spelling
+spelling_lang = "en_GB"
+spelling_warning = True
+spelling_word_list_filename = "spelling_wordlist.txt"
+spelling_add_pypi_package_names = True
+spelling_show_suggestions = False
+# see: https://pyenchant.github.io/pyenchant/api/enchant.tokenize.html
+spelling_filters = [
+    "enchant.tokenize.URLFilter",
+    "enchant.tokenize.EmailFilter",
+    "enchant.tokenize.MentionFilter",
+    "docs.source.utils.ModnameFilter",
+    "docs.source.utils.MDLinkFilter",
+    "docs.source.utils.SignatureFilter",
+]
+# spelling_exclude_patterns = ["*<autosummary>*"]
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for

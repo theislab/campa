@@ -20,13 +20,13 @@ def annotate_img(
     img
         Image to annotate.
     annotation
-        :attr:`Cluster.cluster_annotation` containing mapping of classes to cluster names and colors.
+        :attr:`Cluster.cluster_annotation` containing mapping of classes to cluster names and colours.
     from_col
         Annotation column containing current values in image.
     to_col
         Annotation column containing desired mapping. If None, use ``from_col``.
     color
-        If True, use annotation column ``to_col+"_colors"`` to get colormap and color image.
+        If True, use annotation column ``to_col+"_colors"`` to get colormap and colour image.
     Returns
     -------
     Annotated image.

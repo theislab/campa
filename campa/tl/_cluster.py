@@ -69,8 +69,8 @@ def add_clustering_to_adata(
     """
     Add clustering to adata.
 
-    Adds `cluster_name` to `adata.obs[added_name]` and color values for each cluster stored in the annotation dict.
-    Assumes that adata has the same dimentionality as the clustering.
+    Adds `cluster_name` to `adata.obs[added_name]` and colour values for each cluster stored in the annotation dict.
+    Assumes that adata has the same dimensionality as the clustering.
 
     Parameters
     ----------
@@ -120,7 +120,7 @@ class Cluster:
 
     - ``data_config``: name of the data config to use, should be registered in ``campa.ini``
     - ``data_dirs``: where to read data from (relative to ``DATA_DIR`` defined in data config)
-    - ``process_like_dataset``: name of dataset that gives params for processing (except subsampling/subsetting)
+    - ``process_like_dataset``: name of dataset that gives parameters for processing (except subsampling/subsetting)
     - ``subsample``: (bool) subsampling of pixels
     - ``subsample_kwargs``: kwargs for :meth:`MPPData.subsample` defining the fraction of pixels to be sampled
     - ``subset``: (bool) subset to objects with certain metadata.
@@ -130,9 +130,9 @@ class Cluster:
     - ``cluster_name``: name of the cluster assignment file
     - ``cluster_rep``: representation that should be clustered
       (name of existing file, should be predicted with :meth:`Predictor.get_representation`).
-    - ``cluster_method``: leiden or kmeans (kmeans not tested).
+    - ``cluster_method``: `leiden` or `kmeans` (`kmeans` not tested).
     - ``leiden_resolution``: resolution parameter for leiden clustering.
-    - ``kmeans_n``: number of clusters for kmeans.
+    - ``kmeans_n``: number of clusters for `kmeans`.
     - ``umap``: (bool) predict UMAP of ``cluster_rep``.
 
     Parameters
@@ -226,14 +226,14 @@ class Cluster:
         """
         Initialise from experiment for clustering of entire data that went into creating training data.
 
-        Cluster params are read from ``Experiment.config['cluster']``.
+        Cluster parameters are read from ``Experiment.config['cluster']``.
 
         Parameters
         ----------
         exp
             Trained Experiment.
         cluster_config
-            Additional cluster params (like subsampling etc). Overwrites default cluster params.
+            Additional cluster parameters (like subsampling etc). Overwrites default cluster parameters.
         data_dir
             Directory containing ``cluster_mpp`` (relative to ``{exp.dir}/{exp.name}``).
         """
@@ -398,7 +398,7 @@ class Cluster:
         from_col
             Optionally set the annotation name from which to annotate. Default is ``cluster_name``.
         colors
-            Color dict, mapping from annotations to hex colors. Default is using tab20 colormap.
+            Colour dict, mapping from annotations to hex colours. Default is using tab20 colormap.
         """
         if from_col is None:
             from_col = self.config["cluster_name"]
@@ -421,7 +421,7 @@ class Cluster:
 
     def add_cluster_colors(self, colors: Mapping[str, str] | None, from_col: str | None = None) -> None:
         """
-        Add colors to clustering or to annotation.
+        Add colours to clustering or to annotation.
 
         Adds column ``{from_col}_colors`` to :attr:`Cluster.cluster_annotation`
         and saves it to ``{cluster_name}_annotation.csv``.
@@ -429,10 +429,10 @@ class Cluster:
         Parameters
         ----------
         colors
-            Color dict, mapping from unique clustering values from ``from_col`` to hex colors.
+            Colour dict, mapping from unique clustering values from ``from_col`` to hex colours.
             Default is using tab20 colormap.
         from_col
-            Optionally set clustering name for which to add colors. Default is ``cluster_name``.
+            Optionally set clustering name for which to add colours. Default is ``cluster_name``.
         """
         if from_col is None:
             from_col = self.config["cluster_name"]
@@ -489,7 +489,7 @@ class Cluster:
     # --- functions creating and adding data to cluster_mpp ---
     def create_cluster_mpp(self):
         """
-        Use cluster params to create and save :attr:`Cluster.cluster_mpp` to use for clustering.
+        Use cluster parameters to create and save :attr:`Cluster.cluster_mpp` to use for clustering.
 
         Raises
         ------
@@ -705,7 +705,7 @@ class Cluster:
 
     def predict_cluster_imgs(self, exp: Experiment) -> MPPData | None:
         """
-        Predict cluster imgs from experiment.
+        Predict cluster images from experiment.
 
         Parameters
         ----------
@@ -753,7 +753,7 @@ def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_d
     Parameters
     ----------
     experiment_dir
-        Experiment directory releative to ``EXPERIMENT_PATH``.
+        Experiment directory relative to ``EXPERIMENT_PATH``.
     save_dir
         Directory to save prepared full data to, relative to ``experiment_dir``.
     """
@@ -810,7 +810,7 @@ def create_cluster_data(
     Parameters
     ----------
     experiment_dir
-        Experiment directory releative to ``EXPERIMENT_PATH``.
+        Experiment directory relative to ``EXPERIMENT_PATH``.
     subsample
         Subsample the data.
     frac
@@ -819,7 +819,7 @@ def create_cluster_data(
         Directory to save subsampled cluster data, relative to ``experiment_dir``.
         Default is ``aggregated/sub-FRAC``.
     cluster
-        Use cluster params in Experiment config to cluster the subsetted data.
+        Use cluster parameters in Experiment config to cluster the subsetted data.
     """
     from campa.tl import Experiment
 
@@ -855,7 +855,7 @@ def project_cluster_data(
     Parameters
     ----------
     experiment_dir
-        Experiment directory releative to ``EXPERIMENT_PATH``.
+        Experiment directory relative to ``EXPERIMENT_PATH``.
     cluster_data_dir
         Directory in which clustering is stored relative to experiment dir. Usually in ``aggregated/sub-FRAC``.
     cluster_name
@@ -863,7 +863,7 @@ def project_cluster_data(
     save_dir
         Directory in which the data to be projected is stored, relative to ``experiment_dir``.
     data_dir
-        Data_dir to project. If not specified, project all ``data_dir``s in ``save_dir``.
+        Data directory to project. If not specified, project all ``data_dir``s in ``save_dir``.
         Relative to ``save_dir``.
     """
     from campa.tl import Experiment
@@ -900,17 +900,17 @@ def load_full_data_dict(
     exp
         Experiment from which to load the mpp_datas.
     keys
-        Controls which np data matrices are being loaded. Passed to :meth:`MPPData.from_data_dir`,
+        Controls which numpy data matrices are being loaded. Passed to :meth:`MPPData.from_data_dir`,
         with `optional_keys` set to empty list. Excluding mpp here speeds up loading.
     data_dirs
-        Dirs that should be loaded, if None, all data_dirs are loaded.
+        Directories that should be loaded, if None, all ``data_dirs`` are loaded.
     save_dir
         Directory in which the data to be loaded is stored, relative to ``{exp.dir}/{exp.name}``.
 
 
     Returns
     -------
-    Dictonary with `data_dirs` as keys and :class:`MPPData` as values.
+    Dictionary with `data_dirs` as keys and :class:`MPPData` as values.
     """
     if data_dirs is None:
         data_dirs = exp.data_params["data_dirs"]
@@ -945,7 +945,7 @@ def get_clustered_cells(
 
     Returns
     -------
-    dictionary containing clustered cells in `cluster_name` and colored cells in `cluster_name_colored`.
+    dictionary containing clustered cells in `cluster_name` and coloured cells in `cluster_name_colored`.
     """
     from campa.pl import annotate_img
 

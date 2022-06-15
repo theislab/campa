@@ -115,7 +115,7 @@ class Predictor:
         split
             Data split to predict. One of `train`, `val`, `test`, `val_imgs`, `test_imgs`.
         img_ids
-            obj_ids or number of objects that should be predicted (only for val_imgs and test_imgs).
+            Object ids or number of objects that should be predicted (only for ``val_imgs`` and ``test_imgs``).
         reps
             Representations to predict. See :meth:`Predictor.get_representation`.
         """
@@ -164,7 +164,7 @@ class Predictor:
 
         Returns
         -------
-        Iterable
+        ``Iterable``
             Representation.
         """
         #  TODO might remove entangled, latent_y in the future (not needed currently)
@@ -321,7 +321,7 @@ class ModelComparator:
         save_prefix: str = "",
     ) -> None:
         """
-        Bar plot of scores for different experiments.
+        Barplot of scores for different experiments.
 
         Saves plot in :attr:`ModelComparator.save_dir`.
 

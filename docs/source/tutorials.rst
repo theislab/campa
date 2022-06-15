@@ -4,7 +4,7 @@
 Tutorials
 ---------
 
-This section contains several detailled tutorials
+This section contains several detailed tutorials
 showcasing different aspects of CAMPA. See the :ref:`workflow` documentation for a
 short introduction to the CAMPA workflow of creating and analysing CSLs.
 

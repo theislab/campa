@@ -259,7 +259,7 @@ class Estimator:
 
         Returns
         -------
-        Iterable
+        ``Iterable``
             prediction
         """
         if isinstance(data, tf.data.Dataset):
@@ -286,7 +286,7 @@ class Estimator:
 
         Returns
         -------
-        Iterable[float]
+        ``Iterable[float]``
             Scores.
         """
         if not self.compiled_model:

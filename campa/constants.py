@@ -19,19 +19,19 @@ def _get_value(config: ConfigParser, key: str, section: str = "DEFAULT") -> Opti
 
 class CAMPAConfig:
     """
-    Config for CAMPA.
+    Configuration for CAMPA.
 
     Defines device-specific ``EXPERIENT_DIR`` and ``BASE_DATA_DIR`` paths and
-    mapping of data config names to config files.
+    mapping of data configuration names to configuration files.
 
-    The config is attempted to be read from a "campa.ini" config file.
+    The configuration is attempted to be read from a ``campa.ini`` configuration file.
     This file is searched for in the following places:
 
     - the current directory
     - ``$HOME/.config/campa/``
 
-    A default config file can be created using ``campa setup``.
-    Config values can also directly be set in memory.
+    A default configuration file can be created using ``campa setup``.
+    Configuration values can also directly be set in memory.
     """
 
     def __init__(self):
@@ -135,10 +135,10 @@ class CAMPAConfig:
     @property
     def CO_OCC_CHUNK_SIZE(self):
         """
-        Chunk size for optimised co_occurrence in :meth:`FeatureExtractor.extract_co_occurrence`.
+        Chunk size for optimised co-occurrence in :meth:`FeatureExtractor.extract_co_occurrence`.
 
-        Maximal size of co-occ matrix.
-        If number of coordinates that need to be checked is larger, co-occ is computed in chunks.
+        Maximal size of co-occurrence matrix.
+        If number of coordinates that need to be checked is larger, co-occurrence is computed in chunks.
         Set to lower values when using multi-processing to compute co-occurrence scores.
         """
         if self._CO_OCC_CHUNK_SIZE is not None:
@@ -152,7 +152,7 @@ class CAMPAConfig:
     @property
     def data_configs(self):
         """
-        Return dictionary mapping from names to data_config files.
+        Return dictionary mapping from names to ``data_config`` files.
         """
         return self._data_configs
 
@@ -163,9 +163,9 @@ class CAMPAConfig:
         Parameters
         ----------
         data_config_name
-            Name of the data config.
+            Name of the data configuration.
         data_config_file
-            Path to the data_config file.
+            Path to the ``data_config`` file.
         """
         if data_config_name.lower() in self._data_configs.keys():
             print(f"Overwriting existing data config for {data_config_name.lower()}")
@@ -173,16 +173,16 @@ class CAMPAConfig:
 
     def get_data_config(self, data_config_name: str = "ExampleData") -> Any:
         """
-        Load data_config file.
+        Load ``data_config`` file.
 
         Parameters
         ----------
         data_config_name
-            Name of the data config.
+            Name of the data configuration.
 
         Returns
         -------
-        data_config module
+        ``data_config`` module
         """
         module = load_config(self.data_configs[data_config_name.lower()])
         if module is None:
@@ -192,12 +192,12 @@ class CAMPAConfig:
 
     def write(self, config_fname=None):
         """
-        Save current config to config_fname.
+        Save current configuration to ``config_fname``.
 
         Parameters
         ----------
         config_fname
-            Name of the config file. Default is :attr:`CAMPAConfig.config_fname`.
+            Name of the configuration file. Default is :attr:`CAMPAConfig.config_fname`.
         """
         if config_fname is None:
             if self.config_fname is None:
