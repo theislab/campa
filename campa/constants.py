@@ -216,6 +216,7 @@ class CAMPAConfig:
         for data_config_name, data_config in self.data_configs.items():
             config.set("data", data_config_name, data_config)
         # write config
+        os.makedirs(Path(config_fname).parent, exist_ok=True)
         with open(config_fname, "w") as configfile:
             config.write(configfile)
         # set config_fname
