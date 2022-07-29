@@ -27,9 +27,9 @@ extract_features    Extract features from clustered dataset
 def _get_setup_parser():
     parser = argparse.ArgumentParser(description="Create configuration file ``campa.ini``.")
     parser.add_argument(
-        "--force",
+        "--quiet",
         action="store_true",
-        help="force recreation of ``campa.ini`` even if exists",
+        help="create default configuration file without asking for user input.",
     )
     return parser
 
@@ -144,7 +144,7 @@ class CAMPA:
         parser = _get_setup_parser()
         args = parser.parse_args(sys.argv[2:])
         # create and populate campa.ini
-        prepare_config(args)
+        prepare_config(**vars(args))
 
     def create_dataset(self):
         parser = _get_create_dataset_parser()
