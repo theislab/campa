@@ -18,7 +18,11 @@ CAMPA config
 
 To find data and experiment folders, and dataset specific parameters,
 CAMPA uses a config, :attr:`campa.constants.campa_config`.
-CAMPA attempts to read the config values from a ``campa.ini`` config file
+Config values can directly be set in memory. For more information on
+this see the `Setup and download data tutorial`_.
+
+In order to provide a persistent config, CAMPA attempts to read the
+config values from a ``campa.ini`` config file
 from the following locations:
 
 - the current directory
@@ -34,9 +38,8 @@ data folders in by running::
     campa setup
 
 This creates a default config in ``$HOME/.config/campa/campa.ini``.
-
-Config values can also directly be set in memory. For more information on
-this see the `Setup and download data tutorial`_.
+Note that for following the tutorials it is not necessary to write a config to disk,
+as all tutorials set the necessary config values at the start.
 
 
 Data format

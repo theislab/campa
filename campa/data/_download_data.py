@@ -104,7 +104,7 @@ def load_dataset(dataset_path: Path_t, fname: str, backup_url: str) -> Path_t:
     """
     Load dataset (from URL).
 
-    In dataset_path, creates ierarhy of folders "raw", "archive".
+    In dataset_path, creates hierachy of folders "raw", "archive".
     If unpacked files are already stored in "raw" doesn't do anything.
     Otherwise checks for archive file in "archive" folder and unpacks it into "raw" folder.
     If no files are present there, attempts to load the dataset from URL
