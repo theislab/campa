@@ -471,8 +471,15 @@ class Cluster:
             campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"], "pynndescent_index.pickle"
         )
         if os.path.isfile(index_fname) and not recreate:
-            # load and return index
-            return pickle.load(open(index_fname, "rb"))
+            try:
+                # load and return index
+                return pickle.load(open(index_fname, "rb"))
+            except AttributeError as e:
+                if "'NNDescent' object has no attribute 'parallel_batch_queries'" in str(e):
+                    # need to recreate index
+                    self.log.info("Version of pynndescent does not match version that index was created with. Recreating index.")
+                else:
+                    raise(e)
         # need to create index
         # check that cluster_rep has been computed already for cluster_mpp
         assert self.cluster_mpp is not None

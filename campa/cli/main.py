@@ -168,11 +168,12 @@ class CAMPA:
         parser = _get_cluster_parser()
         args = parser.parse_args(sys.argv[2:])
         init_logging()
+        vars_args = vars(args)
         try:
-            func = args.func
+            func = vars_args.pop('func')
         except AttributeError:
             parser.error("too few arguments")
-        func(**vars(args))
+        func(**vars_args)
 
     def extract_features(self):
         parser = _get_extract_features_parser()
