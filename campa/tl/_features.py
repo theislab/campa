@@ -267,6 +267,11 @@ class FeatureExtractor:
             ].astype(str)
             # prepare according to data_params
             data_params = deepcopy(self.exp.data_params)
+            if not self.exp.is_trainable: 
+                # for non-trainable models, latent rep is mpp.
+                # if mpp is present in data_dir, this will overwrite the base_data_dir mpp
+                # but mpp present in data_dir is normalised already -> skip normalisation in mpp_data.prepare()
+                data_params['normalise'] = False
             self._mpp_data.prepare(data_params)
         return self._mpp_data
 
