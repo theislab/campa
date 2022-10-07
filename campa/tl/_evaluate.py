@@ -55,15 +55,6 @@ class Predictor:
                 reps=config["predict_reps"],
             )
 
-    # TODO might not need?
-    # def calculate_mse(self, mpp_data):
-    #    """
-    #    Calculate mean squared error from mpp_data. If mpp_data does not have decoder representation, predict it
-    #    """
-    #    if mpp_data.data("decoder") is None:
-    #        self.predict(mpp_data, reps=["decoder"])
-    #    return np.mean((mpp_data.center_mpp - mpp_data.data("decoder")) ** 2, axis=0)
-
     def predict(
         self,
         mpp_data: MPPData,
@@ -551,6 +542,7 @@ class ModelComparator:
         if img_channel is None:
             input_channel_ids = [0]
             img_channel = str(self.img_mpps[exp_names[0]].channels.loc[0])
+        #print(exp_names[0], img_channel)
         input_channel_ids = self.img_mpps[exp_names[0]].get_channel_ids([img_channel])
         input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(channel_ids=input_channel_ids, **kwargs)
         if img_ids is None:

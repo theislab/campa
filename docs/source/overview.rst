@@ -107,6 +107,8 @@ You can find a complete set of example parameter files `here <https://github.com
 
 The workflow consists of the following steps:
 
+- Setup up the config and download data by following along with the `Setup and download data tutorial`_.
+
 - Create a subsampled pixel-level dataset for neural network training.
   This is done either by using the API function :func:`campa.data.create_dataset` or by using the CLI::
 
