@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from typing import (
     Any,
-    List,
-    Union,
     Mapping,
     Iterable,
-    Optional,
     TYPE_CHECKING,
     MutableMapping,
 )
