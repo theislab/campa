@@ -95,6 +95,9 @@ def _get_cluster_parser():
         help="directory to save prepared full data to, relative to ``experiment-dir``.",
         default="aggregated/full_data",
     )
+    prepare.add_argument(
+        "--data-dirs", help="Data dirs to prepare. Defaults to experiment data dirs", nargs="+", type=str, default=None
+    ),
     prepare.set_defaults(func=campa.tl.prepare_full_dataset)
     # project
     project = subparsers.add_parser("project", help="Project existing clustering.")
@@ -170,7 +173,7 @@ class CAMPA:
         init_logging()
         vars_args = vars(args)
         try:
-            func = vars_args.pop('func')
+            func = vars_args.pop("func")
         except AttributeError:
             parser.error("too few arguments")
         func(**vars_args)
