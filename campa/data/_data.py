@@ -8,6 +8,7 @@ from typing import (
     Mapping,
     Iterable,
     Optional,
+    Sequence,
     MutableMapping,
 )
 from logging import getLogger
@@ -174,7 +175,7 @@ class MPPData:
             # first, load base_mpp_data
             res_keys, res_optional_keys = _get_keys(keys, optional_keys, None)
             mpp_params = json.load(open(os.path.join(base_dir, data_dir, "mpp_params.json")))
-            #print(f"!!!!!loading base mpp from {data_config_inst.DATA_DIR}, {mpp_params['base_data_dir']}")
+            # print(f"!!!!!loading base mpp from {data_config_inst.DATA_DIR}, {mpp_params['base_data_dir']}")
 
             self = cls.from_data_dir(
                 mpp_params["base_data_dir"],
@@ -185,7 +186,7 @@ class MPPData:
                 mode=mode,
                 **kwargs,
             )
-            #print(f"!!!!!adding from {base_dir}, {data_dir}")
+            # print(f"!!!!!adding from {base_dir}, {data_dir}")
             # second, add mpp_data
             res_keys, res_optional_keys = _get_keys(keys, optional_keys, self)
             self.add_data_from_dir(
@@ -727,7 +728,7 @@ class MPPData:
         # apply mask
         return self.apply_mask(mpp_mask, copy=copy)
 
-    def subset_channels(self, channels: Iterable[str]) -> None:
+    def subset_channels(self, channels: Sequence[str]) -> None:
         """
         Restrict :attr:`MPPData.mpp` to ``channels``.
 
@@ -741,8 +742,8 @@ class MPPData:
         Nothing, updates :attr:`MPPData.mpp` and :attr:`MPPdata.channels`.
         """
         self.log.info(f"Subsetting from {len(self.channels)} channels")
-        assert (
-            len(np.intersect1d(self.channels.name.values, channels)) == len(channels)
+        assert len(np.intersect1d(self.channels.name.values, channels)) == len(
+            channels
         ), "mpp object does not contain provided channels!"
         cids = list(self.channels.reset_index().set_index("name").loc[channels]["channel_id"])
         raw_channels = self.channels
@@ -1322,8 +1323,8 @@ class MPPData:
         if data == "mpp":
             values = self.center_mpp[mask]
             if channel_ids is not None:
-                #print('channel_ids:', channel_ids, type(channel_ids))
-                #print('values:', values, values.shape, values.dtype)
+                # print('channel_ids:', channel_ids, type(channel_ids))
+                # print('values:', values, values.shape, values.dtype)
                 values = values[:, channel_ids]
         else:
             values = self._data[data][mask]

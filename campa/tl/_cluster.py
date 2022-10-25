@@ -901,7 +901,9 @@ def query_hpa_subcellular_location(
     return {"hpa_data": data, "subcellular_locations": summary}
 
 
-def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_data") -> None:
+def prepare_full_dataset(
+    experiment_dir: str, save_dir: str = "aggregated/full_data", data_dirs: list[str] | None = None
+) -> None:
     """
     Prepare all data for clustering by predicting cluster-rep.
 
@@ -911,13 +913,18 @@ def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_d
         Experiment directory relative to ``EXPERIMENT_PATH``.
     save_dir
         Directory to save prepared full data to, relative to ``experiment_dir``.
+    data_dirs
+        Data to prepare. Defaults for ``exp.data_params['data_dirs']``.
     """
     from campa.tl import Experiment
 
     log = logging.getLogger("prepare full dataset")
     exp = Experiment.from_dir(experiment_dir)
     # iterate over all data dirs
-    for data_dir in exp.data_params["data_dirs"]:
+    if data_dirs is None:
+        data_dirs = exp.data_params["data_dirs"]
+    print("iterating over data dirs", data_dirs)
+    for data_dir in data_dirs:
         log.info(f"Processing data_dir {data_dir}")
         mpp_data = MPPData.from_data_dir(
             data_dir,
