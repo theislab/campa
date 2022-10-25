@@ -540,9 +540,8 @@ class ModelComparator:
 
         # get input images
         if img_channel is None:
-            input_channel_ids = [0]
-            img_channel = str(self.img_mpps[exp_names[0]].channels.loc[0])
-        #print(exp_names[0], img_channel)
+            # take first channel in first experiment
+            img_channel = self.img_mpps[exp_names[0]].channels.loc[0].values[0]
         input_channel_ids = self.img_mpps[exp_names[0]].get_channel_ids([img_channel])
         input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(channel_ids=input_channel_ids, **kwargs)
         if img_ids is None:

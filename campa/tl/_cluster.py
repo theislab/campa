@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Iterable, TYPE_CHECKING, MutableMapping
+from typing import (
+    Any,
+    List,
+    Union,
+    Mapping,
+    Iterable,
+    Optional,
+    TYPE_CHECKING,
+    MutableMapping,
+)
 
 if TYPE_CHECKING:
     from campa.tl import Experiment
@@ -10,6 +19,7 @@ from copy import deepcopy
 import os
 import json
 import pickle
+import urllib
 import logging
 
 from pynndescent import NNDescent
@@ -477,9 +487,11 @@ class Cluster:
             except AttributeError as e:
                 if "'NNDescent' object has no attribute 'parallel_batch_queries'" in str(e):
                     # need to recreate index
-                    self.log.info("Version of pynndescent does not match version that index was created with. Recreating index.")
+                    self.log.info(
+                        "Version of pynndescent does not match version that index was created with. Recreating index."
+                    )
                 else:
-                    raise(e)
+                    raise (e)
         # need to create index
         # check that cluster_rep has been computed already for cluster_mpp
         assert self.cluster_mpp is not None
@@ -751,6 +763,145 @@ class Cluster:
             mpp_imgs = MPPData.from_data_dir(img_save_dir, base_dir="", data_config=self.data_config_name)
         self.log.info(f"Projecting cluster_imgs for {exp.dir}/{exp.name}")
         return self.project_clustering(mpp_imgs, save_dir=img_save_dir)
+
+    # --- use cluster_mpp to query HPA ---
+    def get_hpa_localisation(
+        self,
+        cluster_name: str = "clustering_res0.5",
+        thresh: float = 1,
+        limit_to_groups: Mapping[str, str | list[str]] | None = None,
+        **kwargs: Any,
+    ) -> Mapping[str, Mapping[str, Any]]:
+        """
+        Query subcellular localisation for each cluster from Human Protein Atlas (https://www.proteinatlas.org).
+
+        Calculates cluster loadings and returns the subcellular localisations of the channels that are enriched for each cluster.
+        Requires "hpa_gene_name" column in channel_metadata.csv file in DATA_DIR to map channel names to genes available in HPA.
+
+        Parameters
+        ----------
+        cluster_name
+            Clustering to calculate localisations for. Must exist already.
+        thresh
+            Minimum z-scored intensity value of channel in cluster to be considered for HPA query.
+            thresh=0 considers all enriched channel of this cluster
+        limit_to_groups
+            Dict with obs as keys and groups from obs as values, to subset data before calculating loadings.
+        kwargs
+            Keyword arguments for :func:`campa.tl.query_hpa_subcellular_location`.
+
+        Returns
+        -------
+            Mapping[str, Mapping[str, Any]]:
+                Results dictionary with clusters as keys, and return value from :func:`campa.tl.query_hpa_subcellular_location`
+        """
+        self.set_cluster_name(cluster_name)
+        adata = self.cluster_mpp.get_adata(X="mpp", obsm={"X_latent": "latent", "X_umap": "umap"})
+        # ensure that clustering is available in adata
+        add_clustering_to_adata(
+            os.path.join(campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"]),
+            cluster_name,
+            adata,
+            self.cluster_annotation,
+        )
+
+        # subset data
+        if limit_to_groups is None:
+            limit_to_groups = {}
+        for key, groups in limit_to_groups.items():
+            if not isinstance(groups, list):
+                groups = [groups]
+            adata = adata[adata.obs[key].isin(groups)]
+
+        # calculate mean z-scored intensity values
+        means = (
+            pd.concat(
+                [
+                    pd.DataFrame(adata.X, columns=adata.var_names).reset_index(drop=True),
+                    adata.obs[[cluster_name]].reset_index(drop=True),
+                ],
+                axis=1,
+            )
+            .groupby(cluster_name)
+            .aggregate("mean")
+        )
+        means = (means - means.mean()) / means.std()
+        # means = means.apply(zscore, axis=1)
+
+        # for each cluster, determine channels that localise to this cluster (mean z-scored intensity > thresh)
+        # and map channel names to gene names used in HPA
+        channels_metadata = pd.read_csv(os.path.join(self.data_config.DATA_DIR, "channels_metadata.csv"), index_col=0)
+        cluster_localisation = {}
+        for idx, row in means.iterrows():
+            channels = list(row[row > thresh].index)
+            weights = list(row[row > thresh])
+            cluster_localisation[idx] = (list(channels_metadata.set_index("name").loc[channels].gene_name_hpa), weights)
+
+        # query hpa for each cluster
+        results = {}
+        for idx, (genes, weights) in cluster_localisation.items():
+            results[idx] = query_hpa_subcellular_location(genes, gene_weights=weights, **kwargs)
+        return results
+
+
+def query_hpa_subcellular_location(
+    genes: list[str], gene_weights: Iterable[float] | None = None, filter_reliability: Iterable[str] = ["Uncertain"]
+) -> Mapping[str, Any]:
+    """
+    Query the Human Protein Atlas for a consensus subcellular locations from a list of genes.
+
+    HPA is availablen at https://www.proteinatlas.org
+
+    Parameters
+    ----------
+    genes
+        List of genes to query in the HPA (using field "gene_name").
+    gene_weights
+        List of weights for each gene, used to compute main subcellular locations.
+    filter_reliability
+        Do not return genes with this subcellular location reliability ("Reliability IF").
+        Available reliabilities (in order from most reliable to least reliable) are: Enhanced, Supported, Approved, Uncertain.
+        See also https://www.proteinatlas.org/about/assays+annotation#if_reliability_score
+
+    Returns
+    -------
+        Mapping[str, Any]:
+            Results dictionary with keys:
+                - hpa_data: data frame of available genes and their subcellular locations according to HPA data.
+                - subcellular_locations: pd.Series of all subcellular locations ocurring for this list of genes, sorted by most frequent
+    """
+    if gene_weights is None:
+        gene_weights = [1] * len(genes)
+    url_str = "http://www.proteinatlas.org/api/search_download.php?search=gene_name:{gene}&format=json&columns=g,gs,scml,scal,relce&compress=no"
+    data = []
+    index = []
+    for gene in genes:
+        if gene is None or gene == np.nan:
+            continue
+        cur_url_str = url_str.format(gene=gene)
+        with urllib.request.urlopen(cur_url_str) as url:
+            res = json.load(url)
+            if len(res) > 0:
+                index.append(gene)
+                data.append(res[0])
+            else:
+                print(f"No result for {gene}")
+    data = pd.DataFrame(data, index=index)
+    # filter out any columns with filter_reliability or None reliability score
+    data = data[~data["Reliability (IF)"].isin(filter_reliability + [None])]
+    data = pd.merge(
+        data, pd.DataFrame({"gene_weights": gene_weights}, index=genes), how="left", right_index=True, left_index=True
+    )
+    # summarise locations & their occurrence counts
+    summary = {}
+    for locations, weight in zip(data["Subcellular main location"], data["gene_weights"]):
+        for loc in locations:
+            if loc not in summary.keys():
+                summary[loc] = weight
+            else:
+                summary[loc] += weight
+    summary = pd.Series(summary).sort_values(ascending=False)
+    return {"hpa_data": data, "subcellular_locations": summary}
 
 
 def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_data") -> None:
