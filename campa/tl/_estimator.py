@@ -164,6 +164,8 @@ class Estimator:
         weights_path = self.config["model"]["init_with_weights"]
         if weights_path is True:
             weights_path = tf.train.latest_checkpoint(self.exp.full_path)
+            if weights_path is None:
+                self.log.warn(f"WARNING: weights_path set to true but no trained model found in {self.exp.full_path}")
         if isinstance(weights_path, str):
             # first need to compile the model
             self._compile_model()

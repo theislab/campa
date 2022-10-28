@@ -35,7 +35,8 @@ def annotate_img(
         to_col = from_col
     if color:
         to_col = to_col + "_colors"
-        res = np.zeros(img.shape + (3,), dtype=np.uint8)
+        # default to white background
+        res = np.zeros(img.shape + (3,), dtype=np.uint8)+255
     else:
         if from_col == to_col:
             # no need to change anything

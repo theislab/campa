@@ -189,18 +189,19 @@ class TestSubsetChannels:
         assert np.array_equal(np.sort(mpp_data.channels["name"].values), np.sort(channels_to_subset))
         assert mpp_data.mpp.shape[-1] == len(channels_to_subset)
 
-    def test_filterOverlapChannels(self):
-        channels = [str(i) for i in range(5)]
-        mpp_data = gen_mppdata(num_obj_ids=20, channels=channels)
-        mpp_data_orig = mpp_data.copy()
-        channels_to_subset = [str(i) for i in range(3, 7)]
-        overlap_channels = ["3", "4"]
+    # This functionality currently does not exist within MPPData
+    #def test_filterOverlapChannels(self):
+    #    channels = [str(i) for i in range(5)]
+    #    mpp_data = gen_mppdata(num_obj_ids=20, channels=channels)
+    #    mpp_data_orig = mpp_data.copy()
+    #    channels_to_subset = [str(i) for i in range(3, 7)]
+    #    overlap_channels = ["3", "4"]
 
-        mpp_data.subset_channels(channels_to_subset)
-        isequal, isequal_dict = mpp_data._compare(mpp_data_orig)
-        assert not isequal
-        assert np.array_equal(np.sort(mpp_data.channels["name"].values), ["3", "4"])
-        assert mpp_data.mpp.shape[-1] == len(overlap_channels)
+    #    mpp_data.subset_channels(channels_to_subset)
+    #    isequal, isequal_dict = mpp_data._compare(mpp_data_orig)
+    #    assert not isequal
+    #    assert np.array_equal(np.sort(mpp_data.channels["name"].values), ["3", "4"])
+    #    assert mpp_data.mpp.shape[-1] == len(overlap_channels)
 
 
 if __name__ == "__main__":

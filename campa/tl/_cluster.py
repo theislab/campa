@@ -766,6 +766,7 @@ class Cluster:
         self,
         cluster_name: str = "clustering_res0.5",
         thresh: float = 1,
+        max_num_channels: int = 3,
         limit_to_groups: Mapping[str, str | list[str]] | None = None,
         **kwargs: Any,
     ) -> Mapping[str, Mapping[str, Any]]:
@@ -782,6 +783,9 @@ class Cluster:
         thresh
             Minimum z-scored intensity value of channel in cluster to be considered for HPA query.
             thresh=0 considers all enriched channel of this cluster
+        max_num_channels
+            Maximal number of channels to be considered for HPA query. Channels with highest z-scored intensity value will be used.
+            If None, all channels passing `thresh` will be used.
         limit_to_groups
             Dict with obs as keys and groups from obs as values, to subset data before calculating loadings.
         kwargs
@@ -830,8 +834,12 @@ class Cluster:
         channels_metadata = pd.read_csv(os.path.join(self.data_config.DATA_DIR, "channels_metadata.csv"), index_col=0)
         cluster_localisation = {}
         for idx, row in means.iterrows():
-            channels = list(row[row > thresh].index)
-            weights = list(row[row > thresh])
+            channels = np.array(row[row > thresh].index)
+            weights = np.array(row[row > thresh])
+            if max_num_channels is not None:
+                selected_indices = np.argsort(weights)[::-1][:max_num_channels]
+                weights = weights[selected_indices]
+                channels = channels[selected_indices]
             cluster_localisation[idx] = (list(channels_metadata.set_index("name").loc[channels].gene_name_hpa), weights)
 
         # query hpa for each cluster
@@ -883,6 +891,9 @@ def query_hpa_subcellular_location(
                 data.append(res[0])
             else:
                 print(f"No result for {gene}")
+    # no resulting data? (either len(genes)==0 or no genes found)
+    if len(data) == 0:
+        return {"hpa_data": None, "subcellular_locations": None}
     data = pd.DataFrame(data, index=index)
     # filter out any columns with filter_reliability or None reliability score
     data = data[~data["Reliability (IF)"].isin(filter_reliability + [None])]

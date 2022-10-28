@@ -118,7 +118,7 @@ def plot_mean_intensity(
         color = "mean intensity"
         g_expr = adata[adata.obs[groupby] == g].X
         g_size = np.array(adata[adata.obs[groupby] == g].obs["size"])
-        color_values[g] = (g_expr * g_size[:, np.newaxis]).sum(axis=0) / g_size.sum()
+        color_values[g] = np.array((g_expr * g_size[:, np.newaxis]).sum(axis=0) / g_size.sum())
     color_values = color_values.loc[marker_list]
 
     standard_scale = kwargs.pop("standard_scale", None)
@@ -476,9 +476,9 @@ def get_intensity_change(
             raise NotImplementedError(size)
         # set color values
         if color == "logfoldchange":
-            color_values[g] = np.log2(mean_g / mean_ref)
+            color_values[g] = np.array(np.log2(mean_g / mean_ref))
         elif color == "meanchange":
-            color_values[g] = mean_g - mean_ref
+            color_values[g] = np.array(mean_g - mean_ref)
         else:
             raise NotImplementedError(color)
 
