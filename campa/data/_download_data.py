@@ -34,8 +34,7 @@ def load_example_data(data_dir: Path_t = None) -> Path_t:
     folder_dir = load_dataset(
         dataset_path=data_dir,
         fname=fname,
-        #backup_url="https://figshare.com/ndownloader/files/34987036",
-        backup_url="https://figshare.com/ndownloader/files/38021094?private_link=79b062207e500dd31053",
+        backup_url="https://figshare.com/ndownloader/files/38021094",
     )
 
     return folder_dir
@@ -56,8 +55,7 @@ def load_example_experiment(experiment_dir: Path_t = None) -> Path_t:
     """
     if experiment_dir is None:
         experiment_dir = Path(__file__).parent.parent.parent / "notebooks" / "example_experiments"
-    #url = "https://figshare.com/ndownloader/files/34987534"
-    url = "https://figshare.com/ndownloader/files/38021925?private_link=bf771d5a6c73f807f96e"
+    url = "https://figshare.com/ndownloader/files/38021925"
 
     uncpacked_dir = Path(os.path.join(experiment_dir, "test_pre_trained"))
     archive_path = Path(os.path.join(experiment_dir, "test_pre_trained.zip"))

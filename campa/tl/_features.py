@@ -267,11 +267,11 @@ class FeatureExtractor:
             ].astype(str)
             # prepare according to data_params
             data_params = deepcopy(self.exp.data_params)
-            if not self.exp.is_trainable: 
+            if not self.exp.is_trainable:
                 # for non-trainable models, latent rep is mpp.
                 # if mpp is present in data_dir, this will overwrite the base_data_dir mpp
                 # but mpp present in data_dir is normalised already -> skip normalisation in mpp_data.prepare()
-                data_params['normalise'] = False
+                data_params["normalise"] = False
             self._mpp_data.prepare(data_params)
         return self._mpp_data
 
@@ -451,7 +451,7 @@ class FeatureExtractor:
                         elif feature == "circularity":
                             # circularity can max be 1,
                             # larger values are due to tiny regions where perimeter is overestimated
-                            features[feature].append(min(4 * np.pi * region.area / region.perimeter ** 2, 1))
+                            features[feature].append(min(4 * np.pi * region.area / region.perimeter**2, 1))
                         elif feature == "elongation":
                             features[feature].append(
                                 (region.major_axis_length - region.minor_axis_length) / region.major_axis_length
@@ -784,7 +784,7 @@ class FeatureExtractor:
             If None, all clusters are displayed.
         """
         if self.adata is None or "object_stats_agg" not in self.adata.obsm:
-            self.log.warn(
+            self.log.warning(
                 "Object stats information is not present.\
                 Run extract_object_stats and get_objects_stats first! Exiting."
             )
@@ -835,21 +835,30 @@ class FeatureExtractor:
             List of cluster names for which pairwise co_occurrence scores should be calculated
         """
         if self.adata is None:
-            self.log.warn("Co-occurrence information is not present. Calculate extract_co_occurrence first! Exiting.")
+            self.log.warning(
+                "Co-occurrence information is not present. Calculate extract_co_occurrence first! Exiting."
+            )
             return
         if clusters is None:
             clusters = self.adata.uns["clusters"]
         for c1 in clusters:
             for c2 in clusters:
-                columns = list(
-                    map(
-                        lambda x: f"{x[0]:.2f}-{x[1]:.2f}",
-                        zip(
-                            self.adata.uns["co_occurrence_params"]["interval"][:-1],
-                            self.adata.uns["co_occurrence_params"]["interval"][1:],
-                        ),
+                # columns = list(
+                #    map(
+                #        lambda x: f"{x[0]:.2f}-{x[1]:.2f}",
+                #        zip(
+                #            self.adata.uns["co_occurrence_params"]["interval"][:-1],
+                #            self.adata.uns["co_occurrence_params"]["interval"][1:],
+                #        ),
+                #    )
+                # )
+                columns = [
+                    f"{x0:.2f}-{x1:.2f}"
+                    for x0, x1 in zip(
+                        self.adata.uns["co_occurrence_params"]["interval"][:-1],
+                        self.adata.uns["co_occurrence_params"]["interval"][1:],
                     )
-                )
+                ]
                 df = self.adata.obsm[f"co_occurrence_{c1}_{c2}"].copy()
                 df.columns = columns
                 # add obj_id

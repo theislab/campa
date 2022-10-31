@@ -190,7 +190,7 @@ class TestSubsetChannels:
         assert mpp_data.mpp.shape[-1] == len(channels_to_subset)
 
     # This functionality currently does not exist within MPPData
-    #def test_filterOverlapChannels(self):
+    # def test_filterOverlapChannels(self):
     #    channels = [str(i) for i in range(5)]
     #    mpp_data = gen_mppdata(num_obj_ids=20, channels=channels)
     #    mpp_data_orig = mpp_data.copy()

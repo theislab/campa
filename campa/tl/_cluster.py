@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-from typing import (
-    Any,
-    Mapping,
-    Iterable,
-    TYPE_CHECKING,
-    MutableMapping,
-)
+from typing import Any, Mapping, Iterable, TYPE_CHECKING, MutableMapping
 
 if TYPE_CHECKING:
     from campa.tl import Experiment
@@ -773,8 +767,10 @@ class Cluster:
         """
         Query subcellular localisation for each cluster from Human Protein Atlas (https://www.proteinatlas.org).
 
-        Calculates cluster loadings and returns the subcellular localisations of the channels that are enriched for each cluster.
-        Requires "hpa_gene_name" column in channel_metadata.csv file in DATA_DIR to map channel names to genes available in HPA.
+        Calculates cluster loadings and returns the subcellular localisations of
+        the channels that are enriched for each cluster.
+        Requires "hpa_gene_name" column in channel_metadata.csv file in DATA_DIR
+        to map channel names to genes available in HPA.
 
         Parameters
         ----------
@@ -784,7 +780,8 @@ class Cluster:
             Minimum z-scored intensity value of channel in cluster to be considered for HPA query.
             thresh=0 considers all enriched channel of this cluster
         max_num_channels
-            Maximal number of channels to be considered for HPA query. Channels with highest z-scored intensity value will be used.
+            Maximal number of channels to be considered for HPA query.
+            Channels with highest z-scored intensity value will be used.
             If None, all channels passing `thresh` will be used.
         limit_to_groups
             Dict with obs as keys and groups from obs as values, to subset data before calculating loadings.
@@ -794,8 +791,12 @@ class Cluster:
         Returns
         -------
             Mapping[str, Mapping[str, Any]]:
-                Results dictionary with clusters as keys, and return value from :func:`campa.tl.query_hpa_subcellular_location`
+                Results dictionary with clusters as keys,
+                and return value from :func:`campa.tl.query_hpa_subcellular_location`
         """
+        if (self.cluster_mpp is None) or (self.cluster_mpp.data(cluster_name) is None):
+            self.log.info(f"cannot query HPA: cluster_mpp does not exist or {cluster_name} does not exist")
+            return {}
         self.set_cluster_name(cluster_name)
         adata = self.cluster_mpp.get_adata(X="mpp", obsm={"X_latent": "latent", "X_umap": "umap"})
         # ensure that clustering is available in adata
@@ -850,7 +851,9 @@ class Cluster:
 
 
 def query_hpa_subcellular_location(
-    genes: list[str], gene_weights: Iterable[float] | None = None, filter_reliability: Iterable[str] = ["Uncertain"]
+    genes: Iterable[str],
+    gene_weights: Iterable[float] | None = None,
+    filter_reliability: Iterable[str] = ("Uncertain",),
 ) -> Mapping[str, Any]:
     """
     Query the Human Protein Atlas for a consensus subcellular locations from a list of genes.
@@ -865,7 +868,8 @@ def query_hpa_subcellular_location(
         List of weights for each gene, used to compute main subcellular locations.
     filter_reliability
         Do not return genes with this subcellular location reliability ("Reliability IF").
-        Available reliabilities (in order from most reliable to least reliable) are: Enhanced, Supported, Approved, Uncertain.
+        Available reliabilities (in order from most reliable to least reliable) are:
+        Enhanced, Supported, Approved, Uncertain.
         See also https://www.proteinatlas.org/about/assays+annotation#if_reliability_score
 
     Returns
@@ -873,15 +877,17 @@ def query_hpa_subcellular_location(
         Mapping[str, Any]:
             Results dictionary with keys:
                 - hpa_data: data frame of available genes and their subcellular locations according to HPA data.
-                - subcellular_locations: pd.Series of all subcellular locations ocurring for this list of genes, sorted by most frequent
+                - subcellular_locations: pd.Series of all subcellular locations ocurring for this list of genes,
+                  sorted by most frequent
+
     """
     if gene_weights is None:
-        gene_weights = [1] * len(genes)
-    url_str = "http://www.proteinatlas.org/api/search_download.php?search=gene_name:{gene}&format=json&columns=g,gs,scml,scal,relce&compress=no"
+        gene_weights = [1] * len(list(genes))
+    url_str = "http://www.proteinatlas.org/api/search_download.php?search=gene_name:{gene}&format=json&columns=g,gs,scml,scal,relce&compress=no"  # noqa: <E501>
     data = []
     index = []
     for gene in genes:
-        if gene is None or gene == np.nan:
+        if gene is None or gene == np.nan:  # type: ignore[comparison-overlap]
             continue
         cur_url_str = url_str.format(gene=gene)
         with urllib.request.urlopen(cur_url_str) as url:
@@ -896,12 +902,12 @@ def query_hpa_subcellular_location(
         return {"hpa_data": None, "subcellular_locations": None}
     data = pd.DataFrame(data, index=index)
     # filter out any columns with filter_reliability or None reliability score
-    data = data[~data["Reliability (IF)"].isin(filter_reliability + [None])]
+    data = data[~data["Reliability (IF)"].isin(list(filter_reliability) + [None])]
     data = pd.merge(
         data, pd.DataFrame({"gene_weights": gene_weights}, index=genes), how="left", right_index=True, left_index=True
     )
     # summarise locations & their occurrence counts
-    summary = {}
+    summary = {}  # type: ignore[var-annotated]
     for locations, weight in zip(data["Subcellular main location"], data["gene_weights"]):
         for loc in locations:
             if loc not in summary.keys():

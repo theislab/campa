@@ -1082,7 +1082,7 @@ class MPPData:
         """
         if cond_params is None:
             cond_params = {}
-        cond = None
+        cond: np.ndarray
         if isinstance(desc, list):
             # check if combining is possible
             assert np.all([("one_hot" in d) for d in desc]), f"all of {desc} need to be one_hot encoded"

@@ -39,7 +39,7 @@ class LossWarmup(tf.keras.callbacks.Callback):
             print(f"set {key} loss weight to {tf.keras.backend.get_value(self.weight_vars[key])}")
 
         if "latent" in self.weight_vars.keys():
-            print("set latent loss weight to {}".format(tf.keras.backend.get_value(self.weight_vars["latent"])))
+            print(f"set latent loss weight to {tf.keras.backend.get_value(self.weight_vars['latent'])}")
 
 
 class AnnealTemperature(tf.keras.callbacks.Callback):
@@ -165,7 +165,9 @@ class Estimator:
         if weights_path is True:
             weights_path = tf.train.latest_checkpoint(self.exp.full_path)
             if weights_path is None:
-                self.log.warn(f"WARNING: weights_path set to true but no trained model found in {self.exp.full_path}")
+                self.log.warning(
+                    f"WARNING: weights_path set to true but no trained model found in {self.exp.full_path}"
+                )
         if isinstance(weights_path, str):
             # first need to compile the model
             self._compile_model()
@@ -223,7 +225,7 @@ class Estimator:
         # reset epoch when overwriting history
         if config["overwrite_history"]:
             self.epoch = 0
-        self.log.info("Training model for {} epochs".format(config["epochs"]))
+        self.log.info(f"Training model for {config['epochs']} epochs")
         history = self.model.model.fit(
             # TODO this is only shuffling the first 10000 samples, but as data is shuffled already should be ok
             x=self.train_dataset.shuffle(10000).batch(config["batch_size"]).prefetch(1),
