@@ -57,3 +57,6 @@ dendrogram
 Matplotlib
 dimensionality
 foldchange
+loadings
+localisations
+interpretability
