@@ -38,7 +38,7 @@ data folders in by running::
     campa setup
 
 This creates a default config in ``$HOME/.config/campa/campa.ini``.
-Note that for following the tutorials it is not necessary to write a config to disk,
+Note that for following the tutorials it is not necessary complete this step and write a config file to disk,
 as all tutorials set the necessary config values at the start.
 
 

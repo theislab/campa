@@ -918,7 +918,12 @@ class FeatureExtractor:
         """
 
         def array_comp(arr1, arr2):
-            comp = arr1 == arr2
+            if arr1.shape != arr2.shape:
+                return False
+            if arr1.dtype == object:
+                comp = arr1 == arr2
+            else:
+                comp = np.isclose(arr1, arr2)
             if comp is False:
                 return False
             else:
@@ -944,7 +949,7 @@ class FeatureExtractor:
                 # params are experiment specific, but here we just care about the resulting values
                 continue
             if key == "object_stats":
-                res["uns"][key] = self.adata.uns[key].equals(obj.adata.uns[key])
+                res["uns"][key] = array_comp(self.adata.uns[key], obj.adata.uns[key])
             elif key == "clusters":
                 res["uns"][key] = array_comp(self.adata.uns[key], obj.adata.uns[key])
             elif key in ("object_stats_params", "co_occurrence_params"):
