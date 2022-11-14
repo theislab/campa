@@ -96,7 +96,11 @@ def _get_cluster_parser():
         default="aggregated/full_data",
     )
     prepare.add_argument(
-        "--data-dirs", help="Data dirs to prepare. Defaults to experiment data dirs", nargs="+", type=str, default=None
+        "--data-dirs",
+        help="Data directories to prepare. Defaults to experiment data directories",
+        nargs="+",
+        type=str,
+        default=None,
     ),
     prepare.set_defaults(func=campa.tl.prepare_full_dataset)
     # project
