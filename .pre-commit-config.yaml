@@ -25,7 +25,7 @@ repos:
 # temporarily disable yesqa, because of: ValueError: not enough values to unpack (expected 2, got 1).
 # Possibly related to https://github.com/asottile/yesqa/issues/132
 #-   repo: https://github.com/asottile/yesqa
-#    rev: v1.2.3
+#    rev: v1.4.0
 #    hooks:
 #    -   id: yesqa
 #        additional_dependencies: [flake8-tidy-imports, flake8-docstrings, flake8-rst-docstrings, flake8-comprehensions, flake8-bugbear, flake8-logging-format, flake8-blind-except, flake8-builtins, flake8-pytest-style, flake8-mock, flake8-string-format]

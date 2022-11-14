@@ -8,11 +8,3 @@ Installation with pip
 ::
 
     pip install campa
-
-
-Setup
-=====
-
-Create a config file (see :ref:`campa-config`) and set up paths to data and experiment folders::
-
-    campa setup
