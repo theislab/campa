@@ -31,10 +31,6 @@ Install CAMPA by running::
 
     pip install campa
 
-Setup `data and experiment paths`_ with::
-
-    campa setup
-
 
 Contributing
 ------------
