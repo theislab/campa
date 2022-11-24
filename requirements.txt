@@ -4,5 +4,5 @@ scanpy[leiden]>=1.8.0
 scikit-learn
 scikit-learn
 squidpy
-tensorflow>=2.6
+tensorflow>=2.6,<2.11
 tqdm>=4.50.2

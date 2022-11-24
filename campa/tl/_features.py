@@ -918,6 +918,16 @@ class FeatureExtractor:
         """
 
         def array_comp(arr1, arr2):
+            if type(arr1) == pd.DataFrame:
+                if type(arr2) == pd.DataFrame:
+                    if (arr1.columns != arr2.columns).any():
+                        return False
+                    for c in arr1:
+                        if not array_comp(arr1[c], arr2[c]):
+                            return False
+                    return True
+                else:
+                    return False
             if arr1.shape != arr2.shape:
                 return False
             if arr1.dtype == object:
