@@ -894,8 +894,7 @@ class FeatureExtractor:
                 for c2 in self.clusters:
                     self.adata.obsm[f"co_occurrence_{c1}_{c2}"]
                     mask1 = (self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1)
-                    mask2 = pd.isna(self.adata.obsm["co_occurrence_Cajal bodies_Cajal bodies"]).all(axis=1)
-                    masks.append(mask1 | mask2)
+                    masks.append(mask1)
             obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
             return obj_ids
 
