@@ -49,7 +49,7 @@ The pixel-level multi-channel data is represented as a :class:`campa.data.MPPDat
 (Multiplexed Pixel Profile Data) object.
 
 It is represented on disk by a folder containing ``npy`` and ``csv`` files.
-Let :math:`n_o` the the number of objects (cells) in the data,
+Let :math:`n_o` the number of objects (cells) in the data,
 :math:`n_p` the number of pixels, and :math:`m` the number of measurements per pixel
 (e.g. number of protein channels), the data is saved in:
 
@@ -64,7 +64,7 @@ For example, after training a cVAE with :math:`c` conditions and clustering its 
 of dimension :math:`l` into :math:`k` CSLs, the results directory will also contain:
 
 - ``conditions.npy``: :math:`n_p \times c`, conditions used to train the cVAE
-- ``latent.npy``: :math:`n_p \times l`, latent space of the cVAE used for clustering of ICLs
+- ``latent.npy``: :math:`n_p \times l`, latent space of the cVAE used for clustering CSLs
 - ``clustering.npy``: :math:`n_p \times k`, clustering of ``latent.npy``
 - ``cluster_annotation.csv``: :math:`k`, mapping of clusters to cluster names
 
@@ -126,7 +126,7 @@ The workflow consists of the following steps:
 - Cluster cVAE latent representation into CSLs.
   This is done in three steps:
 
-    - First, the the data is subsampled and clustered, because we would like the clustering
+    - First, the data is subsampled and clustered, because we would like the clustering
       to be interactive and feasible to compute on a laptop.
       If you have more time or access to GPUs, you could also consider to skip the subsampling
       step and cluster all data directly.

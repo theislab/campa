@@ -7,7 +7,7 @@ feature_params = {  # type: ignore[var-annotated]
     "cluster_name": "clustering_res0.2",
     # dir of subsampled clustering to load annotation. Relative to experiment_dir.
     # Default is taking first of experiment_dir/aggregated/sub-*
-    "cluster_dir": None,
+    "cluster_dir": "aggregated/sub-pre",
     # cluster annotation to use. Defaults to cluster_name
     "cluster_col": None,
     # data dirs to be processed.
