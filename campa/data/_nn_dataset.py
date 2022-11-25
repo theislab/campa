@@ -14,12 +14,12 @@ def create_dataset(params: Mapping[str, Any]) -> None:
     """
     Create a :class:`NNDataset`.
 
-    Params determine how the data should be selected and processed.
-    The following keys in params are expected:
+    Parameters determine how the data should be selected and processed.
+    The following keys in parameters are expected:
 
-    - ``dataset_name``: name of the resulting dataset that is defined by these params
+    - ``dataset_name``: name of the resulting dataset that is defined by these parameters
       (relative to ``DATA_DIR/datasets``)
-    - ``data_config``: name of data config (registered in campa.ini)
+    - ``data_config``: name of data configuration (registered in ``campa.ini``)
     - ``data_dirs``: where to read data from (relative to ``DATA_DIR`` defined in data config)
     - ``channels``: list of channel names to include in this dataset
     - ``condition``: list of conditions. Should be defined in data config.
@@ -33,8 +33,8 @@ def create_dataset(params: Mapping[str, Any]) -> None:
     - ``subset_kwargs``: kwargs to :meth:`MPPData.subset` defining which object to subset to
     - ``subsample``: (bool) subsampling of pixels (only for train/val)
     - ``subsample_kwargs``: kwargs for :meth:`MPPData.subsample` defining the fraction of pixels to be sampled
-    - ``neighborhood``: (bool) add local neighborhood to samples in NNDataset
-    - ``neighborhood_size``: size of neighborhood
+    - ``neighborhood``: (bool) add local neighbourhood to samples in NNDataset
+    - ``neighborhood_size``: size of neighbourhood
     - ``normalise``: (bool) Intensity normalisation
     - ``normalise_kwargs``: kwargs to :meth:`MPPData.normalise`
     - ``seed``: random seed to make subsampling reproducible

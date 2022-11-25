@@ -1,11 +1,11 @@
 CAMPA - Conditional Autoencoder for Multiplexed Pixel Analysis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-CAMPA is a framework for quantiative analysis of subcellular multi-channel imaging data.
+CAMPA is a framework for quantitative analysis of subcellular multi-channel imaging data.
 It consists of a workflow that generates consistent subcellular landmarks (CSLs)
 using conditional Variational Autoencoders (cVAE).
 The output of the CAMPA workflow is an `anndata`_ object that contains interpretable
-per-cell features summarizing the molecular composition
+per-cell features summarising the molecular composition
 and spatial arrangement of CSLs inside each cell.
 
 

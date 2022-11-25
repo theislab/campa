@@ -41,7 +41,7 @@ class Experiment:
         - `init_with_weights`: if true, looks for saved weights in experiment_dir.
           if a path, loads these weights
 
-    - `training`: training hyperparameters
+    - `training`: training hyper-parameters
 
         - `learning_rate`: learning rate to use
         - `epochs`: number of epochs to train
@@ -64,9 +64,9 @@ class Experiment:
 
     - `cluster`: clustering on val/test split
 
-        - `cluster_name`: name of the clustering, used to save npy file.
+        - `cluster_name`: name of the clustering, used to save `npy` file.
         - `cluster_rep`: model output name to use for clustering, or "mpp".
-        - `cluster_method`: leiden or kmeans.
+        - `cluster_method`: `leiden` or `kmeans`.
         - `leiden_resolution`: resolution parameter for leiden clustering.
         - `subsample`: None or "subsample", whether or not to subsample data before clustering.
         - `subsample_kwargs`: passed to :meth:`campa.data.MPPData.subsample`
@@ -165,7 +165,7 @@ class Experiment:
     @classmethod
     def from_dir(cls, exp_path: str) -> "Experiment":
         """
-        Init experiment from trained experiment in exp_path.
+        Initialise experiment from trained experiment in exp_path.
 
         Changes ``init_with_weights`` to True and ``save_config`` to False
 
@@ -196,7 +196,7 @@ class Experiment:
     @property
     def is_trainable(self) -> bool:
         """
-        Return false, if this is not a traineable experiment.
+        Return false, if this is not a trainable experiment.
         """
         return self.config["model"] is not None and self.config["training"] is not None
 
@@ -246,8 +246,7 @@ class Experiment:
 
         Returns
         -------
-        pd.DataFrame:
-            training history
+        training history.
         """
         history_path = os.path.join(self.full_path, "history.csv")
         if os.path.isfile(history_path):
@@ -298,7 +297,7 @@ class Experiment:
 
     def get_split_imgs_mpp_data(self) -> Optional[MPPData]:
         """
-        Val_imgs / test_imgs :class:`MPPData` read from ``results_epoch{self.epoch}```.
+        `Val_imgs` / `test_imgs` :class:`MPPData` read from ``results_epoch{self.epoch}```.
 
         Whether val or test is returned depends on evaluation split defined in config.
         """
@@ -335,8 +334,7 @@ class Experiment:
 
         Returns
         -------
-        pd.DataFrame
-            The cluster annotation file.
+        The cluster annotation file.
         """
         fname = os.path.join(
             self.full_path,
@@ -365,8 +363,7 @@ class Experiment:
 
         Returns
         -------
-        pd.DataFrame
-            The cluster annotation file.
+        The cluster annotation file.
         """
         # TODO need to somehow figure out sub dir!
         if cluster_dir is None:
@@ -380,7 +377,7 @@ class Experiment:
     @staticmethod
     def get_experiments_from_config(config_fname: str, exp_names: Optional[Iterable[str]] = None) -> List["Experiment"]:
         """
-        Init and return experiments from configs in config file.
+        Initialise and return experiments from configs in config file.
 
         Parameters
         ----------
@@ -407,7 +404,7 @@ class Experiment:
         exp_dir: str, exp_names: Optional[Iterable[str]] = None, only_trainable: bool = False
     ) -> List["Experiment"]:
         """
-        Init and return experiments from experiment directory.
+        Initialise and return experiments from experiment directory.
 
         Parameters
         ----------
@@ -420,8 +417,7 @@ class Experiment:
 
         Returns
         -------
-        Iterable[Experiment]
-            Initialised experiments.
+        Initialised experiments.
         """
         exps = []
         for exp_name in next(os.walk(os.path.join(campa_config.EXPERIMENT_DIR, exp_dir)))[1]:

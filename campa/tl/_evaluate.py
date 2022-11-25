@@ -55,15 +55,6 @@ class Predictor:
                 reps=config["predict_reps"],
             )
 
-    # TODO might not need?
-    # def calculate_mse(self, mpp_data):
-    #    """
-    #    Calculate mean squared error from mpp_data. If mpp_data does not have decoder representation, predict it
-    #    """
-    #    if mpp_data.data("decoder") is None:
-    #        self.predict(mpp_data, reps=["decoder"])
-    #    return np.mean((mpp_data.center_mpp - mpp_data.data("decoder")) ** 2, axis=0)
-
     def predict(
         self,
         mpp_data: MPPData,
@@ -115,7 +106,7 @@ class Predictor:
         split
             Data split to predict. One of `train`, `val`, `test`, `val_imgs`, `test_imgs`.
         img_ids
-            obj_ids or number of objects that should be predicted (only for val_imgs and test_imgs).
+            Object ids or number of objects that should be predicted (only for ``val_imgs`` and ``test_imgs``).
         reps
             Representations to predict. See :meth:`Predictor.get_representation`.
         """
@@ -164,7 +155,7 @@ class Predictor:
 
         Returns
         -------
-        Iterable
+        ``Iterable``
             Representation.
         """
         #  TODO might remove entangled, latent_y in the future (not needed currently)
@@ -321,7 +312,7 @@ class ModelComparator:
         save_prefix: str = "",
     ) -> None:
         """
-        Bar plot of scores for different experiments.
+        Barplot of scores for different experiments.
 
         Saves plot in :attr:`ModelComparator.save_dir`.
 
@@ -549,8 +540,8 @@ class ModelComparator:
 
         # get input images
         if img_channel is None:
-            input_channel_ids = [0]
-            img_channel = str(self.img_mpps[exp_names[0]].channels.loc[0])
+            # take first channel in first experiment
+            img_channel = self.img_mpps[exp_names[0]].channels.loc[0].values[0]
         input_channel_ids = self.img_mpps[exp_names[0]].get_channel_ids([img_channel])
         input_imgs = self.img_mpps[exp_names[0]].get_object_imgs(channel_ids=input_channel_ids, **kwargs)
         if img_ids is None:

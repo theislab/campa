@@ -10,6 +10,7 @@ from copy import deepcopy
 import os
 import json
 import pickle
+import urllib
 import logging
 
 from pynndescent import NNDescent
@@ -69,8 +70,8 @@ def add_clustering_to_adata(
     """
     Add clustering to adata.
 
-    Adds `cluster_name` to `adata.obs[added_name]` and color values for each cluster stored in the annotation dict.
-    Assumes that adata has the same dimentionality as the clustering.
+    Adds `cluster_name` to `adata.obs[added_name]` and colour values for each cluster stored in the annotation dict.
+    Assumes that adata has the same dimensionality as the clustering.
 
     Parameters
     ----------
@@ -120,7 +121,7 @@ class Cluster:
 
     - ``data_config``: name of the data config to use, should be registered in ``campa.ini``
     - ``data_dirs``: where to read data from (relative to ``DATA_DIR`` defined in data config)
-    - ``process_like_dataset``: name of dataset that gives params for processing (except subsampling/subsetting)
+    - ``process_like_dataset``: name of dataset that gives parameters for processing (except subsampling/subsetting)
     - ``subsample``: (bool) subsampling of pixels
     - ``subsample_kwargs``: kwargs for :meth:`MPPData.subsample` defining the fraction of pixels to be sampled
     - ``subset``: (bool) subset to objects with certain metadata.
@@ -130,9 +131,9 @@ class Cluster:
     - ``cluster_name``: name of the cluster assignment file
     - ``cluster_rep``: representation that should be clustered
       (name of existing file, should be predicted with :meth:`Predictor.get_representation`).
-    - ``cluster_method``: leiden or kmeans (kmeans not tested).
+    - ``cluster_method``: `leiden` or `kmeans` (`kmeans` not tested).
     - ``leiden_resolution``: resolution parameter for leiden clustering.
-    - ``kmeans_n``: number of clusters for kmeans.
+    - ``kmeans_n``: number of clusters for `kmeans`.
     - ``umap``: (bool) predict UMAP of ``cluster_rep``.
 
     Parameters
@@ -226,14 +227,14 @@ class Cluster:
         """
         Initialise from experiment for clustering of entire data that went into creating training data.
 
-        Cluster params are read from ``Experiment.config['cluster']``.
+        Cluster parameters are read from ``Experiment.config['cluster']``.
 
         Parameters
         ----------
         exp
             Trained Experiment.
         cluster_config
-            Additional cluster params (like subsampling etc). Overwrites default cluster params.
+            Additional cluster parameters (like subsampling etc). Overwrites default cluster parameters.
         data_dir
             Directory containing ``cluster_mpp`` (relative to ``{exp.dir}/{exp.name}``).
         """
@@ -398,7 +399,7 @@ class Cluster:
         from_col
             Optionally set the annotation name from which to annotate. Default is ``cluster_name``.
         colors
-            Color dict, mapping from annotations to hex colors. Default is using tab20 colormap.
+            Colour dict, mapping from annotations to hex colours. Default is using tab20 colormap.
         """
         if from_col is None:
             from_col = self.config["cluster_name"]
@@ -421,7 +422,7 @@ class Cluster:
 
     def add_cluster_colors(self, colors: Mapping[str, str] | None, from_col: str | None = None) -> None:
         """
-        Add colors to clustering or to annotation.
+        Add colours to clustering or to annotation.
 
         Adds column ``{from_col}_colors`` to :attr:`Cluster.cluster_annotation`
         and saves it to ``{cluster_name}_annotation.csv``.
@@ -429,10 +430,10 @@ class Cluster:
         Parameters
         ----------
         colors
-            Color dict, mapping from unique clustering values from ``from_col`` to hex colors.
+            Colour dict, mapping from unique clustering values from ``from_col`` to hex colours.
             Default is using tab20 colormap.
         from_col
-            Optionally set clustering name for which to add colors. Default is ``cluster_name``.
+            Optionally set clustering name for which to add colours. Default is ``cluster_name``.
         """
         if from_col is None:
             from_col = self.config["cluster_name"]
@@ -471,8 +472,17 @@ class Cluster:
             campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"], "pynndescent_index.pickle"
         )
         if os.path.isfile(index_fname) and not recreate:
-            # load and return index
-            return pickle.load(open(index_fname, "rb"))
+            try:
+                # load and return index
+                return pickle.load(open(index_fname, "rb"))
+            except AttributeError as e:
+                if "'NNDescent' object has no attribute 'parallel_batch_queries'" in str(e):
+                    # need to recreate index
+                    self.log.info(
+                        "Version of pynndescent does not match version that index was created with. Recreating index."
+                    )
+                else:
+                    raise (e)
         # need to create index
         # check that cluster_rep has been computed already for cluster_mpp
         assert self.cluster_mpp is not None
@@ -489,7 +499,7 @@ class Cluster:
     # --- functions creating and adding data to cluster_mpp ---
     def create_cluster_mpp(self):
         """
-        Use cluster params to create and save :attr:`Cluster.cluster_mpp` to use for clustering.
+        Use cluster parameters to create and save :attr:`Cluster.cluster_mpp` to use for clustering.
 
         Raises
         ------
@@ -705,7 +715,7 @@ class Cluster:
 
     def predict_cluster_imgs(self, exp: Experiment) -> MPPData | None:
         """
-        Predict cluster imgs from experiment.
+        Predict cluster images from experiment.
 
         Parameters
         ----------
@@ -745,24 +755,193 @@ class Cluster:
         self.log.info(f"Projecting cluster_imgs for {exp.dir}/{exp.name}")
         return self.project_clustering(mpp_imgs, save_dir=img_save_dir)
 
+    # --- use cluster_mpp to query HPA ---
+    def get_hpa_localisation(
+        self,
+        cluster_name: str = "clustering_res0.5",
+        thresh: float = 1,
+        max_num_channels: int = 3,
+        limit_to_groups: Mapping[str, str | list[str]] | None = None,
+        **kwargs: Any,
+    ) -> Mapping[str, Mapping[str, Any]]:
+        """
+        Query subcellular localisation for each cluster from Human Protein Atlas (https://www.proteinatlas.org).
 
-def prepare_full_dataset(experiment_dir: str, save_dir: str = "aggregated/full_data") -> None:
+        Calculates cluster loadings and returns the subcellular localisations of
+        the channels that are enriched for each cluster.
+        Requires "hpa_gene_name" column in channel_metadata.csv file in DATA_DIR
+        to map channel names to genes available in HPA.
+
+        Parameters
+        ----------
+        cluster_name
+            Clustering to calculate localisations for. Must exist already.
+        thresh
+            Minimum z-scored intensity value of channel in cluster to be considered for HPA query.
+            thresh=0 considers all enriched channel of this cluster
+        max_num_channels
+            Maximal number of channels to be considered for HPA query.
+            Channels with highest z-scored intensity value will be used.
+            If None, all channels passing `thresh` will be used.
+        limit_to_groups
+            Dict with obs as keys and groups from obs as values, to subset data before calculating loadings.
+        kwargs
+            Keyword arguments for :func:`campa.tl.query_hpa_subcellular_location`.
+
+        Returns
+        -------
+            Mapping[str, Mapping[str, Any]]:
+                Results dictionary with clusters as keys,
+                and return value from :func:`campa.tl.query_hpa_subcellular_location`
+        """
+        if (self.cluster_mpp is None) or (self.cluster_mpp.data(cluster_name) is None):
+            self.log.info(f"cannot query HPA: cluster_mpp does not exist or {cluster_name} does not exist")
+            return {}
+        self.set_cluster_name(cluster_name)
+        adata = self.cluster_mpp.get_adata(X="mpp", obsm={"X_latent": "latent", "X_umap": "umap"})
+        # ensure that clustering is available in adata
+        add_clustering_to_adata(
+            os.path.join(campa_config.EXPERIMENT_DIR, self.config["cluster_data_dir"]),
+            cluster_name,
+            adata,
+            self.cluster_annotation,
+        )
+
+        # subset data
+        if limit_to_groups is None:
+            limit_to_groups = {}
+        for key, groups in limit_to_groups.items():
+            if not isinstance(groups, list):
+                groups = [groups]
+            adata = adata[adata.obs[key].isin(groups)]
+
+        # calculate mean z-scored intensity values
+        means = (
+            pd.concat(
+                [
+                    pd.DataFrame(adata.X, columns=adata.var_names).reset_index(drop=True),
+                    adata.obs[[cluster_name]].reset_index(drop=True),
+                ],
+                axis=1,
+            )
+            .groupby(cluster_name)
+            .aggregate("mean")
+        )
+        means = (means - means.mean()) / means.std()
+        # means = means.apply(zscore, axis=1)
+
+        # for each cluster, determine channels that localise to this cluster (mean z-scored intensity > thresh)
+        # and map channel names to gene names used in HPA
+        channels_metadata = pd.read_csv(os.path.join(self.data_config.DATA_DIR, "channels_metadata.csv"), index_col=0)
+        cluster_localisation = {}
+        for idx, row in means.iterrows():
+            channels = np.array(row[row > thresh].index)
+            weights = np.array(row[row > thresh])
+            if max_num_channels is not None:
+                selected_indices = np.argsort(weights)[::-1][:max_num_channels]
+                weights = weights[selected_indices]
+                channels = channels[selected_indices]
+            cluster_localisation[idx] = (list(channels_metadata.set_index("name").loc[channels].gene_name_hpa), weights)
+
+        # query hpa for each cluster
+        results = {}
+        for idx, (genes, weights) in cluster_localisation.items():
+            results[idx] = query_hpa_subcellular_location(genes, gene_weights=weights, **kwargs)
+        return results
+
+
+def query_hpa_subcellular_location(
+    genes: Iterable[str],
+    gene_weights: Iterable[float] | None = None,
+    filter_reliability: Iterable[str] = ("Uncertain",),
+) -> Mapping[str, Any]:
+    """
+    Query the Human Protein Atlas for a consensus subcellular locations from a list of genes.
+
+    HPA is availablen at https://www.proteinatlas.org
+
+    Parameters
+    ----------
+    genes
+        List of genes to query in the HPA (using field "gene_name").
+    gene_weights
+        List of weights for each gene, used to compute main subcellular locations.
+    filter_reliability
+        Do not return genes with this subcellular location reliability ("Reliability IF").
+        Available reliabilities (in order from most reliable to least reliable) are:
+        Enhanced, Supported, Approved, Uncertain.
+        See also https://www.proteinatlas.org/about/assays+annotation#if_reliability_score
+
+    Returns
+    -------
+        Mapping[str, Any]:
+            Results dictionary with keys:
+                - hpa_data: data frame of available genes and their subcellular locations according to HPA data.
+                - subcellular_locations: pd.Series of all subcellular locations ocurring for this list of genes,
+                  sorted by most frequent
+
+    """
+    if gene_weights is None:
+        gene_weights = [1] * len(list(genes))
+    url_str = "http://www.proteinatlas.org/api/search_download.php?search=gene_name:{gene}&format=json&columns=g,gs,scml,scal,relce&compress=no"  # noqa: <E501>
+    data = []
+    index = []
+    for gene in genes:
+        if gene is None or gene == np.nan:  # type: ignore[comparison-overlap]
+            continue
+        cur_url_str = url_str.format(gene=gene)
+        with urllib.request.urlopen(cur_url_str) as url:
+            res = json.load(url)
+            if len(res) > 0:
+                index.append(gene)
+                data.append(res[0])
+            else:
+                print(f"No result for {gene}")
+    # no resulting data? (either len(genes)==0 or no genes found)
+    if len(data) == 0:
+        return {"hpa_data": None, "subcellular_locations": None}
+    data = pd.DataFrame(data, index=index)
+    # filter out any columns with filter_reliability or None reliability score
+    data = data[~data["Reliability (IF)"].isin(list(filter_reliability) + [None])]
+    data = pd.merge(
+        data, pd.DataFrame({"gene_weights": gene_weights}, index=genes), how="left", right_index=True, left_index=True
+    )
+    # summarise locations & their occurrence counts
+    summary = {}  # type: ignore[var-annotated]
+    for locations, weight in zip(data["Subcellular main location"], data["gene_weights"]):
+        for loc in locations:
+            if loc not in summary.keys():
+                summary[loc] = weight
+            else:
+                summary[loc] += weight
+    summary = pd.Series(summary).sort_values(ascending=False)
+    return {"hpa_data": data, "subcellular_locations": summary}
+
+
+def prepare_full_dataset(
+    experiment_dir: str, save_dir: str = "aggregated/full_data", data_dirs: list[str] | None = None
+) -> None:
     """
     Prepare all data for clustering by predicting cluster-rep.
 
     Parameters
     ----------
     experiment_dir
-        Experiment directory releative to ``EXPERIMENT_PATH``.
+        Experiment directory relative to ``EXPERIMENT_PATH``.
     save_dir
         Directory to save prepared full data to, relative to ``experiment_dir``.
+    data_dirs
+        Data to prepare. Defaults for ``exp.data_params['data_dirs']``.
     """
     from campa.tl import Experiment
 
     log = logging.getLogger("prepare full dataset")
     exp = Experiment.from_dir(experiment_dir)
     # iterate over all data dirs
-    for data_dir in exp.data_params["data_dirs"]:
+    if data_dirs is None:
+        data_dirs = exp.data_params["data_dirs"]
+    print("iterating over data dirs", data_dirs)
+    for data_dir in data_dirs:
         log.info(f"Processing data_dir {data_dir}")
         mpp_data = MPPData.from_data_dir(
             data_dir,
@@ -810,7 +989,7 @@ def create_cluster_data(
     Parameters
     ----------
     experiment_dir
-        Experiment directory releative to ``EXPERIMENT_PATH``.
+        Experiment directory relative to ``EXPERIMENT_PATH``.
     subsample
         Subsample the data.
     frac
@@ -819,7 +998,7 @@ def create_cluster_data(
         Directory to save subsampled cluster data, relative to ``experiment_dir``.
         Default is ``aggregated/sub-FRAC``.
     cluster
-        Use cluster params in Experiment config to cluster the subsetted data.
+        Use cluster parameters in Experiment config to cluster the subsetted data.
     """
     from campa.tl import Experiment
 
@@ -855,7 +1034,7 @@ def project_cluster_data(
     Parameters
     ----------
     experiment_dir
-        Experiment directory releative to ``EXPERIMENT_PATH``.
+        Experiment directory relative to ``EXPERIMENT_PATH``.
     cluster_data_dir
         Directory in which clustering is stored relative to experiment dir. Usually in ``aggregated/sub-FRAC``.
     cluster_name
@@ -863,7 +1042,7 @@ def project_cluster_data(
     save_dir
         Directory in which the data to be projected is stored, relative to ``experiment_dir``.
     data_dir
-        Data_dir to project. If not specified, project all ``data_dir``s in ``save_dir``.
+        Data directory to project. If not specified, project all ``data_dir``s in ``save_dir``.
         Relative to ``save_dir``.
     """
     from campa.tl import Experiment
@@ -900,17 +1079,17 @@ def load_full_data_dict(
     exp
         Experiment from which to load the mpp_datas.
     keys
-        Controls which np data matrices are being loaded. Passed to :meth:`MPPData.from_data_dir`,
+        Controls which numpy data matrices are being loaded. Passed to :meth:`MPPData.from_data_dir`,
         with `optional_keys` set to empty list. Excluding mpp here speeds up loading.
     data_dirs
-        Dirs that should be loaded, if None, all data_dirs are loaded.
+        Directories that should be loaded, if None, all ``data_dirs`` are loaded.
     save_dir
         Directory in which the data to be loaded is stored, relative to ``{exp.dir}/{exp.name}``.
 
 
     Returns
     -------
-    Dictonary with `data_dirs` as keys and :class:`MPPData` as values.
+    Dictionary with `data_dirs` as keys and :class:`MPPData` as values.
     """
     if data_dirs is None:
         data_dirs = exp.data_params["data_dirs"]
@@ -945,7 +1124,7 @@ def get_clustered_cells(
 
     Returns
     -------
-    dictionary containing clustered cells in `cluster_name` and colored cells in `cluster_name_colored`.
+    dictionary containing clustered cells in `cluster_name` and coloured cells in `cluster_name_colored`.
     """
     from campa.pl import annotate_img
 

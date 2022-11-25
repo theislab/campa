@@ -8,6 +8,7 @@ from ._cluster import (
     prepare_full_dataset,
     project_cluster_data,
     add_clustering_to_adata,
+    query_hpa_subcellular_location,
 )
 from ._evaluate import Predictor, ModelComparator
 from ._features import (

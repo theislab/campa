@@ -13,7 +13,7 @@ def _get_base_parser():
         usage="""campa <command> [<args>]
 
 Available subcommands are:
-setup               Create configuration file campa.ini
+setup               Create configuration file ``campa.ini``
 create_dataset      Create NNDataset using parameter file
 train               Train and evaluate models defined by experiment config
 cluster             Cluster data and project clustering
@@ -25,18 +25,18 @@ extract_features    Extract features from clustered dataset
 
 
 def _get_setup_parser():
-    parser = argparse.ArgumentParser(description="Create configuration file campa.ini.")
+    parser = argparse.ArgumentParser(description="Create configuration file ``campa.ini``.")
     parser.add_argument(
-        "--force",
+        "--quiet",
         action="store_true",
-        help="force recreation of campa.ini even if exists",
+        help="create default configuration file without asking for user input.",
     )
     return parser
 
 
 def _get_create_dataset_parser():
     parser = argparse.ArgumentParser(description=("Create NNDataset using parameter file"))
-    parser.add_argument("params", help="path to data_params.py")
+    parser.add_argument("params", help="path to ``data_params.py``")
     return parser
 
 
@@ -48,10 +48,10 @@ def _get_train_parser():
         choices=["all", "train", "evaluate", "trainval", "compare"],
     )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--config", help="path_to_experiment_config.py")
+    group.add_argument("--config", help="path to ``experiment_config.py``")
     group.add_argument(
         "--experiment-dir",
-        help="experiment_dir containing experiment folders. Relative to EXPERIMENT_DIR",
+        help="``experiment_dir`` containing experiment folders. Relative to EXPERIMENT_DIR",
     )
     parser.add_argument(
         "--exp-name",
@@ -80,11 +80,11 @@ def _get_cluster_parser():
     )
     create.add_argument(
         "--save-dir",
-        help="directory to save subsampled cluster data, relative to experiment dir. Default is aggregated/sub-FRAC",  # noqa: E501
+        help="directory to save subsampled cluster data, relative to ``experiment-dir``. Default is ``aggregated/sub-FRAC``",  # noqa: E501
     )
     create.add_argument(
         "--cluster",
-        help="use cluster params in Experiment config to cluster the subsetted data.",
+        help="use cluster parameters in Experiment config to cluster the subsetted data.",
         action="store_true",
     )
     create.set_defaults(func=campa.tl.create_cluster_data)
@@ -92,25 +92,35 @@ def _get_cluster_parser():
     prepare = subparsers.add_parser("prepare-full", help="Prepare full data for clustering. Predicts cluster-rep.")
     prepare.add_argument(
         "--save-dir",
-        help="directory to save prepared full data to, relative to experiment dir.",
+        help="directory to save prepared full data to, relative to ``experiment-dir``.",
         default="aggregated/full_data",
     )
+    prepare.add_argument(
+        "--data-dirs",
+        help="Data directories to prepare. Defaults to experiment data directories",
+        nargs="+",
+        type=str,
+        default=None,
+    ),
     prepare.set_defaults(func=campa.tl.prepare_full_dataset)
     # project
     project = subparsers.add_parser("project", help="Project existing clustering.")
     project.add_argument(
         "cluster_data_dir",
         metavar="cluster-data-dir",
-        help="directory in which clustering is stored relative to experiment dir. Usually in aggregated/sub-FRAC",
+        help="""
+        directory in which clustering is stored relative to ``experiment-dir``.
+        Usually in ``aggregated/sub-FRAC``
+        """,
     )
     project.add_argument(
         "--save-dir",
-        help="directory in which data to be projected is stored, relative to experiment dir.",
+        help="directory in which data to be projected is stored, relative to ``experiment-dir``.",
         default="aggregated/full_data",
     )
     project.add_argument(
         "--data-dir",
-        help="data to project. If not specified, project all data_dirs in save_dir",
+        help="data to project. If not specified, project all ``data_dirs`` in ``save_dir``",
     )
     project.add_argument("--cluster-name", default="clustering", help="name of clustering to project")
     project.set_defaults(func=campa.tl.project_cluster_data)
@@ -119,7 +129,7 @@ def _get_cluster_parser():
 
 def _get_extract_features_parser():
     parser = argparse.ArgumentParser(description=("Extract features from clustered dataset."))
-    parser.add_argument("params", help="path to feature_params.py")
+    parser.add_argument("params", help="path to ``feature_params.py``")
     return parser
 
 
@@ -141,7 +151,7 @@ class CAMPA:
         parser = _get_setup_parser()
         args = parser.parse_args(sys.argv[2:])
         # create and populate campa.ini
-        prepare_config(args)
+        prepare_config(**vars(args))
 
     def create_dataset(self):
         parser = _get_create_dataset_parser()
@@ -165,11 +175,12 @@ class CAMPA:
         parser = _get_cluster_parser()
         args = parser.parse_args(sys.argv[2:])
         init_logging()
+        vars_args = vars(args)
         try:
-            func = args.func
+            func = vars_args.pop("func")
         except AttributeError:
             parser.error("too few arguments")
-        func(**vars(args))
+        func(**vars_args)
 
     def extract_features(self):
         parser = _get_extract_features_parser()

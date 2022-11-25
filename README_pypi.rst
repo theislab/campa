@@ -27,13 +27,9 @@ Please see our preprint
 Installation
 ------------
 
-Install CAMPA by running::
+CAMPA was developed for Python 3.9 and can be installed by running::
 
     pip install campa
-
-Setup `data and experiment paths`_ with::
-
-    campa setup
 
 
 Contributing

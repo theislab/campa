@@ -20,22 +20,24 @@ def annotate_img(
     img
         Image to annotate.
     annotation
-        :attr:`Cluster.cluster_annotation` containing mapping of classes to cluster names and colors.
+        :attr:`Cluster.cluster_annotation` containing mapping of classes to cluster names and colours.
     from_col
         Annotation column containing current values in image.
     to_col
         Annotation column containing desired mapping. If None, use ``from_col``.
     color
-        If True, use annotation column ``to_col+"_colors"`` to get colormap and color image.
+        If True, use annotation column ``to_col+"_colors"`` to get colormap and colour image.
     Returns
     -------
     Annotated image.
     """
     if to_col is None:
         to_col = from_col
+    res: np.ndarray
     if color:
         to_col = to_col + "_colors"
-        res = np.zeros(img.shape + (3,), dtype=np.uint8)
+        # default to white background
+        res = np.zeros(img.shape + (3,), dtype=np.uint8) + 255
     else:
         if from_col == to_col:
             # no need to change anything

@@ -1,7 +1,7 @@
 # TODO go through functions and comment
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, Optional
 from functools import partial
 import json
 import logging
@@ -132,9 +132,9 @@ class BaseAEModel:
     """
     Base class for AE and VAE models.
 
-    This model can have neighbors, conditions (concatenated to input + decoder), and
+    This model can have neighbours, conditions (concatenated to input + decoder), and
     and adversarial head.
-    The class defines init functions for setting up AE with encoder and decoder.
+    The class defines initialisation functions for setting up AE with encoder and decoder.
     In addition, encoder and decoder input layers are defined (can be overwritten in subclassed functions).
 
     Subclassed models can define:
@@ -146,13 +146,14 @@ class BaseAEModel:
 
     Default architecture of this model:
 
-    - Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim
-    - Decoder: fc_layers - linear (regularized) layer to num_output_channels
+    - Encoder: ``(noise) - conv layers - fc layers - linear layer to latent_dim``
+    - Decoder: ``fc_layers - linear (regularized) layer to num_output_channels``
 
     Conditional models additionally output `latent`, the latent space (for KL loss computation).
 
-    Adversarial models additionally output `adv_head`, the output of the adversarial head (for adv loss computation).
-    (adv_latent - reverse_gradients - adversarial_layers - linear layer to num_conditions).
+    Adversarial models additionally output `adv_head`, the output of the adversarial head
+    (for adversarial loss computation).
+    ``(adv_latent - reverse_gradients - adversarial_layers - linear layer to num_conditions)``.
 
     TODO adversarial models are not tested in this version of the code.
 
@@ -161,7 +162,7 @@ class BaseAEModel:
     name: Optional[str]
         Model name.
     num_neighbors: str
-        Number of neighbors used in input data.
+        Number of neighbours used in input data.
     num_channels: int
         Number of channels for input and output.
         Can be split up in ``num_input_channels`` and ``num_output_channels``.
@@ -180,19 +181,19 @@ class BaseAEModel:
     input_noise: Optional[str]
         One of `gaussian`, `dropout`, adds noise to encoder input.
     noise_scale: int
-        Scale of gaussian noise.
+        Scale of Gaussian noise.
     encoder_conv_layers: Iterable[int]
-        Size of conv layers for encoder.
+        Size of convolutional layers for encoder.
     encoder_conv_kernel_size: Iterable[int]
-        Kernel size for each encoder conv layer.
+        Kernel size for each encoder convolutional layer.
     encoder_fc_layers: Iterable[int]
-        Size of fc encoder layers.
-        From last encoder layer, a linear fcl to latent_dim is applied.
+        Size of fully connected encoder layers.
+        From last encoder layer, a linear fully connected layer to ``latent_dim`` is applied.
     latent_dim: int
         Number of nodes in latent space (for some models == number of classes).
     decoder_fc_layers: Iterable[int]
         Decoder architecture.
-        From last decoder later, a linear fcl to ``num_output_channels`` is applied.
+        From last decoder later, a linear fully connected layer to ``num_output_channels`` is applied.
     decoder_regularizer: Optional[str]
         Regularizer for decoder, `l1` or `l2`.
     decoder_regularizer_weight: float
@@ -257,7 +258,7 @@ class BaseAEModel:
             self.adv_head.summary(print_fn=lambda x: summary.append(x))
         self.summary = "\n".join(summary)
 
-    def create_model(self):
+    def create_model(self) -> tf.keras.Model:
         """
         Create :class:`tf.keras.Model`.
 
@@ -266,8 +267,7 @@ class BaseAEModel:
 
         Returns
         -------
-        :class:`tf.keras.Model`
-            Neural network model.
+        Neural network model.
         """
         # encoder and decoder
         self.encoder, self.latent = self.create_encoder()
@@ -297,12 +297,12 @@ class BaseAEModel:
 
     @property
     def is_conditional(self):
-        """Flag set based on num_conditions."""
+        """Flag set based on ``num_conditions``."""
         return self.config["num_conditions"] > 0
 
     @property
     def is_adversarial(self):
-        """Model is adversarial if is is conditional and adv layers are defined."""
+        """Model is adversarial if is is conditional and adversarial layers are defined."""
         return self.config["adversarial_layers"] is not None and self.is_conditional
 
     def encode_condition(self, C):
@@ -332,7 +332,7 @@ class BaseAEModel:
 
     def _create_base_encoder(self):
         """
-        Create base encoder structure with conv layers and fcl.
+        Create base encoder structure with convolutional layers and fully connected layers.
 
         Does not apply the last (linear) layer to latent_dim - useful for VAE which does this differently.
         """
@@ -371,7 +371,7 @@ class BaseAEModel:
             X = tf.keras.layers.Dense(l, activation=tf.nn.relu)(X)
         return X
 
-    def create_encoder(self):
+    def create_encoder(self) -> Tuple[tf.keras.Model, Optional[tf.Tensor]]:
         """
         Create encoder.
 
@@ -380,8 +380,7 @@ class BaseAEModel:
 
         Returns
         -------
-        tf.keras.model, tf.Tensor
-            Encoder and latent (None for BaseAEModel).
+        Encoder and latent (None for BaseAEModel).
         """
         X = self._create_base_encoder()
         # linear layer to latent
@@ -431,14 +430,13 @@ class BaseAEModel:
         decoder = tf.keras.Model(self.decoder_input, decoder_output, name="decoder")
         return decoder
 
-    def create_adversarial_head(self):
+    def create_adversarial_head(self) -> tf.keras.Model:
         """
-        Create adversarial head: (reverse_gradient - adversarial_layers - num_conditions).
+        Create adversarial head: ``reverse_gradient - adversarial_layers - num_conditions``.
 
         Returns
         -------
-        tf.keras.Model
-            adversarial head.
+        adversarial head.
         """
         assert self.is_conditional
         assert self.is_adversarial
@@ -479,20 +477,20 @@ class BaseAEModel:
 
 class VAEModel(BaseAEModel):
     """
-    VAE with simple gaussian prior (trainable with KL loss).
+    VAE with simple Gaussian prior (trainable with KL loss).
 
     Inherits from :class:`BaseAEModel`.
 
     Model architecture:
 
-    - Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim * 2
-    - Latent: split latent_dim in half, resample using gaussian prior
-    - Decoder: fc_layers - linear (regularized) layer to num_output_channels
+    - Encoder: ``(noise) - conv layers - fc layers - linear layer to latent_dim * 2``
+    - Latent: split ``latent_dim`` in half, re-sample using Gaussian prior
+    - Decoder: ``fc_layers - linear (regularized) layer to num_output_channels``
     """
 
     default_config = {"name": "VAEModel"}
 
-    def create_encoder(self):
+    def create_encoder(self) -> Tuple[tf.keras.Model, Optional[tf.Tensor]]:
         """
         Create encoder.
 
@@ -501,8 +499,7 @@ class VAEModel(BaseAEModel):
 
         Returns
         -------
-        tf.keras.model, tf.Tensor
-            Encoder and latent (None for BaseAEModel).
+        Encoder and latent (None for ``BaseAEModel``).
         """
         X = self._create_base_encoder()
         # linear layer to latent
@@ -520,7 +517,7 @@ class CatVAEModel(BaseAEModel):
 
     VAE with categorical prior (softmax gumbel) (trainable with categorical loss)
     Encoder: (noise) - conv layers - fc layers - linear layer to latent_dim * 2
-    Latent: split latent_dim in half, resample using gaussian prior
+    Latent: split latent_dim in half, resample using Gaussian prior
     Decoder: fc_layers - linear (regularized) layer to num_output_channels
     """
 
@@ -544,7 +541,7 @@ class CatVAEModel(BaseAEModel):
         """
         Create encoder.
 
-        Encoder outputs reparameterized latent.
+        Encoder outputs reparameterised latent.
         Latent is potentially returned by overall model for loss calculation, e.g. for VAE.
 
         Returns
@@ -602,7 +599,7 @@ class GMMVAEModel(BaseAEModel):
     VAE with gmm prior (trainable with categorical loss for y and weighted kl loss for z)
     Encoder y: (noise) - conv layers y - fc layers y - linear layer to latent_dim
     Encoder: (noise) + y - conv layers - fc layers - linear layer to latent_dim * 2
-    Latent: split latent_dim in half, resample using gaussian prior
+    Latent: split latent_dim in half, resample using Gaussian prior
     Decoder: fc_layers - linear (regularized) layer to num_output_channels
     """
 
@@ -640,7 +637,7 @@ class GMMVAEModel(BaseAEModel):
 
     def qy_graph(self, input_shape):
         """
-        Return Y calculated from X (conv layers + fcl layers).
+        Return Y calculated from X (convolutional layers + fully connected layers).
         """
         X_input = tf.keras.layers.Input(input_shape)
         X = X_input
@@ -659,7 +656,7 @@ class GMMVAEModel(BaseAEModel):
 
     def create_y_encoder(self, X):
         """
-        Return Y calculated from X (conv layers + fcl layers).
+        Return Y calculated from X (convolutional layers + fully connected layers).
         """
         # conv layers
         for i, l in enumerate(self.config["y_conv_layers"]):
@@ -714,7 +711,7 @@ class GMMVAEModel(BaseAEModel):
         """
         Create encoder.
 
-        Encoder outputs reparameterized latent.
+        Encoder outputs reparameterised latent.
         Latent is potentially returned by overall model for loss calculation, e.g. for VAE.
 
         Returns

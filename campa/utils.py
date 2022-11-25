@@ -53,12 +53,12 @@ Removing unused categories will always return a new Categorical object.*",
 
 def load_config(config_file: str) -> Any:
     """
-    Load config file and return config object.
+    Load configuration file and return configuration object.
 
     Parameters
     ----------
     config_file
-        Full path to config.py file.
+        Full path to ``config.py`` file.
 
     Returns
     -------
@@ -80,17 +80,17 @@ def merged_config(config1: MutableMapping[str, Any], config2: Mapping[str, Any])
     """
     Update config1 with config2.
 
-    Work with arbitary nested levels.
+    Work with arbitrary nested levels.
 
     Parameters
     ----------
     config1
-        Base config dict.
+        Base configuration dict.
     config2
-        Config dict containing values that should be updated.
+        Configuration dict containing values that should be updated.
     Returns
     -------
-    Updated config (copy).
+    Updated configuration (copy).
     """
     res_config = deepcopy(config1)
     for k, v in config2.items():

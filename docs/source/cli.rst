@@ -4,7 +4,7 @@ CLI
 Command line interface for CAMPA.
 
 Use this to execute long-running steps of the CAMPA workflow
-(e.g. clustering large data or calculating co-ocurrence features) in a script on e.g. a HPC system.
+(e.g. clustering large data or calculating co-occurrence features) in a script on e.g. a HPC system.
 
 See the :ref:`workflow` documentation for a short introduction to the CLI commands
 and the :ref:`campatutorials` for the CLI commands needed to reproduce the example workflow.

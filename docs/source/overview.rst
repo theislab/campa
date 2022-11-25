@@ -8,7 +8,7 @@ that contains per-cell features about the molecular composition and spatial arra
 of CSLs inside each cell.
 
 CAMPA both contains a high-level API for easy access to the workflow, a low-level class-based access
-to all functions for more detailled control, and a CLI for all steps except the manual cluster annotation step.
+to all functions for more detailed control, and a CLI for all steps except the manual cluster annotation step.
 Depending on your data size, you might want to run long-running steps of the CAMPA workflow on a HPC cluster.
 
 .. _campa-config:
@@ -18,7 +18,11 @@ CAMPA config
 
 To find data and experiment folders, and dataset specific parameters,
 CAMPA uses a config, :attr:`campa.constants.campa_config`.
-CAMPA attempts to read the config values from a ``campa.ini`` config file
+Config values can directly be set in memory. For more information on
+this see the `Setup and download data tutorial`_.
+
+In order to provide a persistent config, CAMPA attempts to read the
+config values from a ``campa.ini`` config file
 from the following locations:
 
 - the current directory
@@ -34,9 +38,8 @@ data folders in by running::
     campa setup
 
 This creates a default config in ``$HOME/.config/campa/campa.ini``.
-
-Config values can also directly be set in memory. For more information on
-this see the `Setup and download data tutorial`_.
+Note that for following the tutorials it is not necessary complete this step and write a config file to disk,
+as all tutorials set the necessary config values at the start.
 
 
 Data format
@@ -46,7 +49,7 @@ The pixel-level multi-channel data is represented as a :class:`campa.data.MPPDat
 (Multiplexed Pixel Profile Data) object.
 
 It is represented on disk by a folder containing ``npy`` and ``csv`` files.
-Let :math:`n_o` the the number of objects (cells) in the data,
+Let :math:`n_o` the number of objects (cells) in the data,
 :math:`n_p` the number of pixels, and :math:`m` the number of measurements per pixel
 (e.g. number of protein channels), the data is saved in:
 
@@ -56,13 +59,13 @@ Let :math:`n_o` the the number of objects (cells) in the data,
 - ``channels.csv``: :math:`m`, protein channel names
 - ``metadata.csv``: :math:`n_o`, metadata information (perturbation, cell cycle, etc) for each object (cell)
 
-During processing of the data, additional npy files might be created.
+During processing of the data, additional numpy files might be created.
 For example, after training a cVAE with :math:`c` conditions and clustering its latent space
-of dimensionality :math:`l` into :math:`k` CSLs, the results directory will also contain:
+of dimension :math:`l` into :math:`k` CSLs, the results directory will also contain:
 
 - ``conditions.npy``: :math:`n_p \times c`, conditions used to train the cVAE
-- ``latent.npy``: :math:`n_p \times l`, latent space of the cVAE used for clustering of ICLs
-- ``clustering.npy``: :math:`n_p \times k`, clustering of latent.npy
+- ``latent.npy``: :math:`n_p \times l`, latent space of the cVAE used for clustering CSLs
+- ``clustering.npy``: :math:`n_p \times k`, clustering of ``latent.npy``
 - ``cluster_annotation.csv``: :math:`k`, mapping of clusters to cluster names
 
 For more information on the data representation, see also the `Data representation tutorial`_.
@@ -82,8 +85,8 @@ The data config file is specific per dataset but has to contain the following va
 - ``DATA_DIR``: path to the folder containing the data, can use
   :attr:`campa.constants.CAMPAConfig.BASE_DATA_DIR` to be device-agnostic.
 - ``DATASET_DIR``: path to the folder where training/testing datasets derived from this data should be stored;
-- ``OBJ_ID``: name of column in metadata.csv that contains a unique object identifier.
-- ``CHANNELS_METADATA``: name of csv file containing channels metadata (relative to ``DATA_DIR``).
+- ``OBJ_ID``: name of column in ``metadata.csv`` that contains a unique object identifier.
+- ``CHANNELS_METADATA``: name of CSV file containing channels metadata (relative to ``DATA_DIR``).
   Is expected to contain channel names in column "name".
 - ``CONDITIONS``: dictionary of conditions to be used for cVAE models.
   Keys are column names in ``metadata.csv``, and values are all possible values for this condition.
@@ -104,6 +107,8 @@ You can find a complete set of example parameter files `here <https://github.com
 
 The workflow consists of the following steps:
 
+- Setup up the config and download data by following along with the `Setup and download data tutorial`_.
+
 - Create a subsampled pixel-level dataset for neural network training.
   This is done either by using the API function :func:`campa.data.create_dataset` or by using the CLI::
 
@@ -121,7 +126,7 @@ The workflow consists of the following steps:
 - Cluster cVAE latent representation into CSLs.
   This is done in three steps:
 
-    - First, the the data is subsampled and clustered, because we would like the clustering
+    - First, the data is subsampled and clustered, because we would like the clustering
       to be interactive and feasible to compute on a laptop.
       If you have more time or access to GPUs, you could also consider to skip the subsampling
       step and cluster all data directly.
@@ -129,7 +134,7 @@ The workflow consists of the following steps:
 
         campa cluster <EXPERIMENT> create ...
 
-      Optionally, after this step a manual reclustering or annotation of clusters can be done.
+      Optionally, after this step a manual re-clustering or annotation of clusters can be done.
       See the `Cluster data into CSLs tutorial`_ for more details
 
     - To project the clustering to the entire dataset, the model needs to be used to predict the
@@ -147,7 +152,7 @@ The workflow consists of the following steps:
   For more information, see the `Cluster data into CSLs tutorial`_.
 
 - Extract features from CSLs to quantitatively compare molecular intensity differences and
-  spatial relocalisation of proteins in different conditions.
+  spatial re-localisation of proteins in different conditions.
   Use the API function :func:`campa.tl.extract_features` or the CLI::
 
     campa extract_features ...

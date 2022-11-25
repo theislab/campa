@@ -37,7 +37,7 @@ def thresholded_count(df, threshold=0.9):
     Parameters
     ----------
     threshold
-        Only consider large objects up to cumsum of 90% of the total area.
+        Only consider large objects up to the cumulative sum of 90% of the total area.
 
     Returns
     -------
@@ -53,14 +53,14 @@ def thresholded_median(df, threshold=0.9):
     Calculate median area of large CSL objects per cell.
 
     Sort objects by area (largest areas first)
-    and compute the median area of all objects that are below cumsum of threshold.
+    and compute the median area of all objects that are below cumulative sum of threshold.
     This is essentially a small object invariant way of computing median.
     Can be used as aggregation function in :meth:`FeatureExtractor.get_object_stats`.
 
     Parameters
     ----------
     threshold
-        Only consider large objects up to cumsum of 90% of the total area.
+        Only consider large objects up to the cumulative sum of 90% of the total area.
 
     Returns
     -------
@@ -76,7 +76,7 @@ def _thresholded_mask(df, threshold):
     Mask small objects in df.
 
     Sort objects by area (largest areas first)
-    and mask all objects that are below cumsum of threshold.
+    and mask all objects that are below cumulative sum of threshold.
     This is used by thresholded_median and thresholded_count.
 
     This is essentially a small object invariant way of computing median.
@@ -99,8 +99,8 @@ def extract_features(params: Mapping[str, Any]) -> None:
 
     Creates features :class:`anndata.AnnData` object.
 
-    Params determine what features are extracted from a given clustering.
-    The following keys in params are expected:
+    Parameters determine what features are extracted from a given clustering.
+    The following keys in ``params`` are expected:
 
     - ``experiment_dir``: path to experiment directory relative to campa_config.EXPERIMENT_DIR.
     - ``cluster_name``: name of clustering to use.
@@ -108,7 +108,7 @@ def extract_features(params: Mapping[str, Any]) -> None:
       Relative to experiment_dir.
       Default is taking first of ``experiment_dir/aggregated/sub-*``.
     - ``cluster_col``: cluster annotation to use. Defaults to ``cluster_name``.
-    - ``data_dirs``: data dirs to be processed.
+    - ``data_dirs``: data directories to be processed.
       Relative to ``experiment_dir/aggregated/full_data``.
       If None, all available data_dirs will be processed.
     - ``save_name``: filename to use for saving extracted features.
@@ -267,6 +267,11 @@ class FeatureExtractor:
             ].astype(str)
             # prepare according to data_params
             data_params = deepcopy(self.exp.data_params)
+            if not self.exp.is_trainable:
+                # for non-trainable models, latent rep is mpp.
+                # if mpp is present in data_dir, this will overwrite the base_data_dir mpp
+                # but mpp present in data_dir is normalised already -> skip normalisation in mpp_data.prepare()
+                data_params["normalise"] = False
             self._mpp_data.prepare(data_params)
         return self._mpp_data
 
@@ -446,7 +451,7 @@ class FeatureExtractor:
                         elif feature == "circularity":
                             # circularity can max be 1,
                             # larger values are due to tiny regions where perimeter is overestimated
-                            features[feature].append(min(4 * np.pi * region.area / region.perimeter ** 2, 1))
+                            features[feature].append(min(4 * np.pi * region.area / region.perimeter**2, 1))
                         elif feature == "elongation":
                             features[feature].append(
                                 (region.major_axis_length - region.minor_axis_length) / region.major_axis_length
@@ -479,9 +484,10 @@ class FeatureExtractor:
         num_processes: Optional[int] = None,
     ) -> None:
         """
-        Extract co_occurrence for each cell invididually.
+        Extract co-occurrence for each cell individually.
 
-        TODO: add reset flag, that sets existing co-occ matrices to 0 before running co_occ algo.
+        TODO: add reset flag, that sets existing co-occurrence matrices to 0 before running
+        co-occurrence algorithm.
 
         Parameters
         ----------
@@ -778,7 +784,7 @@ class FeatureExtractor:
             If None, all clusters are displayed.
         """
         if self.adata is None or "object_stats_agg" not in self.adata.obsm:
-            self.log.warn(
+            self.log.warning(
                 "Object stats information is not present.\
                 Run extract_object_stats and get_objects_stats first! Exiting."
             )
@@ -829,21 +835,30 @@ class FeatureExtractor:
             List of cluster names for which pairwise co_occurrence scores should be calculated
         """
         if self.adata is None:
-            self.log.warn("Co-occurrence information is not present. Calculate extract_co_occurrence first! Exiting.")
+            self.log.warning(
+                "Co-occurrence information is not present. Calculate extract_co_occurrence first! Exiting."
+            )
             return
         if clusters is None:
             clusters = self.adata.uns["clusters"]
         for c1 in clusters:
             for c2 in clusters:
-                columns = list(
-                    map(
-                        lambda x: f"{x[0]:.2f}-{x[1]:.2f}",
-                        zip(
-                            self.adata.uns["co_occurrence_params"]["interval"][:-1],
-                            self.adata.uns["co_occurrence_params"]["interval"][1:],
-                        ),
+                # columns = list(
+                #    map(
+                #        lambda x: f"{x[0]:.2f}-{x[1]:.2f}",
+                #        zip(
+                #            self.adata.uns["co_occurrence_params"]["interval"][:-1],
+                #            self.adata.uns["co_occurrence_params"]["interval"][1:],
+                #        ),
+                #    )
+                # )
+                columns = [
+                    f"{x0:.2f}-{x1:.2f}"
+                    for x0, x1 in zip(
+                        self.adata.uns["co_occurrence_params"]["interval"][:-1],
+                        self.adata.uns["co_occurrence_params"]["interval"][1:],
                     )
-                )
+                ]
                 df = self.adata.obsm[f"co_occurrence_{c1}_{c2}"].copy()
                 df.columns = columns
                 # add obj_id
@@ -879,8 +894,7 @@ class FeatureExtractor:
                 for c2 in self.clusters:
                     self.adata.obsm[f"co_occurrence_{c1}_{c2}"]
                     mask1 = (self.adata.obsm[f"co_occurrence_{c1}_{c2}"] == 0).all(axis=1)
-                    mask2 = pd.isna(self.adata.obsm["co_occurrence_Cajal bodies_Cajal bodies"]).all(axis=1)
-                    masks.append(mask1 | mask2)
+                    masks.append(mask1)
             obj_ids = np.array(self.adata[np.array(masks).T.all(axis=1)].obs[OBJ_ID]).astype(np.uint32)
             return obj_ids
 
@@ -903,7 +917,22 @@ class FeatureExtractor:
         """
 
         def array_comp(arr1, arr2):
-            comp = arr1 == arr2
+            if type(arr1) == pd.DataFrame:
+                if type(arr2) == pd.DataFrame:
+                    if (arr1.columns != arr2.columns).any():
+                        return False
+                    for c in arr1:
+                        if not array_comp(arr1[c], arr2[c]):
+                            return False
+                    return True
+                else:
+                    return False
+            if arr1.shape != arr2.shape:
+                return False
+            if arr1.dtype == object:
+                comp = arr1 == arr2
+            else:
+                comp = np.isclose(arr1, arr2)
             if comp is False:
                 return False
             else:
@@ -929,7 +958,7 @@ class FeatureExtractor:
                 # params are experiment specific, but here we just care about the resulting values
                 continue
             if key == "object_stats":
-                res["uns"][key] = self.adata.uns[key].equals(obj.adata.uns[key])
+                res["uns"][key] = array_comp(self.adata.uns[key], obj.adata.uns[key])
             elif key == "clusters":
                 res["uns"][key] = array_comp(self.adata.uns[key], obj.adata.uns[key])
             elif key in ("object_stats_params", "co_occurrence_params"):

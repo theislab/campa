@@ -34,7 +34,7 @@ def load_example_data(data_dir: Path_t = None) -> Path_t:
     folder_dir = load_dataset(
         dataset_path=data_dir,
         fname=fname,
-        backup_url="https://figshare.com/ndownloader/files/34987036",
+        backup_url="https://figshare.com/ndownloader/files/38021094",
     )
 
     return folder_dir
@@ -55,7 +55,7 @@ def load_example_experiment(experiment_dir: Path_t = None) -> Path_t:
     """
     if experiment_dir is None:
         experiment_dir = Path(__file__).parent.parent.parent / "notebooks" / "example_experiments"
-    url = "https://figshare.com/ndownloader/files/34987534"
+    url = "https://figshare.com/ndownloader/files/38021925"
 
     uncpacked_dir = Path(os.path.join(experiment_dir, "test_pre_trained"))
     archive_path = Path(os.path.join(experiment_dir, "test_pre_trained.zip"))
@@ -104,11 +104,10 @@ def load_dataset(dataset_path: Path_t, fname: str, backup_url: str) -> Path_t:
     """
     Load dataset (from URL).
 
-    In dataset_path, creates ierarhy of folders "raw", "archive".
-    If unpacked files are already stored in "raw" doesn't do anything.
-    Otherwise checks for archive file in "archive" folder and unpacks it into "raw" folder.
-    If no files are present there, attempts to load the dataset from URL
-    into "archive" folder and then unpacks it into "raw" folder.
+    If unpacked files are already stored in `dataset_path/fname` don't do anything.
+    Otherwise check for archive file in `dataset_path/fname.zip` and unpack it into `dataset_path/fname`.
+    If no files are present there, attempt to load the dataset from URL
+    into  `dataset_path/fname.zip` and unpack it from there.
 
     Parameters
     ----------
@@ -123,8 +122,8 @@ def load_dataset(dataset_path: Path_t, fname: str, backup_url: str) -> Path_t:
     -------
     path to a folder where unpacked dataset is stored
     """
-    uncpacked_dir = Path(os.path.join(dataset_path, fname, "raw"))
-    archive_path = Path(os.path.join(dataset_path, fname, "archive", f"{fname}.zip"))
+    uncpacked_dir = Path(os.path.join(dataset_path, fname))
+    archive_path = Path(os.path.join(dataset_path, fname, f"{fname}.zip"))
 
     os.makedirs(uncpacked_dir, exist_ok=True)
     foldercontent = os.listdir(str(uncpacked_dir))
